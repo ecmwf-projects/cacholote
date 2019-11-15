@@ -5,6 +5,9 @@ import importlib
 import inspect
 import json
 import operator
+import uuid
+
+import xarray as xr
 
 
 def uniquify_arguments(callable_, *args, **kwargs):
@@ -48,22 +51,49 @@ def uniquify_call_signature(callable_, *args, **kwargs):
     return call_signature
 
 
-class LocalFilesJSONENcoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, datetime.datetime):
-            return uniquify_call_signature(
-                "datetime:datetime.fromisoformat", o.isoformat()
-            )
-        return super(self, LocalFilesJSONENcoder).default(o)
+def filecache_default(o):
+    if isinstance(o, datetime.datetime):
+        return uniquify_call_signature("datetime:datetime.fromisoformat", o.isoformat())
+    elif isinstance(o, xr.Dataset):
+        try:
+            path = o.encoding["source"]
+            orig = xr.open_dataset(path)
+            if not o.identical(orig):
+                path = None
+        except:
+            path = None
+        if path is None:
+            path = f"./{uuid.uuid4()}.nc"
+            o.to_netcdf(path)
+        call_signature = {"type": "object/constructor"}
+        call_signature.update(uniquify_call_signature(xr.open_dataset, path))
+        return call_signature
+    raise TypeError("can't encode object")
 
 
-def jsonify(obj, cls=LocalFilesJSONENcoder):
-    return json.dumps(obj, separators=(",", ":"), cls=cls)
+def call(callable, args=(), kwargs={}):
+    func = import_object(callable)
+    return func(*args, **kwargs)
+
+
+def call_json(call_signature_json):
+    call_signature = json.loads(call_signature_json)
+    return call(**call_signature)
+
+
+def call_object_hook(o):
+    if o.pop("type", None) == "object/constructor" and "callable" in o:
+        return call(**o)
+    return o
+
+
+def jsonify(obj):
+    return json.dumps(obj, separators=(",", ":"), default=filecache_default)
 
 
 def uniquify_call_signature_json(callable_, *args, **kwargs):
     unique_call_signature = uniquify_call_signature(callable_, *args, **kwargs)
-    return jsonify(unique_call_signature, cls=LocalFilesJSONENcoder)
+    return jsonify(unique_call_signature)
 
 
 def hexdigestify(text):

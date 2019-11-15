@@ -22,7 +22,10 @@ def test_uniquify_arguments():
     assert callcache.uniquify_arguments(len, "test") == (("test",), {})
 
     expected_2 = (("2019-01-01",), {})
-    assert callcache.uniquify_arguments(datetime.datetime.isoformat, "2019-01-01") == expected_2
+    assert (
+        callcache.uniquify_arguments(datetime.datetime.isoformat, "2019-01-01")
+        == expected_2
+    )
 
 
 def test_uniquify_arguments_order():
@@ -59,9 +62,10 @@ def test_import_object():
 def test_uniquify_call_signature():
     expected = {"callable": "test:test"}
 
-    res = callcache.uniquify_call_signature('test:test')
+    res = callcache.uniquify_call_signature("test:test")
 
     assert res == expected
+
 
 def test_uniquify_call_signature_json():
     expected = '{"callable":"test_callcache:func","args":[1,2],"kwargs":{"c":null,"d":false,"e":4,"f":5}}'
@@ -88,3 +92,11 @@ def test_uniquify_call_signatures():
     )
     assert res_json == expected_json
     assert res_hexdigest == expected_hexdigest
+
+
+def test_call_json():
+    call_signature_json = callcache.uniquify_call_signature_json(len, "test")
+
+    res = callcache.call_json(call_signature_json)
+
+    assert res == 4
