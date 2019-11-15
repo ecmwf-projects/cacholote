@@ -1,3 +1,4 @@
+import datetime
 import functools
 import hashlib
 import importlib
@@ -6,11 +7,15 @@ import json
 import operator
 
 
-def make_unique_arguments(callable_, *args, **kwargs):
-    bound_arguments = inspect.signature(callable_).bind(*args, **kwargs)
-    bound_arguments.apply_defaults()
-    sorted_kwargs = sorted(bound_arguments.kwargs.items(), key=operator.itemgetter(0))
-    return bound_arguments.args, dict(sorted_kwargs)
+def uniquify_arguments(callable_, *args, **kwargs):
+    try:
+        bound_arguments = inspect.signature(callable_).bind(*args, **kwargs)
+        bound_arguments.apply_defaults()
+        args, kwargs = bound_arguments.args, bound_arguments.kwargs
+    except:
+        pass
+    sorted_kwargs = sorted(kwargs.items(), key=operator.itemgetter(0))
+    return args, dict(sorted_kwargs)
 
 
 def inspect_fully_qualified_name(obj):
@@ -29,24 +34,36 @@ def import_object(fully_qualified_name):
     return obj
 
 
-def make_unique_call_signature(callable_, *args, **kwargs):
-    fully_qualified_name = inspect_fully_qualified_name(callable_)
-    unique_args, unique_kwargs = make_unique_arguments(callable_, *args, **kwargs)
-    unique_call_signature = {
-        "callable": fully_qualified_name,
-        "args": unique_args,
-        "kwargs": unique_kwargs,
-    }
-    return unique_call_signature
+def uniquify_call_signature(callable_, *args, **kwargs):
+    if isinstance(callable_, str):
+        fully_qualified_name = callable_
+    else:
+        fully_qualified_name = inspect_fully_qualified_name(callable_)
+    args, kwargs = uniquify_arguments(callable_, *args, **kwargs)
+    call_signature = {"callable": fully_qualified_name}
+    if args:
+        call_signature["args"] = args
+    if kwargs:
+        call_signature["kwargs"] = kwargs
+    return call_signature
 
 
-def jsonify(obj):
-    return json.dumps(obj, separators=(",", ":"))
+class LocalFilesJSONENcoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime.datetime):
+            return uniquify_call_signature(
+                "datetime:datetime.fromisoformat", o.isoformat()
+            )
+        return super(self, LocalFilesJSONENcoder).default(o)
 
 
-def make_unique_call_signature_json(callable_, *args, **kwargs):
-    unique_call_signature = make_unique_call_signature(callable_, *args, **kwargs)
-    return jsonify(unique_call_signature)
+def jsonify(obj, cls=LocalFilesJSONENcoder):
+    return json.dumps(obj, separators=(",", ":"), cls=cls)
+
+
+def uniquify_call_signature_json(callable_, *args, **kwargs):
+    unique_call_signature = uniquify_call_signature(callable_, *args, **kwargs)
+    return jsonify(unique_call_signature, cls=LocalFilesJSONENcoder)
 
 
 def hexdigestify(text):
@@ -54,8 +71,8 @@ def hexdigestify(text):
     return hash_req.hexdigest()
 
 
-def make_unique_call_signatures(callable_, *args, **kwargs):
-    call_signature = make_unique_call_signature(callable_, *args, **kwargs)
+def uniquify_call_signatures(callable_, *args, **kwargs):
+    call_signature = uniquify_call_signature(callable_, *args, **kwargs)
     call_signature_json = jsonify(call_signature)
     return call_signature, call_signature_json, hexdigestify(call_signature_json)
 
@@ -71,7 +88,7 @@ def cacheable(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            signatures = make_unique_call_signatures(func, *args, **kwargs)
+            signatures = uniquify_call_signatures(func, *args, **kwargs)
         except TypeError:
             print(f"UNCACHEABLE: {args} {kwargs}")
             return func(*args, **kwargs)
