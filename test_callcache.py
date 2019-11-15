@@ -57,14 +57,18 @@ def test_make_unique_call_signature_json():
     assert res == expected
 
 
-def test_make_unique_call_signature_hexdigest():
+def test_make_unique_call_signatures():
     expected_json = '{"callable":"test_callcache:func","args":[1,2],"kwargs":{"c":null,"d":false,"e":4,"f":5}}'
-    expected_hexdigest = 'fe799885cb9de3c6c8fae87fa7783577eea267e721a70fefb3aaea95'
+    expected_hexdigest = "fe799885cb9de3c6c8fae87fa7783577eea267e721a70fefb3aaea95"
 
-    res_json, res_hexdigest = callcache.make_unique_call_signature_hexdigest(func, 1, 2, e=4, f=5)
+    _, res_json, res_hexdigest = callcache.make_unique_call_signatures(
+        func, 1, 2, e=4, f=5
+    )
     assert res_json == expected_json
     assert res_hexdigest == expected_hexdigest
 
-    res_json, res_hexdigest = callcache.make_unique_call_signature_hexdigest(func, f=5, d=False, b=2, a=1, e=4)
+    _, res_json, res_hexdigest = callcache.make_unique_call_signatures(
+        func, f=5, d=False, b=2, a=1, e=4
+    )
     assert res_json == expected_json
     assert res_hexdigest == expected_hexdigest

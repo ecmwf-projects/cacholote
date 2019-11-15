@@ -1,3 +1,4 @@
+import functools
 import hashlib
 import importlib
 import inspect
@@ -48,12 +49,40 @@ def make_unique_call_signature_json(callable_, *args, **kwargs):
     return jsonify(unique_call_signature)
 
 
-def hexdigest(text):
+def hexdigestify(text):
     hash_req = hashlib.sha3_224(text.encode())
     return hash_req.hexdigest()
 
 
-def make_unique_call_signature_hexdigest(callable_, *args, **kwargs):
-    unique_call_signature = make_unique_call_signature(callable_, *args, **kwargs)
-    unique_call_signature_json = jsonify(unique_call_signature)
-    return unique_call_signature_json, hexdigest(unique_call_signature_json)
+def make_unique_call_signatures(callable_, *args, **kwargs):
+    call_signature = make_unique_call_signature(callable_, *args, **kwargs)
+    call_signature_json = jsonify(call_signature)
+    return call_signature, call_signature_json, hexdigestify(call_signature_json)
+
+
+CACHE = {}
+
+
+def invalidate_entry(hexdigest):
+    return CACHE.pop(hexdigest, None)
+
+
+def cacheable(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            signatures = make_unique_call_signatures(func, *args, **kwargs)
+        except TypeError:
+            print(f"UNCACHEABLE: {args} {kwargs}")
+            return func(*args, **kwargs)
+
+        signature_dict, signature_json, hexdigest = signatures
+        if hexdigest not in CACHE:
+            print(f"MISS: {hexdigest} {signature_json}")
+            result = func(*signature_dict["args"], **signature_dict["kwargs"])
+            CACHE[hexdigest] = (signature_json, result)
+        else:
+            print(f"HIT: {hexdigest}")
+        return CACHE[hexdigest][1]
+
+    return wrapper
