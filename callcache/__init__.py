@@ -61,8 +61,8 @@ def filecache_default(o):
         return call_signature
     elif callable(o):
         object_json = {
-            'type': 'python_object',
-            'fully_qualified_name': inspect_fully_qualified_name(o)
+            "type": "python_object",
+            "fully_qualified_name": inspect_fully_qualified_name(o),
         }
         return object_json
     raise TypeError("can't encode object")
@@ -89,14 +89,11 @@ def uniquify_call_signatures(callable_, *args, **kwargs):
 
 
 def make_call_signature_json(func, args=(), kwargs={}):
-    call_simple = {
-        'type': 'python_call',
-        'callable': func,
-    }
+    call_simple = {"type": "python_call", "callable": func}
     if args:
-        call_simple['args'] = args
+        call_simple["args"] = args
     if kwargs:
-        call_simple['kwargs'] = kwargs
+        call_simple["kwargs"] = kwargs
     return json.dumps(call_simple, default=filecache_default)
 
 
