@@ -31,6 +31,14 @@ def test_object_hook():
     res = decode.object_hook(len_call_simple)
     assert res == len("test")
 
+    len_call_simple = {
+        "type": "python_call",
+        "callable": "builtins:len",
+        "args": ["test"],
+    }
+    res = decode.object_hook(len_call_simple)
+    assert res == len("test")
+
     unsupported_object = {"key": 1}
     res = decode.object_hook(unsupported_object)
     assert res is unsupported_object

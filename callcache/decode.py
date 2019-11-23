@@ -17,7 +17,11 @@ def object_hook(o):
     if o.get("type") == "python_object" and "fully_qualified_name" in o:
         o = import_object(o["fully_qualified_name"])
     elif o.get("type") == "python_call" and "callable" in o:
-        o = o["callable"](*o.get("args", ()), **o.get("kwargs", {}))
+        if callable(o["callable"]):
+            func = o["callable"]
+        else:
+            func = import_object(o["callable"])
+        o = func(*o.get("args", ()), **o.get("kwargs", {}))
     return o
 
 
