@@ -56,7 +56,7 @@ def test_dictify_pd_dataframe(tmpdir):
     res = extra_encoders.dictify_pd_dataframe(data, cache_root)
     assert res == expected
 
-    data_name1 = '91aae6e1ff77e0cde8413be9226a3453162d06616419106b200ee94d.csv'
+    data_name1 = "91aae6e1ff77e0cde8413be9226a3453162d06616419106b200ee94d.csv"
     data_path1 = os.path.join(cache_root, data_name1)
     expected = {
         "type": "python_call",

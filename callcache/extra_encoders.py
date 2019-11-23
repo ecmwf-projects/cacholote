@@ -29,6 +29,7 @@ def dictify_xr_dataset(o, cache_root=".", file_name_template="{uuid}.nc"):
 
 def dictify_pd_dataframe(o, cache_root=".", file_name_template="{uuid}.csv"):
     import dask.base
+
     uuid = cache.hexdigestify(str(dask.base.normalize_token(o)))
     file_name = file_name_template.format(**locals())
     path = pathlib.Path(cache_root).absolute() / file_name
