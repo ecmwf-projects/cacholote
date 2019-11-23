@@ -29,10 +29,6 @@ def test_cacheable():
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
     assert cache.CACHE_STATS["hit"] == 1
 
-    res = cfunc(b=None, a="test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert cache.CACHE_STATS["hit"] == 2
-
     class Dummy:
         pass
 
