@@ -1,9 +1,7 @@
 import datetime
+import collections.abc
 import inspect
 import json
-import uuid
-
-import xarray as xr
 
 
 def inspect_fully_qualified_name(obj):
@@ -13,9 +11,16 @@ def inspect_fully_qualified_name(obj):
 
 
 def dictify_python_object(obj):
+    if isinstance(obj, str):
+        # NOTE: a stricter test would be decode.import_object(obj)
+        if ":" not in obj:
+            raise ValueError(f"{obj} not in the form 'module:qualname'")
+        fully_qualified_name = obj
+    else:
+        fully_qualified_name = inspect_fully_qualified_name(obj)
     object_simple = {
         "type": "python_object",
-        "fully_qualified_name": inspect_fully_qualified_name(obj),
+        "fully_qualified_name": fully_qualified_name,
     }
     return object_simple
 
@@ -30,23 +35,36 @@ def dictify_python_call(func, *args, **kwargs):
     return python_call_simple
 
 
-def filecache_default(o):
-    if isinstance(o, datetime.datetime):
-        return dictify_python_call(datetime.datetime.fromisoformat, o.isoformat())
-    elif isinstance(o, xr.Dataset):
-        try:
-            path = o.encoding["source"]
-            orig = xr.open_dataset(path)
-            if not o.identical(orig):
-                path = None
-        except:
-            path = None
-        if path is None:
-            path = f"./{uuid.uuid4()}.nc"
-            o.to_netcdf(path)
-        return dictify_python_call(xr.open_dataset, path)
-    elif callable(o):
-        return dictify_python_object(o)
+def dictify_datetime(o):
+    # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
+    return dictify_python_call("datetime:datetime.fromisoformat", o.isoformat())
+
+
+def dictify_date(o):
+    return dictify_python_call("datetime:date.fromisoformat", o.isoformat())
+
+
+def dictify_timedelta(o):
+    return dictify_python_call("datetime:timedelta", o.days, o.seconds, o.microseconds)
+
+
+def dictify_bytes(o):
+    return dictify_python_call(bytes, list(o))
+
+
+FILECACHE_ENCODERS = {
+    datetime.datetime: dictify_datetime,
+    datetime.date: dictify_date,
+    datetime.timedelta: dictify_timedelta,
+    bytes: dictify_bytes,
+    collections.abc.Callable: dictify_python_object,
+}
+
+
+def filecache_default(o, encoders=FILECACHE_ENCODERS):
+    for test, encoder in encoders.items():
+        if isinstance(o, test):
+            return encoder(o)
     raise TypeError("can't encode object")
 
 
