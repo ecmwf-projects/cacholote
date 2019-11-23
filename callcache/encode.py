@@ -1,7 +1,10 @@
-import datetime
+import binascii
 import collections.abc
+import datetime
 import inspect
 import json
+import logging
+import pickle
 
 
 def inspect_fully_qualified_name(obj):
@@ -49,24 +52,40 @@ def dictify_timedelta(o):
 
 
 def dictify_bytes(o):
-    return dictify_python_call(bytes, list(o))
+    return dictify_python_call(
+        binascii.a2b_base64, binascii.b2a_base64(o).decode("ascii")
+    )
 
 
-FILECACHE_ENCODERS = {
-    datetime.datetime: dictify_datetime,
-    datetime.date: dictify_date,
-    datetime.timedelta: dictify_timedelta,
-    bytes: dictify_bytes,
-    collections.abc.Callable: dictify_python_object,
-}
+def dictify_pickable(o):
+    return dictify_python_call(pickle.loads, pickle.dumps(o))
 
 
-def filecache_default(o, encoders=FILECACHE_ENCODERS):
-    for test, encoder in encoders.items():
+FILECACHE_ENCODERS = [
+    (bytes, dictify_bytes),
+    (datetime.datetime, dictify_datetime),
+    (datetime.date, dictify_date),
+    (datetime.timedelta, dictify_timedelta),
+    (collections.abc.Callable, dictify_python_object),
+    (object, dictify_pickable),
+]
+
+
+def filecache_default(o, errors="warn", encoders=FILECACHE_ENCODERS):
+    for test, encoder in encoders:
         if isinstance(o, test):
-            return encoder(o)
+            try:
+                return encoder(o)
+            except Exception:
+                if errors == "warn":
+                    logging.exception("can't pickle object")
     raise TypeError("can't encode object")
 
 
 def dumps(obj, separators=(",", ":"), **kwargs):
     return json.dumps(obj, separators=separators, default=filecache_default, **kwargs)
+
+
+def dumps_python_call(func, *args, **keargs):
+    python_call = dictify_python_call(func, *args, **keargs)
+    return dumps(python_call)

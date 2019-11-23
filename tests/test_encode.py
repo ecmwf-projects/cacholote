@@ -69,11 +69,16 @@ def test_filecache_default():
     res = encode.filecache_default(date)
     assert res == expected
 
-    data = bytes(list(range(255)))
+    data = bytes(list(range(20)) + list(range(225, 256)))
     expected = {
         "type": "python_call",
-        "callable": {"type": "python_object", "fully_qualified_name": "builtins:bytes"},
-        "args": (list(range(255)),),
+        "callable": {
+            "type": "python_object",
+            "fully_qualified_name": "binascii:a2b_base64",
+        },
+        "args": (
+            "AAECAwQFBgcICQoLDA0ODxAREhPh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/\n",
+        ),
     }
     res = encode.filecache_default(data)
     assert res == expected
@@ -83,6 +88,9 @@ def test_filecache_default():
 
     with pytest.raises(TypeError):
         encode.filecache_default(Dummy())
+
+    with pytest.raises(TypeError):
+        encode.filecache_default(Dummy(), errors="ignore")
 
 
 def test_roundtrip():
@@ -100,3 +108,17 @@ def test_roundtrip():
 
     data = datetime.timedelta(234, 23, 128736)
     assert decode.loads(encode.dumps(data)) == data
+
+    # pickle encode / decode
+    data = datetime.timezone(datetime.timedelta(seconds=3600))
+    assert decode.loads(encode.dumps(data)) == data
+
+
+def test_dumps_python_call():
+    expected = r'{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"datetime:datetime"},"args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"_pickle:loads"},"args":[{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"binascii:a2b_base64"},"args":["gANjZGF0ZXRpbWUKdGltZXpvbmUKcQBjZGF0ZXRpbWUKdGltZWRlbHRhCnEBSwBNEA5LAIdxAlJxA4VxBFJxBS4=\n"]}]}}}'
+    tzinfo = datetime.timezone(datetime.timedelta(seconds=3600))
+    res = encode.dumps_python_call("datetime:datetime", 2019, 1, 1, tzinfo=tzinfo)
+    assert res == expected
+
+    res_decoded = decode.loads(res)
+    assert res_decoded == datetime.datetime(2019, 1, 1, tzinfo=tzinfo)
