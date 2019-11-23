@@ -8,7 +8,7 @@ import uuid
 
 import xarray as xr
 
-from .decode import call_object_hook
+from .decode import object_hook, loads
 
 
 def uniquify_arguments(callable_, *args, **kwargs):

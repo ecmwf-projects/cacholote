@@ -13,7 +13,7 @@ def import_object(fully_qualified_name):
     return obj
 
 
-def call_object_hook(o):
+def object_hook(o):
     if o.get("type") == "python_object" and "fully_qualified_name" in o:
         o = import_object(o["fully_qualified_name"])
     elif o.get("type") == "python_call" and "callable" in o:
@@ -22,4 +22,4 @@ def call_object_hook(o):
 
 
 def loads(obj, **kwargs):
-    return json.loads(obj, object_hook=call_object_hook, **kwargs)
+    return json.loads(obj, object_hook=object_hook, **kwargs)

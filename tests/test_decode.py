@@ -15,7 +15,7 @@ def test_import_object():
         decode.import_object("builtins.len")
 
 
-def test_call_object_hook():
+def test_object_hook():
     maxyear_simple = {
         "type": "python_object",
         "fully_qualified_name": "builtins:OSError",
