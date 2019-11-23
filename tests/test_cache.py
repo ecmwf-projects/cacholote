@@ -5,8 +5,10 @@ def func(a, *args, b=None, **kwargs):
     if b is None:
         return locals()
     else:
+
         class LocalClass:
             pass
+
         return LocalClass()
 
 
@@ -27,6 +29,10 @@ def test_cacheable():
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
     assert cache.CACHE_STATS["hit"] == 1
 
+    res = cfunc(b=None, a="test")
+    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
+    assert cache.CACHE_STATS["hit"] == 2
+
     class Dummy:
         pass
 
@@ -36,8 +42,5 @@ def test_cacheable():
     assert cache.CACHE_STATS["uncacheable_input"] == 1
 
     res = cfunc("test", b=1)
-    assert res.__class__.__name__ == 'LocalClass'
+    assert res.__class__.__name__ == "LocalClass"
     assert cache.CACHE_STATS["uncacheable_output"] == 1
-
-    print(cache.CACHE)
-    print(cache.CACHE_STATS)

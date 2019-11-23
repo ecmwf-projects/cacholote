@@ -6,6 +6,10 @@ from callcache import decode
 from callcache import encode
 
 
+def func(a, b, *args, c=None, d=False, **kwargs):
+    pass
+
+
 def test_inspect_fully_qualified_name():
     # Goedel-style self-reference :)
     res = encode.inspect_fully_qualified_name(test_inspect_fully_qualified_name)
@@ -28,6 +32,38 @@ def test_dictify_python_object():
 
     with pytest.raises(ValueError):
         encode.dictify_python_object("datetime.datetime.isoformat")
+
+
+def test_uniquify_call_arguments():
+    expected_1 = ((1, 2), {"c": None, "d": False, "e": 4})
+
+    assert encode.uniquify_call_arguments(func, 1, 2, e=4) == expected_1
+    assert encode.uniquify_call_arguments(func, e=4, b=2, a=1) == expected_1
+    assert encode.uniquify_call_arguments(func, c=None, e=4, b=2, a=1) == expected_1
+
+    expected_2 = ((1, 2, 3), {"c": None, "d": False, "e": 4})
+    assert encode.uniquify_call_arguments(func, 1, 2, 3, e=4) == expected_2
+    assert encode.uniquify_call_arguments(func, 1, 2, 3, e=4, c=None) == expected_2
+
+    assert encode.uniquify_call_arguments(len, "test") == (("test",), {})
+
+    expected_2 = (("2019-01-01",), {})
+    assert (
+        encode.uniquify_call_arguments(datetime.datetime.isoformat, "2019-01-01")
+        == expected_2
+    )
+
+
+def test_uniquify_call_arguments_order():
+    expected = [("c", None), ("d", False), ("e", 4), ("f", 5)]
+
+    _, res = encode.uniquify_call_arguments(func, 1, 2, e=4, f=5)
+
+    assert list(res.items()) == expected
+
+    _, res = encode.uniquify_call_arguments(func, 1, 2, f=5, e=4)
+
+    assert list(res.items()) == expected
 
 
 def test_dictify_python_call():
@@ -77,6 +113,7 @@ def test_filecache_default():
         "args": (
             b"\x80\x03cdatetime\ntimezone\nq\x00cdatetime\ntimedelta\nq\x01K\x00M\x10\x0eK\x00\x87q\x02Rq\x03\x85q\x04Rq\x05.",
         ),
+        "kwargs": {"encoding": "ASCII", "errors": "strict", "fix_imports": True},
     }
     res = encode.filecache_default(data)
     assert res == expected
@@ -113,7 +150,7 @@ def test_roundtrip():
 
 
 def test_dumps_python_call():
-    expected = r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads","args":[{"type":"python_call","callable":"binascii:a2b_base64","args":["gANjZGF0ZXRpbWUKdGltZXpvbmUKcQBjZGF0ZXRpbWUKdGltZWRlbHRhCnEBSwBNEA5LAIdxAlJxA4VxBFJxBS4=\n"]}]}}}'
+    expected = r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads","args":[{"type":"python_call","callable":"binascii:a2b_base64","args":["gANjZGF0ZXRpbWUKdGltZXpvbmUKcQBjZGF0ZXRpbWUKdGltZWRlbHRhCnEBSwBNEA5LAIdxAlJxA4VxBFJxBS4=\n"]}],"kwargs":{"encoding":"ASCII","errors":"strict","fix_imports":true}}}}'
     tzinfo = datetime.timezone(datetime.timedelta(seconds=3600))
     res = encode.dumps_python_call("datetime:datetime", 2019, 1, 1, tzinfo=tzinfo)
     assert res == expected
