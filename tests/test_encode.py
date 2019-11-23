@@ -70,6 +70,17 @@ def test_filecache_default():
     res = encode.filecache_default(data)
     assert res == expected
 
+    data = datetime.timezone(datetime.timedelta(seconds=3600))
+    expected = {
+        "type": "python_call",
+        "callable": "_pickle:loads",
+        "args": (
+            b"\x80\x03cdatetime\ntimezone\nq\x00cdatetime\ntimedelta\nq\x01K\x00M\x10\x0eK\x00\x87q\x02Rq\x03\x85q\x04Rq\x05.",
+        ),
+    }
+    res = encode.filecache_default(data)
+    assert res == expected
+
     class Dummy:
         pass
 
