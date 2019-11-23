@@ -50,17 +50,6 @@ def test_inspect_fully_qualified_name():
     assert res == "builtins:len"
 
 
-def test_import_object():
-    obj = callcache.import_object("test_callcache:func")
-    assert obj is func
-
-    obj = callcache.import_object("builtins:len")
-    assert obj is len
-
-    with pytest.raises(ValueError):
-        callcache.import_object("builtins.len")
-
-
 def test_uniquify_call_signature():
     expected = {"callable": "test:test"}
 
@@ -94,35 +83,3 @@ def test_uniquify_call_signatures():
     )
     assert res_json == expected_json
     assert res_hexdigest == expected_hexdigest
-
-
-def test_call_json():
-    call_signature_json = callcache.uniquify_call_signature_json(len, "test")
-
-    res = callcache.call_json(call_signature_json)
-
-    assert res == 4
-
-
-def test_call_object_hook():
-    maxyear_simple = {
-        "type": "python_object",
-        "fully_qualified_name": "datetime:MAXYEAR",
-    }
-    res = callcache.call_object_hook(maxyear_simple)
-    assert res is datetime.MAXYEAR
-
-    len_simple = {"type": "python_object", "fully_qualified_name": "builtins:len"}
-    res = callcache.call_object_hook(len_simple)
-    assert res is len
-
-    len_call_simple = {"type": "python_call", "callable": len, "args": ["test"]}
-    res = callcache.call_object_hook(len_call_simple)
-    assert res == len("test")
-
-
-def test_call_json():
-    len_call_json = '{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"builtins:int"}}'
-
-    res = json.loads(len_call_json, object_hook=callcache.call_object_hook)
-    assert res == int()
