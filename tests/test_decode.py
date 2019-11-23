@@ -20,19 +20,19 @@ def test_object_hook():
         "type": "python_object",
         "fully_qualified_name": "builtins:OSError",
     }
-    res = decode.call_object_hook(maxyear_simple)
+    res = decode.object_hook(maxyear_simple)
     assert res is OSError
 
     len_simple = {"type": "python_object", "fully_qualified_name": "builtins:len"}
-    res = decode.call_object_hook(len_simple)
+    res = decode.object_hook(len_simple)
     assert res is len
 
     len_call_simple = {"type": "python_call", "callable": len, "args": ["test"]}
-    res = decode.call_object_hook(len_call_simple)
+    res = decode.object_hook(len_call_simple)
     assert res == len("test")
 
     unsupported_object = {"key": 1}
-    res = decode.call_object_hook(unsupported_object)
+    res = decode.object_hook(unsupported_object)
     assert res is unsupported_object
 
 
