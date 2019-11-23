@@ -1,14 +1,16 @@
-import datetime
 import functools
 import hashlib
 import inspect
 import json
 import operator
-import uuid
 
-import xarray as xr
 
 from .decode import object_hook, loads
+from .encode import filecache_default, dumps
+
+from . import encode
+
+__all__ = ["dumps", "filecache_default", "loads", "object_hook"]
 
 
 def uniquify_arguments(callable_, *args, **kwargs):
@@ -22,17 +24,11 @@ def uniquify_arguments(callable_, *args, **kwargs):
     return args, dict(sorted_kwargs)
 
 
-def inspect_fully_qualified_name(obj):
-    """Return the fully qualified name of a python object."""
-    module = inspect.getmodule(obj)
-    return f"{module.__name__}:{obj.__qualname__}"
-
-
 def uniquify_call_signature(callable_, *args, **kwargs):
     if isinstance(callable_, str):
         fully_qualified_name = callable_
     else:
-        fully_qualified_name = inspect_fully_qualified_name(callable_)
+        fully_qualified_name = encode.inspect_fully_qualified_name(callable_)
     args, kwargs = uniquify_arguments(callable_, *args, **kwargs)
     call_signature = {"callable": fully_qualified_name}
     if args:
@@ -42,39 +38,9 @@ def uniquify_call_signature(callable_, *args, **kwargs):
     return call_signature
 
 
-def filecache_default(o):
-    if isinstance(o, datetime.datetime):
-        return uniquify_call_signature("datetime:datetime.fromisoformat", o.isoformat())
-    elif isinstance(o, xr.Dataset):
-        try:
-            path = o.encoding["source"]
-            orig = xr.open_dataset(path)
-            if not o.identical(orig):
-                path = None
-        except:
-            path = None
-        if path is None:
-            path = f"./{uuid.uuid4()}.nc"
-            o.to_netcdf(path)
-        call_signature = {"type": "python_call"}
-        call_signature.update(uniquify_call_signature(xr.open_dataset, path))
-        return call_signature
-    elif callable(o):
-        object_json = {
-            "type": "python_object",
-            "fully_qualified_name": inspect_fully_qualified_name(o),
-        }
-        return object_json
-    raise TypeError("can't encode object")
-
-
-def jsonify(obj):
-    return json.dumps(obj, separators=(",", ":"), default=filecache_default)
-
-
 def uniquify_call_signature_json(callable_, *args, **kwargs):
     unique_call_signature = uniquify_call_signature(callable_, *args, **kwargs)
-    return jsonify(unique_call_signature)
+    return encode.dumps(unique_call_signature)
 
 
 def hexdigestify(text):
@@ -84,7 +50,7 @@ def hexdigestify(text):
 
 def uniquify_call_signatures(callable_, *args, **kwargs):
     call_signature = uniquify_call_signature(callable_, *args, **kwargs)
-    call_signature_json = jsonify(call_signature)
+    call_signature_json = encode.dumps(call_signature)
     return call_signature, call_signature_json, hexdigestify(call_signature_json)
 
 

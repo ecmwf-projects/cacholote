@@ -1,7 +1,4 @@
 import datetime
-import json
-
-import pytest
 
 import callcache
 
@@ -40,14 +37,6 @@ def test_uniquify_arguments_order():
     _, res = callcache.uniquify_arguments(func, 1, 2, f=5, e=4)
 
     assert list(res.items()) == expected
-
-
-def test_inspect_fully_qualified_name():
-    res = callcache.inspect_fully_qualified_name(func)
-    assert res == "test_callcache:func"
-
-    res = callcache.inspect_fully_qualified_name(len)
-    assert res == "builtins:len"
 
 
 def test_uniquify_call_signature():
