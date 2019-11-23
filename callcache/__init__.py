@@ -69,6 +69,12 @@ def filecache_default(o):
         call_signature = {"type": "python_call"}
         call_signature.update(uniquify_call_signature(xr.open_dataset, path))
         return call_signature
+    elif callable(o):
+        object_json = {
+            'type': 'python_object',
+            'fully_qualified_name': inspect_fully_qualified_name(o)
+        }
+        return object_json
     raise TypeError("can't encode object")
 
 
@@ -100,6 +106,18 @@ def uniquify_call_signatures(callable_, *args, **kwargs):
     return call_signature, call_signature_json, hexdigestify(call_signature_json)
 
 
+def make_call_signature_json(func, args=(), kwargs={}):
+    call_simple = {
+        'type': 'python_call',
+        'callable': func,
+    }
+    if args:
+        call_simple['args'] = args
+    if kwargs:
+        call_simple['kwargs'] = kwargs
+    return json.dumps(call_simple, default=filecache_default)
+
+
 CACHE = {}
 
 
@@ -111,16 +129,16 @@ def cacheable(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            signatures = uniquify_call_signatures(func, *args, **kwargs)
+            call_siganture_json = make_call_signature_json(func, args, kwargs)
         except TypeError:
-            print(f"UNCACHEABLE: {args} {kwargs}")
+            print(f"UNCACHEABLE: {func} {args} {kwargs}")
             return func(*args, **kwargs)
 
-        signature_dict, signature_json, hexdigest = signatures
+        hexdigest = hexdigestify(call_siganture_json)
         if hexdigest not in CACHE:
-            print(f"MISS: {hexdigest} {signature_json}")
-            result = func(*signature_dict["args"], **signature_dict["kwargs"])
-            CACHE[hexdigest] = (signature_json, result)
+            print(f"MISS: {hexdigest} {call_siganture_json}")
+            result = func(*args, **kwargs)
+            CACHE[hexdigest] = (call_siganture_json, result)
         else:
             print(f"HIT: {hexdigest}")
         return CACHE[hexdigest][1]
