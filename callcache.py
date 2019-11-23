@@ -28,6 +28,7 @@ def inspect_fully_qualified_name(obj):
 
 
 def import_object(fully_qualified_name):
+    # FIXME: apply exclude/include-rules to `fully_qualified_name`
     if ":" not in fully_qualified_name:
         raise ValueError(f"{fully_qualified_name} not in the form 'module:qualname'")
     module_name, _, object_name = fully_qualified_name.partition(":")
@@ -65,25 +66,17 @@ def filecache_default(o):
         if path is None:
             path = f"./{uuid.uuid4()}.nc"
             o.to_netcdf(path)
-        call_signature = {"type": "object/constructor"}
+        call_signature = {"type": "python_call"}
         call_signature.update(uniquify_call_signature(xr.open_dataset, path))
         return call_signature
     raise TypeError("can't encode object")
 
 
-def call(callable, args=(), kwargs={}):
-    func = import_object(callable)
-    return func(*args, **kwargs)
-
-
-def call_json(call_signature_json):
-    call_signature = json.loads(call_signature_json)
-    return call(**call_signature)
-
-
 def call_object_hook(o):
-    if o.pop("type", None) == "object/constructor" and "callable" in o:
-        return call(**o)
+    if o.get("type") == "python_object" and "fully_qualified_name" in o:
+        o = import_object(o["fully_qualified_name"])
+    elif o.get("type") == "python_call" and "callable" in o:
+        o = o["callable"](*o.get("args", ()), **o.get("kwargs", {}))
     return o
 
 

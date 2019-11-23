@@ -1,4 +1,6 @@
 import datetime
+import json
+
 import pytest
 
 import callcache
@@ -100,3 +102,27 @@ def test_call_json():
     res = callcache.call_json(call_signature_json)
 
     assert res == 4
+
+
+def test_call_object_hook():
+    maxyear_simple = {
+        "type": "python_object",
+        "fully_qualified_name": "datetime:MAXYEAR",
+    }
+    res = callcache.call_object_hook(maxyear_simple)
+    assert res is datetime.MAXYEAR
+
+    len_simple = {"type": "python_object", "fully_qualified_name": "builtins:len"}
+    res = callcache.call_object_hook(len_simple)
+    assert res is len
+
+    len_call_simple = {"type": "python_call", "callable": len, "args": ["test"]}
+    res = callcache.call_object_hook(len_call_simple)
+    assert res == len("test")
+
+
+def test_call_json():
+    len_call_json = '{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"builtins:int"}}'
+
+    res = json.loads(len_call_json, object_hook=callcache.call_object_hook)
+    assert res == int()
