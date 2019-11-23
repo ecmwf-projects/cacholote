@@ -29,8 +29,8 @@ def dictify_python_object(obj):
 
 
 def dictify_python_call(func, *args, **kwargs):
-    callable_simple = dictify_python_object(func)
-    python_call_simple = {"type": "python_call", "callable": callable_simple}
+    callable_fqn = dictify_python_object(func)["fully_qualified_name"]
+    python_call_simple = {"type": "python_call", "callable": callable_fqn}
     if args:
         python_call_simple["args"] = args
     if kwargs:

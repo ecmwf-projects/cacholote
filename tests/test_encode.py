@@ -31,24 +31,17 @@ def test_dictify_python_object():
 
 
 def test_dictify_python_call():
-    expected0 = {
-        "type": "python_call",
-        "callable": {"type": "python_object", "fully_qualified_name": "builtins:int"},
-    }
+    expected0 = {"type": "python_call", "callable": "builtins:int"}
     res0 = encode.dictify_python_call(int)
     assert res0 == expected0
 
-    expected1 = {
-        "type": "python_call",
-        "callable": {"type": "python_object", "fully_qualified_name": "builtins:len"},
-        "args": ("test",),
-    }
+    expected1 = {"type": "python_call", "callable": "builtins:len", "args": ("test",)}
     res1 = encode.dictify_python_call(len, "test")
     assert res1 == expected1
 
     expected1 = {
         "type": "python_call",
-        "callable": {"type": "python_object", "fully_qualified_name": "builtins:int"},
+        "callable": "builtins:int",
         "args": ("2",),
         "kwargs": {"base": 2},
     }
@@ -60,10 +53,7 @@ def test_filecache_default():
     date = datetime.datetime.now()
     expected = {
         "type": "python_call",
-        "callable": {
-            "type": "python_object",
-            "fully_qualified_name": "datetime:datetime.fromisoformat",
-        },
+        "callable": "datetime:datetime.fromisoformat",
         "args": (date.isoformat(),),
     }
     res = encode.filecache_default(date)
@@ -72,10 +62,7 @@ def test_filecache_default():
     data = bytes(list(range(20)) + list(range(225, 256)))
     expected = {
         "type": "python_call",
-        "callable": {
-            "type": "python_object",
-            "fully_qualified_name": "binascii:a2b_base64",
-        },
+        "callable": "binascii:a2b_base64",
         "args": (
             "AAECAwQFBgcICQoLDA0ODxAREhPh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/\n",
         ),
@@ -115,7 +102,7 @@ def test_roundtrip():
 
 
 def test_dumps_python_call():
-    expected = r'{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"datetime:datetime"},"args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"_pickle:loads"},"args":[{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"binascii:a2b_base64"},"args":["gANjZGF0ZXRpbWUKdGltZXpvbmUKcQBjZGF0ZXRpbWUKdGltZWRlbHRhCnEBSwBNEA5LAIdxAlJxA4VxBFJxBS4=\n"]}]}}}'
+    expected = r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads","args":[{"type":"python_call","callable":"binascii:a2b_base64","args":["gANjZGF0ZXRpbWUKdGltZXpvbmUKcQBjZGF0ZXRpbWUKdGltZWRlbHRhCnEBSwBNEA5LAIdxAlJxA4VxBFJxBS4=\n"]}]}}}'
     tzinfo = datetime.timezone(datetime.timedelta(seconds=3600))
     res = encode.dumps_python_call("datetime:datetime", 2019, 1, 1, tzinfo=tzinfo)
     assert res == expected
