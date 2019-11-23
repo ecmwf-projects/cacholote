@@ -4,9 +4,14 @@ import pytest
 pd = pytest.importorskip("pandas")  # noqa
 xr = pytest.importorskip("xarray")  # noqa
 
+from callcache import cache
 from callcache import decode
 from callcache import encode
 from callcache import extra_encoders
+
+
+def func(a):
+    return a
 
 
 def test_dictify_xr_dataset(tmpdir):
@@ -71,3 +76,23 @@ def test_dictify_pd_dataframe(tmpdir):
 def test_roundtrip():
     data = xr.Dataset(data_vars={"data": [0]})
     assert decode.loads(encode.dumps(data)).identical(data)
+
+
+def test_caceable():
+    cfunc = cache.cacheable(func)
+    for key in cache.CACHE_STATS:
+        cache.CACHE_STATS[key] = 0
+
+    data = xr.Dataset(data_vars={"data": [0]})
+    res = cfunc(data)
+    assert res.identical(data)
+    assert cache.CACHE_STATS["miss"] == 1
+
+    # FIXME: why do we get two misses?
+    res = cfunc(data)
+    assert res.identical(data)
+    assert cache.CACHE_STATS["miss"] == 2
+
+    res = cfunc(data)
+    assert res.identical(data)
+    assert cache.CACHE_STATS["hit"] == 1

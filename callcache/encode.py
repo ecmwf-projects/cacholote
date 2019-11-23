@@ -63,17 +63,17 @@ def dictify_pickable(o):
 
 
 FILECACHE_ENCODERS = [
-    (bytes, dictify_bytes),
-    (datetime.datetime, dictify_datetime),
-    (datetime.date, dictify_date),
-    (datetime.timedelta, dictify_timedelta),
-    (collections.abc.Callable, dictify_python_object),
     (object, dictify_pickable),
+    (collections.abc.Callable, dictify_python_object),
+    (bytes, dictify_bytes),
+    (datetime.date, dictify_date),
+    (datetime.datetime, dictify_datetime),
+    (datetime.timedelta, dictify_timedelta),
 ]
 
 
 def filecache_default(o, errors="warn", encoders=FILECACHE_ENCODERS):
-    for test, encoder in encoders:
+    for test, encoder in reversed(encoders):
         if isinstance(o, test):
             try:
                 return encoder(o)
