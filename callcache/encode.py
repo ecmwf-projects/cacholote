@@ -52,9 +52,8 @@ def dictify_timedelta(o):
 
 
 def dictify_bytes(o):
-    return dictify_python_call(
-        binascii.a2b_base64, binascii.b2a_base64(o).decode("ascii")
-    )
+    ascii_decoded = binascii.b2a_base64(o).decode("ascii")
+    return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
 
 def dictify_pickable(o):
