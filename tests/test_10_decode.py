@@ -5,7 +5,7 @@ from callcache import decode
 
 def test_import_object():
     # Goedel-style self-reference :)
-    obj = decode.import_object("test_decode:test_import_object")
+    obj = decode.import_object("test_10_decode:test_import_object")
     assert obj is test_import_object
 
     obj = decode.import_object("builtins:len")

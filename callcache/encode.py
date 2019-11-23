@@ -29,19 +29,8 @@ def dictify_python_object(obj):
     return object_simple
 
 
-def uniquify_call_arguments(callable_, *args, **kwargs):
-    try:
-        bound_arguments = inspect.signature(callable_).bind(*args, **kwargs)
-        bound_arguments.apply_defaults()
-        args, kwargs = bound_arguments.args, bound_arguments.kwargs
-    except:
-        pass
-    sorted_kwargs = sorted(kwargs.items(), key=operator.itemgetter(0))
-    return args, dict(sorted_kwargs)
-
-
 def dictify_python_call(func, *args, **kwargs):
-    args, kwargs = uniquify_call_arguments(func, *args, **kwargs)
+    kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
     python_call_simple = {"type": "python_call", "callable": callable_fqn}
     if args:
