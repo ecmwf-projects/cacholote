@@ -1,7 +1,6 @@
 import os.path
 import pytest
 
-pd = pytest.importorskip("pandas")  # noqa
 xr = pytest.importorskip("xarray")  # noqa
 
 from callcache import cache
@@ -48,38 +47,14 @@ def test_dictify_xr_dataset(tmpdir):
         extra_encoders.dictify_xr_dataset(data, cache_root, data_name1)
 
 
-def test_dictify_pd_dataframe(tmpdir):
+def test_roundtrip(tmpdir):
     cache_root = str(tmpdir)
-    data_name = "72415954bda87fdd2bb934dd93aa137b7a78bcf580194b3fa90b81f7.csv"
-    data_path = os.path.join(cache_root, data_name)
-    data = pd.DataFrame({"data": [0]})
-    expected = {
-        "type": "python_call",
-        "callable": "pandas.io.parsers:_make_parser_function.<locals>.parser_f",
-        "args": (data_path,),
-    }
-    res = extra_encoders.dictify_pd_dataframe(data, cache_root)
-    assert res == expected
-
-    data_name1 = "91aae6e1ff77e0cde8413be9226a3453162d06616419106b200ee94d.csv"
-    data_path1 = os.path.join(cache_root, data_name1)
-    expected = {
-        "type": "python_call",
-        "callable": "pandas.io.parsers:_make_parser_function.<locals>.parser_f",
-        "args": (data_path1,),
-    }
-    data = pd.read_csv(data_path)
-    res = extra_encoders.dictify_pd_dataframe(data, cache_root)
-    assert res == expected
-
-
-def test_roundtrip():
     data = xr.Dataset(data_vars={"data": [0]})
-    assert decode.loads(encode.dumps(data)).identical(data)
+    assert decode.loads(encode.dumps(data, cache_root=cache_root)).identical(data)
 
 
-def test_caceable():
-    cfunc = cache.cacheable(func)
+def test_caceable(tmpdir):
+    cfunc = cache.cacheable(cache_root=str(tmpdir))(func)
     for key in cache.CACHE_STATS:
         cache.CACHE_STATS[key] = 0
 

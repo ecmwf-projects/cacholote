@@ -1,6 +1,7 @@
 import binascii
 import collections.abc
 import datetime
+import functools
 import inspect
 import json
 import logging
@@ -40,25 +41,25 @@ def dictify_python_call(func, *args, **kwargs):
     return python_call_simple
 
 
-def dictify_datetime(o):
+def dictify_datetime(o, **kwargs):
     # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
     return dictify_python_call("datetime:datetime.fromisoformat", o.isoformat())
 
 
-def dictify_date(o):
+def dictify_date(o, **kwargs):
     return dictify_python_call("datetime:date.fromisoformat", o.isoformat())
 
 
-def dictify_timedelta(o):
+def dictify_timedelta(o, **kwargs):
     return dictify_python_call("datetime:timedelta", o.days, o.seconds, o.microseconds)
 
 
-def dictify_bytes(o):
+def dictify_bytes(o, **kwargs):
     ascii_decoded = binascii.b2a_base64(o).decode("ascii")
     return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
 
-def dictify_pickable(o):
+def dictify_pickable(o, **kwargs):
     return dictify_python_call(pickle.loads, pickle.dumps(o))
 
 
@@ -72,21 +73,22 @@ FILECACHE_ENCODERS = [
 ]
 
 
-def filecache_default(o, errors="warn", encoders=FILECACHE_ENCODERS):
+def filecache_default(o, cache_root='.', errors="warn", encoders=FILECACHE_ENCODERS):
     for test, encoder in reversed(encoders):
         if isinstance(o, test):
             try:
-                return encoder(o)
+                return encoder(o, cache_root=cache_root)
             except Exception:
                 if errors == "warn":
                     logging.exception("can't pickle object")
     raise TypeError("can't encode object")
 
 
-def dumps(obj, separators=(",", ":"), **kwargs):
-    return json.dumps(obj, separators=separators, default=filecache_default, **kwargs)
+def dumps(obj, separators=(",", ":"), cache_root='.', **kwargs):
+    default = functools.partial(filecache_default, cache_root=cache_root)
+    return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
-def dumps_python_call(func, *args, **keargs):
-    python_call = dictify_python_call(func, *args, **keargs)
-    return dumps(python_call)
+def dumps_python_call(func, *args, dumps_cache_root='.', **kwargs):
+    python_call = dictify_python_call(func, *args, **kwargs)
+    return dumps(python_call, cache_root=dumps_cache_root)

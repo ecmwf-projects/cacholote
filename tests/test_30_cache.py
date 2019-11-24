@@ -20,7 +20,7 @@ def test_hexdigestify():
 
 
 def test_cacheable():
-    cfunc = cache.cacheable(func)
+    cfunc = cache.cacheable()(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
     assert cache.CACHE_STATS["miss"] == 1

@@ -14,31 +14,34 @@ def hexdigestify(text):
     return hash_req.hexdigest()
 
 
-def cacheable(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            call_siganture_json = dumps_python_call(func, *args, **kwargs)
-        except TypeError:
-            print(f"UNCACHEABLE INPUT: {func} {args} {kwargs}")
-            CACHE_STATS["uncacheable_input"] += 1
-            return func(*args, **kwargs)
-
-        hexdigest = hexdigestify(call_siganture_json)
-        if hexdigest not in CACHE:
-            result = func(*args, **kwargs)
+def cacheable(cache_root='.'):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
             try:
-                cached = dumps(result)
-                print(f"MISS: {hexdigest} {call_siganture_json}")
-                CACHE_STATS["miss"] += 1
-                CACHE[hexdigest] = cached
-            except Exception:
-                print(f"UNCACHEABLE OUTPUT: {func} {args} {kwargs}")
-                CACHE_STATS["uncacheable_output"] += 1
-                return result
-        else:
-            print(f"HIT: {hexdigest}")
-            CACHE_STATS["hit"] += 1
-        return loads(CACHE[hexdigest])
+                call_siganture_json = dumps_python_call(func, *args, dumps_cache_root=cache_root, **kwargs)
+            except TypeError:
+                print(f"UNCACHEABLE INPUT: {func} {args} {kwargs}")
+                CACHE_STATS["uncacheable_input"] += 1
+                return func(*args, **kwargs)
 
-    return wrapper
+            hexdigest = hexdigestify(call_siganture_json)
+            if hexdigest not in CACHE:
+                result = func(*args, **kwargs)
+                try:
+                    cached = dumps(result, cache_root=cache_root)
+                    print(f"MISS: {hexdigest} {call_siganture_json}")
+                    CACHE_STATS["miss"] += 1
+                    CACHE[hexdigest] = cached
+                except Exception:
+                    print(f"UNCACHEABLE OUTPUT: {func} {args} {kwargs}")
+                    CACHE_STATS["uncacheable_output"] += 1
+                    return result
+            else:
+                print(f"HIT: {hexdigest}")
+                CACHE_STATS["hit"] += 1
+            return loads(CACHE[hexdigest])
+
+        return wrapper
+
+    return decorator
