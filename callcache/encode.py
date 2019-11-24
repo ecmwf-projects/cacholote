@@ -73,22 +73,21 @@ FILECACHE_ENCODERS = [
 ]
 
 
-def filecache_default(o, cache_root=".", errors="warn", encoders=FILECACHE_ENCODERS):
+def filecache_default(o, filecache_root=".", encoders=FILECACHE_ENCODERS):
     for test, encoder in reversed(encoders):
         if isinstance(o, test):
             try:
-                return encoder(o, cache_root=cache_root)
+                return encoder(o, filecache_root=filecache_root)
             except Exception:
-                if errors == "warn":
-                    logging.exception("can't pickle object")
+                logging.exception("can't pickle object")
     raise TypeError("can't encode object")
 
 
-def dumps(obj, separators=(",", ":"), cache_root=".", **kwargs):
-    default = functools.partial(filecache_default, cache_root=cache_root)
+def dumps(obj, separators=(",", ":"), filecache_root=".", **kwargs):
+    default = functools.partial(filecache_default, filecache_root=filecache_root)
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
-def dumps_python_call(func, *args, _cache_root=".", **kwargs):
+def dumps_python_call(func, *args, _filecache_root=".", **kwargs):
     python_call = dictify_python_call(func, *args, **kwargs)
-    return dumps(python_call, cache_root=_cache_root)
+    return dumps(python_call, filecache_root=_filecache_root)

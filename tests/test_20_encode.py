@@ -91,9 +91,6 @@ def test_filecache_default():
     with pytest.raises(TypeError):
         encode.filecache_default(Dummy())
 
-    with pytest.raises(TypeError):
-        encode.filecache_default(Dummy(), errors="ignore")
-
 
 def test_roundtrip():
     data = len
