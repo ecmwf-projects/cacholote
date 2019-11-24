@@ -14,23 +14,25 @@ def hexdigestify(text):
     return hash_req.hexdigest()
 
 
-def cacheable(cache_root='.'):
+def cacheable(cache_root="."):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             try:
-                call_siganture_json = dumps_python_call(func, *args, dumps_cache_root=cache_root, **kwargs)
+                call_json = dumps_python_call(
+                    func, *args, _cache_root=cache_root, **kwargs
+                )
             except TypeError:
                 print(f"UNCACHEABLE INPUT: {func} {args} {kwargs}")
                 CACHE_STATS["uncacheable_input"] += 1
                 return func(*args, **kwargs)
 
-            hexdigest = hexdigestify(call_siganture_json)
+            hexdigest = hexdigestify(call_json)
             if hexdigest not in CACHE:
                 result = func(*args, **kwargs)
                 try:
                     cached = dumps(result, cache_root=cache_root)
-                    print(f"MISS: {hexdigest} {call_siganture_json}")
+                    print(f"MISS: {hexdigest} {call_json}")
                     CACHE_STATS["miss"] += 1
                     CACHE[hexdigest] = cached
                 except Exception:

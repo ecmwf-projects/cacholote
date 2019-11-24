@@ -73,7 +73,7 @@ FILECACHE_ENCODERS = [
 ]
 
 
-def filecache_default(o, cache_root='.', errors="warn", encoders=FILECACHE_ENCODERS):
+def filecache_default(o, cache_root=".", errors="warn", encoders=FILECACHE_ENCODERS):
     for test, encoder in reversed(encoders):
         if isinstance(o, test):
             try:
@@ -84,11 +84,11 @@ def filecache_default(o, cache_root='.', errors="warn", encoders=FILECACHE_ENCOD
     raise TypeError("can't encode object")
 
 
-def dumps(obj, separators=(",", ":"), cache_root='.', **kwargs):
+def dumps(obj, separators=(",", ":"), cache_root=".", **kwargs):
     default = functools.partial(filecache_default, cache_root=cache_root)
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
-def dumps_python_call(func, *args, dumps_cache_root='.', **kwargs):
+def dumps_python_call(func, *args, _cache_root=".", **kwargs):
     python_call = dictify_python_call(func, *args, **kwargs)
-    return dumps(python_call, cache_root=dumps_cache_root)
+    return dumps(python_call, cache_root=_cache_root)
