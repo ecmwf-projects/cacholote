@@ -20,7 +20,7 @@ class DictStore:
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
     def _prune(self):
-        while len(self.store) > self.max_count:
+        while len(self.store) >= self.max_count:
             self.store.popitem()
 
     def get(self, key):
@@ -34,8 +34,8 @@ class DictStore:
         self.stats["miss"] += 1
         return None
 
-    def set(self, key, value, timeout=2635200):
-        expires = time.time() + timeout
+    def set(self, key, value, expire=2635200):
+        expires = time.time() + expire
         self._prune()
         self.store[key] = (expires, value)
         return True
@@ -57,7 +57,7 @@ class MemcacheStore:
             self.stats["miss"] += 1
         else:
             self.stats["hit"] += 1
-        return value
+        return value and value.decode('utf-8')
 
 
 CACHE = DictStore()
