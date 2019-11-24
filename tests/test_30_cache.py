@@ -23,11 +23,11 @@ def test_cacheable():
     cfunc = cache.cacheable()(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert cache.CACHE_STATS["miss"] == 1
+    assert cache.CACHE.stats["miss"] == 1
 
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert cache.CACHE_STATS["hit"] == 1
+    assert cache.CACHE.stats["hit"] == 1
 
     class Dummy:
         pass
@@ -35,8 +35,8 @@ def test_cacheable():
     inst = Dummy()
     res = cfunc(inst)
     assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
-    assert cache.CACHE_STATS["uncacheable_input"] == 1
+    assert cache.CACHE.stats["bad_input"] == 1
 
     res = cfunc("test", b=1)
     assert res.__class__.__name__ == "LocalClass"
-    assert cache.CACHE_STATS["uncacheable_output"] == 1
+    assert cache.CACHE.stats["bad_output"] == 1

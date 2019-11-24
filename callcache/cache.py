@@ -1,12 +1,66 @@
 import functools
 import hashlib
+import time
+
+import heapdict
+import pymemcache.client.hash
 
 from .decode import loads
 from .encode import dumps_python_call, dumps
 
 
-CACHE = {}
-CACHE_STATS = {"hit": 0, "miss": 0, "uncacheable_input": 0, "uncacheable_output": 0}
+class DictStore:
+    def __init__(self, max_count=10000):
+        self.max_count = max_count
+        self.store = heapdict.heapdict()
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+
+    def clear(self):
+        self.store.clear()
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+
+    def _prune(self):
+        while len(self.store) > self.max_count:
+            self.store.popitem()
+
+    def get(self, key):
+        try:
+            expires, value = self.store[key]
+            if expires > time.time():
+                self.stats["hit"] += 1
+                return value
+        except KeyError:
+            pass
+        self.stats["miss"] += 1
+        return None
+
+    def set(self, key, value, timeout=2635200):
+        expires = time.time() + timeout
+        self._prune()
+        self.store[key] = (expires, value)
+        return True
+
+
+class MemcacheStore:
+    def __init__(self, servers=(("localhost", 11211),)):
+        self.client = pymemcache.client.hash.HashClient(servers)
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+        self.set = self.client.set
+
+    def clear(self):
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+        return self.client.flush_all()
+
+    def get(self, key):
+        value = self.client.get(key)
+        if value is None:
+            self.stats["miss"] += 1
+        else:
+            self.stats["hit"] += 1
+        return value
+
+
+CACHE = DictStore()
 
 
 def hexdigestify(text):
@@ -14,35 +68,31 @@ def hexdigestify(text):
     return hash_req.hexdigest()
 
 
-def cacheable(cache_root="."):
+def cacheable(cache_root=".", cache_store=None):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            nonlocal cache_store
+            cache_store = cache_store or CACHE
             try:
                 call_json = dumps_python_call(
                     func, *args, _cache_root=cache_root, **kwargs
                 )
             except TypeError:
-                print(f"UNCACHEABLE INPUT: {func} {args} {kwargs}")
-                CACHE_STATS["uncacheable_input"] += 1
+                cache_store.stats["bad_input"] += 1
                 return func(*args, **kwargs)
 
             hexdigest = hexdigestify(call_json)
-            if hexdigest not in CACHE:
+            cached = cache_store.get(hexdigest)
+            if cached is None:
                 result = func(*args, **kwargs)
                 try:
                     cached = dumps(result, cache_root=cache_root)
-                    print(f"MISS: {hexdigest} {call_json}")
-                    CACHE_STATS["miss"] += 1
-                    CACHE[hexdigest] = cached
+                    cache_store.set(hexdigest, cached)
                 except Exception:
-                    print(f"UNCACHEABLE OUTPUT: {func} {args} {kwargs}")
-                    CACHE_STATS["uncacheable_output"] += 1
+                    cache_store.stats["bad_output"] += 1
                     return result
-            else:
-                print(f"HIT: {hexdigest}")
-                CACHE_STATS["hit"] += 1
-            return loads(CACHE[hexdigest])
+            return loads(cached)
 
         return wrapper
 

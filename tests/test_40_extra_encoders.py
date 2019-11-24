@@ -55,19 +55,18 @@ def test_roundtrip(tmpdir):
 
 def test_caceable(tmpdir):
     cfunc = cache.cacheable(cache_root=str(tmpdir))(func)
-    for key in cache.CACHE_STATS:
-        cache.CACHE_STATS[key] = 0
+    cache.CACHE.clear()
 
     data = xr.Dataset(data_vars={"data": [0]})
     res = cfunc(data)
     assert res.identical(data)
-    assert cache.CACHE_STATS["miss"] == 1
+    assert cache.CACHE.stats["miss"] == 1
 
     # FIXME: why do we get two misses?
     res = cfunc(data)
     assert res.identical(data)
-    assert cache.CACHE_STATS["miss"] == 2
+    assert cache.CACHE.stats["miss"] == 2
 
     res = cfunc(data)
     assert res.identical(data)
-    assert cache.CACHE_STATS["hit"] == 1
+    assert cache.CACHE.stats["hit"] == 1
