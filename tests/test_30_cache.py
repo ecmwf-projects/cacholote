@@ -17,56 +17,56 @@ def func(a, *args, b=None, **kwargs):
 def test_DictStore():
     store = cache.DictStore(max_count=2)
 
-    store.set('1', 'a')
+    store.set("1", "a")
 
-    assert store.get('1') == 'a'
-    assert store.stats['hit'] == 1
+    assert store.get("1") == "a"
+    assert store.stats["hit"] == 1
 
-    store.set('2', 'b')
+    store.set("2", "b")
 
-    assert store.get('2') == 'b'
-    assert store.stats['hit'] == 2
+    assert store.get("2") == "b"
+    assert store.stats["hit"] == 2
 
-    store.set('3', 'c', expire=-1)
+    store.set("3", "c", expire=-1)
 
-    assert store.get('3') is None
-    assert store.stats['miss'] == 1
+    assert store.get("3") is None
+    assert store.stats["miss"] == 1
 
-    assert store.get('1') is None
-    assert store.stats['miss'] == 2
+    assert store.get("1") is None
+    assert store.stats["miss"] == 2
 
-    assert store.get('2') == 'b'
-    assert store.stats['hit'] == 3
+    assert store.get("2") == "b"
+    assert store.stats["hit"] == 3
 
     store.clear()
 
-    assert store.get('2') is None
-    assert store.stats['hit'] == 0
+    assert store.get("2") is None
+    assert store.stats["hit"] == 0
 
 
 @pytest.mark.xfail()
 def test_MemcacheStore():
     store = cache.MemcacheStore()
 
-    store.set('1', 'a')
+    store.set("1", "a")
 
-    assert store.get('1') == 'a'
-    assert store.stats['hit'] == 1
+    assert store.get("1") == "a"
+    assert store.stats["hit"] == 1
 
-    store.set('2', 'b')
+    store.set("2", "b")
 
-    assert store.get('2') == 'b'
-    assert store.stats['hit'] == 2
+    assert store.get("2") == "b"
+    assert store.stats["hit"] == 2
 
-    store.set('3', 'c', expire=-1)
+    store.set("3", "c", expire=-1)
 
-    assert store.get('3') is None
-    assert store.stats['miss'] == 1
+    assert store.get("3") is None
+    assert store.stats["miss"] == 1
 
     store.clear()
 
-    assert store.get('2') is None
-    assert store.stats['hit'] == 0
+    assert store.get("2") is None
+    assert store.stats["hit"] == 0
 
 
 def test_hexdigestify():

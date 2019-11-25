@@ -57,7 +57,7 @@ class MemcacheStore:
             self.stats["miss"] += 1
         else:
             self.stats["hit"] += 1
-        return value and value.decode('utf-8')
+        return value and value.decode("utf-8")
 
 
 CACHE = DictStore()

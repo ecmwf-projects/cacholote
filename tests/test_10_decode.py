@@ -5,11 +5,11 @@ from callcache import decode
 
 def test_import_object():
     # Goedel-style self-reference :)
-    obj = decode.import_object("test_10_decode:test_import_object")
-    assert obj is test_import_object
+    res = decode.import_object("test_10_decode:test_import_object")
+    assert res is test_import_object
 
-    obj = decode.import_object("builtins:len")
-    assert obj is len
+    res = decode.import_object("builtins:len")
+    assert res is len
 
     with pytest.raises(ValueError):
         decode.import_object("builtins.len")
