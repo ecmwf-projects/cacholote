@@ -16,11 +16,11 @@ def test_import_object():
 
 
 def test_object_hook():
-    maxyear_simple = {
+    object_simple = {
         "type": "python_object",
         "fully_qualified_name": "builtins:OSError",
     }
-    res = decode.object_hook(maxyear_simple)
+    res = decode.object_hook(object_simple)
     assert res is OSError
 
     len_simple = {"type": "python_object", "fully_qualified_name": "builtins:len"}
@@ -42,6 +42,10 @@ def test_object_hook():
     unsupported_object = {"key": 1}
     res = decode.object_hook(unsupported_object)
     assert res is unsupported_object
+
+    unsupported_type = {"type": "unsupported_type"}
+    res = decode.object_hook(unsupported_type)
+    assert res is unsupported_type
 
 
 def test_loads():

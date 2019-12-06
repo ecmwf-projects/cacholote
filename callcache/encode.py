@@ -74,8 +74,8 @@ FILECACHE_ENCODERS = [
 
 
 def filecache_default(o, filecache_root=".", encoders=FILECACHE_ENCODERS):
-    for test, encoder in reversed(encoders):
-        if isinstance(o, test):
+    for type_, encoder in reversed(encoders):
+        if isinstance(o, type_):
             try:
                 return encoder(o, filecache_root=filecache_root)
             except Exception:
