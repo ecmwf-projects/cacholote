@@ -47,9 +47,9 @@ def test_dictify_python_call():
         "type": "python_call",
         "callable": "builtins:int",
         "args": ("2",),
-        "kwargs": {"base": 2},
+        "kwargs": {"base": 3},
     }
-    res1 = encode.dictify_python_call(int, "2", base=2)
+    res1 = encode.dictify_python_call(int, "2", base=3)
     assert res1 == expected1
 
 
