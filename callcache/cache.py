@@ -3,6 +3,7 @@ import hashlib
 import json
 import time
 
+import boto3
 import fsspec
 import heapdict
 import pymemcache.client.hash
@@ -70,6 +71,64 @@ class S3Store:
         expires_value_text = json.dumps((expires, value))
         self.store[key] = expires_value_text.encode("utf-8")
         return True
+
+
+class DynamoDBStore:
+    def __init__(self, table_name):
+        self.table_name = table_name
+        self.store = boto3.resource("dynamodb").Table(self.table_name)
+        try:
+            self.store.load()
+        except:
+            self.create_store()
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+
+    def create_store(self):
+        dynamodb = boto3.resource("dynamodb")
+        self.store = dynamodb.create_table(
+            TableName=self.table_name,
+            KeySchema=[
+                {
+                    'AttributeName': 'key',
+                    'KeyType': 'HASH'
+                },
+            ],
+            AttributeDefinitions=[
+                {
+                    'AttributeName': 'key',
+                    'AttributeType': 'S'
+                },
+            ],
+            ProvisionedThroughput={
+                'ReadCapacityUnits': 5,
+                'WriteCapacityUnits': 5
+            },
+        )
+        self.store.meta.client.get_waiter('table_exists').wait(TableName=self.table_name)
+
+    def set(self, key, value, expire=2635200):
+        expires = int(time.time()) + expire
+        self.store.put_item(Item={"key": key, "expires": expires, "response": value})
+        return True
+
+    def get(self, key):
+        try:
+            item = self.store.get_item(Key={"key": key})
+            value = item["Item"]["response"]
+            expires = item["Item"]["expires"]
+            if expires > time.time():
+                self.stats["hit"] += 1
+                return value
+        except:
+            pass
+        self.stats["miss"] += 1
+        return None
+
+    def clear(self):
+        with self.store.batch_writer() as batch:
+            for item in self.store.scan()['Items']:
+                batch.delete_item(Key={"key": item['key']})
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
 
 class MemcacheStore:
