@@ -69,6 +69,31 @@ def test_MemcacheStore():
     assert store.stats["hit"] == 0
 
 
+@pytest.mark.xfail()
+def test_S3Store():
+    store = cache.S3Store()
+
+    store.set("1", "a")
+
+    assert store.get("1") == "a"
+    assert store.stats["hit"] == 1
+
+    store.set("2", "b")
+
+    assert store.get("2") == "b"
+    assert store.stats["hit"] == 2
+
+    store.set("3", "c", expire=-1)
+
+    assert store.get("3") is None
+    assert store.stats["miss"] == 1
+
+    store.clear()
+
+    assert store.get("2") is None
+    assert store.stats["hit"] == 0
+
+
 def test_hexdigestify():
     text = "some random Unicode text \U0001f4a9"
     expected = "278a2cefeef9a3269f4ba1c41ad733a4c07101ae6859f607c8a42cf2"
