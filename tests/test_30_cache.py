@@ -71,7 +71,7 @@ def test_MemcacheStore():
 
 @pytest.mark.xfail()
 def test_S3Store():
-    store = cache.S3Store()
+    store = cache.S3Store(s3_root="s3://alexamici/test_callcache")
 
     store.set("1", "a")
 

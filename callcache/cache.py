@@ -44,9 +44,9 @@ class DictStore:
 
 
 class S3Store:
-    def __init__(self, cache_root='s3://alexamici/callcache'):
-        fs = fsspec.filesystem('filecache', target_protocol='s3', cache_storage='/tmp/fsspec/')
-        self.store = fs.get_mapper(cache_root, check=True)
+    def __init__(self, s3_root):
+        fs = fsspec.filesystem("filecache", target_protocol="s3")
+        self.store = fs.get_mapper(s3_root, check=True)
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
     def clear(self):
@@ -58,17 +58,17 @@ class S3Store:
             expires_value_text = self.store[key]
             expires, value = json.loads(expires_value_text)
             if expires > time.time():
-                self.stats['hit'] += 1
+                self.stats["hit"] += 1
                 return value
         except:
             pass
-        self.stats['miss'] += 1
+        self.stats["miss"] += 1
         return None
 
     def set(self, key, value, expire=2635200):
         expires = time.time() + expire
         expires_value_text = json.dumps((expires, value))
-        self.store[key] = expires_value_text.encode('utf-8')
+        self.store[key] = expires_value_text.encode("utf-8")
         return True
 
 
