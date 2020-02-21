@@ -87,24 +87,13 @@ class DynamoDBStore:
         dynamodb = boto3.resource("dynamodb")
         self.store = dynamodb.create_table(
             TableName=self.table_name,
-            KeySchema=[
-                {
-                    'AttributeName': 'key',
-                    'KeyType': 'HASH'
-                },
-            ],
-            AttributeDefinitions=[
-                {
-                    'AttributeName': 'key',
-                    'AttributeType': 'S'
-                },
-            ],
-            ProvisionedThroughput={
-                'ReadCapacityUnits': 5,
-                'WriteCapacityUnits': 5
-            },
+            KeySchema=[{"AttributeName": "key", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "key", "AttributeType": "S"}],
+            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
         )
-        self.store.meta.client.get_waiter('table_exists').wait(TableName=self.table_name)
+        self.store.meta.client.get_waiter("table_exists").wait(
+            TableName=self.table_name
+        )
 
     def set(self, key, value, expire=2635200):
         expires = int(time.time()) + expire
@@ -126,8 +115,8 @@ class DynamoDBStore:
 
     def clear(self):
         with self.store.batch_writer() as batch:
-            for item in self.store.scan()['Items']:
-                batch.delete_item(Key={"key": item['key']})
+            for item in self.store.scan()["Items"]:
+                batch.delete_item(Key={"key": item["key"]})
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
 
