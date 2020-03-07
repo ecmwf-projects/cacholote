@@ -30,10 +30,12 @@ def dictify_python_object(obj):
     return object_simple
 
 
-def dictify_python_call(func, *args, **kwargs):
+def dictify_python_call(func, *args, _callable_version=None, **kwargs):
     kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
     python_call_simple = {"type": "python_call", "callable": callable_fqn}
+    if _callable_version is not None:
+        python_call_simple["version"] = _callable_version
     if args:
         python_call_simple["args"] = args
     if kwargs:
@@ -88,6 +90,6 @@ def dumps(obj, separators=(",", ":"), filecache_root=".", **kwargs):
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
-def dumps_python_call(func, *args, _filecache_root=".", **kwargs):
+def dumps_python_call(func, *args, _filecache_root=".",  **kwargs):
     python_call = dictify_python_call(func, *args, **kwargs)
     return dumps(python_call, filecache_root=_filecache_root)

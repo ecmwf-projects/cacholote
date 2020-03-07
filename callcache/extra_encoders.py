@@ -6,9 +6,41 @@ try:
 except ImportError:  # pragma: no cover
     xr = None
 
+try:
+    import zarr  # noqa
+    import s3fs
+
+    s3 = s3fs.S3FileSystem()
+except ImportError:  # pragma: no cover
+    s3 = None
+
 
 from . import cache
 from . import encode
+
+
+def open_zarr(s3_path, *args, **kwargs):
+    store = s3fs.S3Map(root=s3_path, s3=s3, check=False)
+    return xr.open_zarr(store=store, *args, **kwargs)
+
+
+def dictify_xr_dataset_s3(
+    o, cache_root="s3://callcache", file_name_template="{uuid}.zarr", **kwargs
+):
+    # xarray >= 0.14.1 provide stable hashing
+    uuid = cache.hexdigestify(str(o.__dask_tokenize__()))
+    file_name = file_name_template.format(**locals())
+    s3_path = f"{cache_root}/{file_name}"
+    print(s3_path)
+    store = s3fs.S3Map(root=s3_path, s3=s3, check=False)
+    try:
+        orig = xr.open_zarr(store=store, consolidated=True)
+    except:
+        orig = None
+        o.to_zarr(store=store, consolidated=True)
+    if orig is not None and not o.identical(orig):
+        raise RuntimeError(f"inconsistent array in file {s3_path}")
+    return encode.dictify_python_call(open_zarr, s3_path)
 
 
 def dictify_xr_dataset(o, cache_root=".", file_name_template="{uuid}.nc", **kwargs):

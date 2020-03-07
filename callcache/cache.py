@@ -28,7 +28,7 @@ class DictStore:
 
     def get(self, key):
         try:
-            expires, value = self.store[key]
+            expires, value, expanded_key = self.store[key]
             if expires > time.time():
                 self.stats["hit"] += 1
                 return value
@@ -37,10 +37,10 @@ class DictStore:
         self.stats["miss"] += 1
         return None
 
-    def set(self, key, value, expire=2635200):
+    def set(self, key, value, expire=2635200, expanded_key=None):
         expires = time.time() + expire
         self._prune()
-        self.store[key] = (expires, value)
+        self.store[key] = (expires, value, expanded_key)
         return True
 
 
@@ -66,9 +66,9 @@ class DynamoDBStore:
             TableName=self.table_name
         )
 
-    def set(self, key, value, expire=2635200):
+    def set(self, key, value, expire=2635200, expanded_key=None):
         expires = int(time.time()) + expire
-        self.store.put_item(Item={"key": key, "expires": expires, "response": value})
+        self.store.put_item(Item={"key": key, "expires": expires, "response": value, 'request': expanded_key})
         return True
 
     def get(self, key):
@@ -77,6 +77,8 @@ class DynamoDBStore:
             value = item["Item"]["response"]
             expires = item["Item"]["expires"]
             if expires > time.time():
+                print(type(item['Item']['request']), item['Item']['request'])
+                print(type(value), value)
                 self.stats["hit"] += 1
                 return value
         except:
@@ -118,7 +120,7 @@ def hexdigestify(text):
     return hash_req.hexdigest()
 
 
-def cacheable(filecache_root=".", cache_store=None):
+def cacheable(filecache_root=".", cache_store=None, callable_version=None):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -126,7 +128,7 @@ def cacheable(filecache_root=".", cache_store=None):
             cache_store = cache_store or CACHE
             try:
                 call_json = encode.dumps_python_call(
-                    func, *args, _filecache_root=filecache_root, **kwargs
+                    func, *args, _filecache_root=filecache_root, _callable_version=callable_version, **kwargs
                 )
             except TypeError:
                 cache_store.stats["bad_input"] += 1
@@ -138,7 +140,7 @@ def cacheable(filecache_root=".", cache_store=None):
                 result = func(*args, **kwargs)
                 try:
                     cached = encode.dumps(result, filecache_root=filecache_root)
-                    cache_store.set(hexdigest, cached)
+                    cache_store.set(hexdigest, cached, expanded_key=call_json)
                 except Exception:
                     cache_store.stats["bad_output"] += 1
                     return result
