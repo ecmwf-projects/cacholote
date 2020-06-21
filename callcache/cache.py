@@ -1,10 +1,8 @@
 import functools
 import hashlib
-import json
 import time
 
 import boto3
-import fsspec
 import heapdict
 import pymemcache.client.hash
 
@@ -120,7 +118,7 @@ def hexdigestify(text):
     return hash_req.hexdigest()
 
 
-def cacheable(filecache_root=".", cache_store=None, callable_version=None):
+def cacheable(filecache_root=".", cache_store=None, version=None):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -128,7 +126,7 @@ def cacheable(filecache_root=".", cache_store=None, callable_version=None):
             cache_store = cache_store or CACHE
             try:
                 call_json = encode.dumps_python_call(
-                    func, *args, _filecache_root=filecache_root, _callable_version=callable_version, **kwargs
+                    func, *args, _filecache_root=filecache_root, _callable_version=version, **kwargs
                 )
             except TypeError:
                 cache_store.stats["bad_input"] += 1
