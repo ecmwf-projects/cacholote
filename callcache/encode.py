@@ -7,22 +7,23 @@ import json
 import logging
 import operator
 import pickle
+import typing as T
 
 
-def inspect_fully_qualified_name(obj):
+def inspect_fully_qualified_name(o):
     """Return the fully qualified name of a python object."""
-    module = inspect.getmodule(obj)
-    return f"{module.__name__}:{obj.__qualname__}"
+    module = inspect.getmodule(o)
+    return f"{module.__name__}:{o.__qualname__}"
 
 
-def dictify_python_object(obj):
-    if isinstance(obj, str):
+def dictify_python_object(o):
+    if isinstance(o, str):
         # NOTE: a stricter test would be decode.import_object(obj)
-        if ":" not in obj:
-            raise ValueError(f"{obj} not in the form 'module:qualname'")
-        fully_qualified_name = obj
+        if ":" not in o:
+            raise ValueError(f"{o} not in the form 'module:qualname'")
+        fully_qualified_name = o
     else:
-        fully_qualified_name = inspect_fully_qualified_name(obj)
+        fully_qualified_name = inspect_fully_qualified_name(o)
     object_simple = {
         "type": "python_object",
         "fully_qualified_name": fully_qualified_name,
@@ -30,7 +31,12 @@ def dictify_python_object(obj):
     return object_simple
 
 
-def dictify_python_call(func, *args, _callable_version=None, **kwargs):
+def dictify_python_call(
+    func: T.Union[collections.abc.Callable, str],
+    *args,
+    _callable_version: str = None,
+    **kwargs,
+):
     kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
     python_call_simple = {"type": "python_call", "callable": callable_fqn}
@@ -43,20 +49,20 @@ def dictify_python_call(func, *args, _callable_version=None, **kwargs):
     return python_call_simple
 
 
-def dictify_datetime(o, **kwargs):
+def dictify_datetime(o: datetime.datetime, **kwargs):
     # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
     return dictify_python_call("datetime:datetime.fromisoformat", o.isoformat())
 
 
-def dictify_date(o, **kwargs):
+def dictify_date(o: datetime.date, **kwargs):
     return dictify_python_call("datetime:date.fromisoformat", o.isoformat())
 
 
-def dictify_timedelta(o, **kwargs):
+def dictify_timedelta(o: datetime.timedelta, **kwargs):
     return dictify_python_call("datetime:timedelta", o.days, o.seconds, o.microseconds)
 
 
-def dictify_bytes(o, **kwargs):
+def dictify_bytes(o: bytes, **kwargs):
     ascii_decoded = binascii.b2a_base64(o).decode("ascii")
     return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
@@ -90,6 +96,6 @@ def dumps(obj, separators=(",", ":"), filecache_root=".", **kwargs):
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
-def dumps_python_call(func, *args, _filecache_root=".",  **kwargs):
+def dumps_python_call(func, *args, _filecache_root=".", **kwargs):
     python_call = dictify_python_call(func, *args, **kwargs)
     return dumps(python_call, filecache_root=_filecache_root)

@@ -40,7 +40,7 @@ def test_dictify_python_call():
     assert res0 == expected0
 
     expected0 = {"type": "python_call", "callable": "builtins:int", "version": "0.1"}
-    res0 = encode.dictify_python_call(int, _callable_version='0.1')
+    res0 = encode.dictify_python_call(int, _callable_version="0.1")
     assert res0 == expected0
 
     expected1 = {"type": "python_call", "callable": "builtins:len", "args": ("test",)}
