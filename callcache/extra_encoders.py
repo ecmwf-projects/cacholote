@@ -4,7 +4,7 @@ try:
     import netCDF4  # noqa
     import xarray as xr
 except ImportError:  # pragma: no cover
-    xr = None
+    pass
 
 try:
     import zarr  # noqa
@@ -12,7 +12,7 @@ try:
 
     s3 = s3fs.S3FileSystem()
 except ImportError:  # pragma: no cover
-    s3 = None
+    pass
 
 
 from . import cache
@@ -59,5 +59,7 @@ def dictify_xr_dataset(o, cache_root=".", file_name_template="{uuid}.nc", **kwar
 
 
 def register_all():
-    if xr is not None:  # pragma: no cover
+    try:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
+    except NameError:
+        pass
