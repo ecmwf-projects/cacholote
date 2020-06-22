@@ -10,13 +10,15 @@ import pickle
 import typing as T
 
 
-def inspect_fully_qualified_name(o):
+def inspect_fully_qualified_name(o) -> str:
     """Return the fully qualified name of a python object."""
     module = inspect.getmodule(o)
+    if module is None:
+        raise ValueError(f"can't getmodule for {o!r}")
     return f"{module.__name__}:{o.__qualname__}"
 
 
-def dictify_python_object(o):
+def dictify_python_object(o) -> T.Dict[str, str]:
     if isinstance(o, str):
         # NOTE: a stricter test would be decode.import_object(obj)
         if ":" not in o:
@@ -36,10 +38,13 @@ def dictify_python_call(
     *args,
     _callable_version: str = None,
     **kwargs,
-):
+) -> T.Dict[str, T.Any]:
     kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
-    python_call_simple = {"type": "python_call", "callable": callable_fqn}
+    python_call_simple: T.Dict[str, T.Any] = {
+        "type": "python_call",
+        "callable": callable_fqn,
+    }
     if _callable_version is not None:
         python_call_simple["version"] = _callable_version
     if args:
@@ -49,25 +54,25 @@ def dictify_python_call(
     return python_call_simple
 
 
-def dictify_datetime(o: datetime.datetime, **kwargs):
+def dictify_datetime(o: datetime.datetime, **kwargs) -> T.Dict[str, T.Any]:
     # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
     return dictify_python_call("datetime:datetime.fromisoformat", o.isoformat())
 
 
-def dictify_date(o: datetime.date, **kwargs):
+def dictify_date(o: datetime.date, **kwargs) -> T.Dict[str, T.Any]:
     return dictify_python_call("datetime:date.fromisoformat", o.isoformat())
 
 
-def dictify_timedelta(o: datetime.timedelta, **kwargs):
+def dictify_timedelta(o: datetime.timedelta, **kwargs) -> T.Dict[str, T.Any]:
     return dictify_python_call("datetime:timedelta", o.days, o.seconds, o.microseconds)
 
 
-def dictify_bytes(o: bytes, **kwargs):
+def dictify_bytes(o: bytes, **kwargs) -> T.Dict[str, T.Any]:
     ascii_decoded = binascii.b2a_base64(o).decode("ascii")
     return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
 
-def dictify_pickable(o, **kwargs):
+def dictify_pickable(o, **kwargs) -> T.Dict[str, T.Any]:
     return dictify_python_call(pickle.loads, pickle.dumps(o))
 
 
@@ -91,11 +96,13 @@ def filecache_default(o, filecache_root=".", encoders=FILECACHE_ENCODERS):
     raise TypeError("can't encode object")
 
 
-def dumps(obj, separators=(",", ":"), filecache_root=".", **kwargs):
+def dumps(obj, separators=(",", ":"), filecache_root=".", **kwargs) -> str:
     default = functools.partial(filecache_default, filecache_root=filecache_root)
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
-def dumps_python_call(func, *args, _filecache_root=".", **kwargs):
+def dumps_python_call(
+    func: T.Union[T.Callable, str], *args, _filecache_root=".", **kwargs
+) -> str:
     python_call = dictify_python_call(func, *args, **kwargs)
     return dumps(python_call, filecache_root=_filecache_root)
