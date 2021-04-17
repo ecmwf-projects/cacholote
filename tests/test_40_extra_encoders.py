@@ -1,12 +1,10 @@
 import os.path
+
 import pytest
 
 xr = pytest.importorskip("xarray")  # noqa
 
-from callcache import cache
-from callcache import decode
-from callcache import encode
-from callcache import extra_encoders
+from callcache import cache, decode, encode, extra_encoders
 
 
 def func(a):

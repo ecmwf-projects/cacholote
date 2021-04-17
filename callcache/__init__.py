@@ -1,8 +1,7 @@
-from .cache import cacheable
-from .decode import object_hook, loads
-from .encode import filecache_default, dumps
-
 from . import extra_encoders
+from .cache import cacheable
+from .decode import loads, object_hook
+from .encode import dumps, filecache_default
 
 extra_encoders.register_all()
 

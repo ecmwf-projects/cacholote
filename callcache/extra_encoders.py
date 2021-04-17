@@ -7,16 +7,15 @@ except ImportError:  # pragma: no cover
     pass
 
 try:
-    import zarr  # noqa
     import s3fs
+    import zarr  # noqa
 
     s3 = s3fs.S3FileSystem()
 except ImportError:  # pragma: no cover
     pass
 
 
-from . import cache
-from . import encode
+from . import cache, encode
 
 
 def open_zarr(s3_path, *args, **kwargs):

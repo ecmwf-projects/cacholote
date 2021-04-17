@@ -2,8 +2,7 @@ import datetime
 
 import pytest
 
-from callcache import decode
-from callcache import encode
+from callcache import decode, encode
 
 
 def func(a, b, *args, c=None, d=False, **kwargs):

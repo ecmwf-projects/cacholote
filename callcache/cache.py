@@ -3,12 +3,19 @@ import hashlib
 import time
 import typing as T
 
-import boto3
+try:
+    import boto3
+except ModuleNotFoundError:
+    pass
 import heapdict
 import pymemcache.client.hash
 
-from . import decode
-from . import encode
+try:
+    from google.cloud import firestore
+except ModuleNotFoundError:
+    pass
+
+from . import decode, encode
 
 
 class DictStore:
@@ -83,8 +90,6 @@ class DynamoDBStore:
             value = item["Item"]["response"]
             expires = item["Item"]["expires"]
             if expires > time.time():
-                print(type(item["Item"]["request"]), item["Item"]["request"])
-                print(type(value), value)
                 self.stats["hit"] += 1
                 return value
         except:
@@ -96,6 +101,43 @@ class DynamoDBStore:
         with self.store.batch_writer() as batch:
             for item in self.store.scan()["Items"]:
                 batch.delete_item(Key={"key": item["key"]})
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+
+
+class FirestoreStore:
+    def __init__(self, table_name):
+        self.table_name = table_name
+        self.store = firestore.Client().collection(self.table_name)
+        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
+
+    def set(self, key, value, expire=2635200, expanded_key=None):
+        expires = int(time.time()) + expire
+        self.store.document(key).set(
+            {
+                "key": key,
+                "expires": expires,
+                "response": value,
+                "request": expanded_key,
+            }
+        )
+        return True
+
+    def get(self, key):
+        try:
+            item = self.store.document(key).get().to_dict()
+            value = item["response"]
+            expires = item["expires"]
+            if expires > time.time():
+                self.stats["hit"] += 1
+                return value
+        except:
+            pass
+        self.stats["miss"] += 1
+        return None
+
+    def clear(self):
+        for document in self.store.stream():
+            document.reference.delete()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
 
