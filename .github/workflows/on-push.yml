@@ -102,9 +102,9 @@ jobs:
       matrix:
         include:
         - extra: -minver
-          python-version: 3.10
+          python-version: '3.10'
         - extra: ''
-          python-version: 3.8
+          python-version: '3.8'
 
     steps:
     - uses: actions/checkout@v3
