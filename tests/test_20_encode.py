@@ -82,7 +82,7 @@ def test_filecache_default():
         "type": "python_call",
         "callable": "_pickle:loads",
         "args": (
-            b"\x80\x03cdatetime\ntimezone\nq\x00cdatetime\ntimedelta\nq\x01K\x00M\x10\x0eK\x00\x87q\x02Rq\x03\x85q\x04Rq\x05.",
+            b"\x80\x04\x958\x00\x00\x00\x00\x00\x00\x00\x8c\x08datetime\x94\x8c\x08timezone\x94\x93\x94h\x00\x8c\ttimedelta\x94\x93\x94K\x00M\x10\x0eK\x00\x87\x94R\x94\x85\x94R\x94.",
         ),
     }
     res = encode.filecache_default(data)
@@ -117,7 +117,7 @@ def test_roundtrip():
 
 
 def test_dumps_python_call():
-    expected = r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads","args":[{"type":"python_call","callable":"binascii:a2b_base64","args":["gANjZGF0ZXRpbWUKdGltZXpvbmUKcQBjZGF0ZXRpbWUKdGltZWRlbHRhCnEBSwBNEA5LAIdxAlJxA4VxBFJxBS4=\n"]}]}}}'
+    expected = r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads","args":[{"type":"python_call","callable":"binascii:a2b_base64","args":["gASVOAAAAAAAAACMCGRhdGV0aW1llIwIdGltZXpvbmWUk5RoAIwJdGltZWRlbHRhlJOUSwBNEA5LAIeUUpSFlFKULg==\n"]}]}}}'
     tzinfo = datetime.timezone(datetime.timedelta(seconds=3600))
     res = encode.dumps_python_call("datetime:datetime", 2019, 1, 1, tzinfo=tzinfo)
     assert res == expected
