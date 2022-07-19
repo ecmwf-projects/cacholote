@@ -49,7 +49,10 @@ def test_object_hook():
 
 
 def test_loads():
-    len_call_json = '{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"builtins:int"}}'
+    len_call_json = (
+        r'{"type":"python_call",'
+        r'"callable":{"type":"python_object","fully_qualified_name":"builtins:int"}}'
+    )
 
     res = decode.loads(len_call_json)
     assert res == int()
