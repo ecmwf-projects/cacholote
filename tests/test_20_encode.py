@@ -1,15 +1,18 @@
 import datetime
+from typing import Any
 
 import pytest
 
 from callcache import decode, encode
 
 
-def func(a, b, *args, c=None, d=False, **kwargs):
+def func(
+    a: Any, b: Any, *args: Any, c: Any = None, d: Any = False, **kwargs: Any
+) -> None:
     pass
 
 
-def test_inspect_fully_qualified_name():
+def test_inspect_fully_qualified_name() -> None:
     # Goedel-style self-reference :)
     res = encode.inspect_fully_qualified_name(test_inspect_fully_qualified_name)
     assert res == "test_20_encode:test_inspect_fully_qualified_name"
@@ -18,7 +21,7 @@ def test_inspect_fully_qualified_name():
     assert res == "builtins:len"
 
 
-def test_dictify_python_object():
+def test_dictify_python_object() -> None:
     res = encode.dictify_python_object(len)
     assert res == {"type": "python_object", "fully_qualified_name": "builtins:len"}
 
@@ -33,52 +36,52 @@ def test_dictify_python_object():
         encode.dictify_python_object("datetime.datetime.isoformat")
 
 
-def test_dictify_python_call():
+def test_dictify_python_call() -> None:
     expected0 = {"type": "python_call", "callable": "builtins:int"}
     res0 = encode.dictify_python_call(int)
     assert res0 == expected0
 
-    expected0 = {"type": "python_call", "callable": "builtins:int", "version": "0.1"}
-    res0 = encode.dictify_python_call(int, _callable_version="0.1")
-    assert res0 == expected0
-
-    expected1 = {"type": "python_call", "callable": "builtins:len", "args": ("test",)}
-    res1 = encode.dictify_python_call(len, "test")
+    expected1 = {"type": "python_call", "callable": "builtins:int", "version": "0.1"}
+    res1 = encode.dictify_python_call(int, _callable_version="0.1")
     assert res1 == expected1
 
-    expected1 = {
+    expected2 = {"type": "python_call", "callable": "builtins:len", "args": ("test",)}
+    res2 = encode.dictify_python_call(len, "test")
+    assert res2 == expected2
+
+    expected3 = {
         "type": "python_call",
         "callable": "builtins:int",
         "args": ("2",),
         "kwargs": {"base": 3},
     }
-    res1 = encode.dictify_python_call(int, "2", base=3)
-    assert res1 == expected1
+    res3 = encode.dictify_python_call(int, "2", base=3)
+    assert res3 == expected3
 
 
-def test_filecache_default():
+def test_filecache_default() -> None:
     date = datetime.datetime.now()
-    expected = {
+    expected0 = {
         "type": "python_call",
         "callable": "datetime:datetime.fromisoformat",
         "args": (date.isoformat(),),
     }
-    res = encode.filecache_default(date)
-    assert res == expected
+    res0 = encode.filecache_default(date)
+    assert res0 == expected0
 
-    data = bytes(list(range(20)) + list(range(225, 256)))
-    expected = {
+    data1 = bytes(list(range(20)) + list(range(225, 256)))
+    expected1 = {
         "type": "python_call",
         "callable": "binascii:a2b_base64",
         "args": (
             "AAECAwQFBgcICQoLDA0ODxAREhPh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/\n",
         ),
     }
-    res = encode.filecache_default(data)
-    assert res == expected
+    res1 = encode.filecache_default(data1)
+    assert res1 == expected1
 
-    data = datetime.timezone(datetime.timedelta(seconds=3600))
-    expected = {
+    data2 = datetime.timezone(datetime.timedelta(seconds=3600))
+    expected2 = {
         "type": "python_call",
         "callable": "_pickle:loads",
         "args": (
@@ -87,8 +90,8 @@ def test_filecache_default():
             b"timedelta\x94\x93\x94K\x00M\x10\x0eK\x00\x87\x94R\x94\x85\x94R\x94.",
         ),
     }
-    res = encode.filecache_default(data)
-    assert res == expected
+    res2 = encode.filecache_default(data2)
+    assert res2 == expected2
 
     class Dummy:
         pass
@@ -97,28 +100,23 @@ def test_filecache_default():
         encode.filecache_default(Dummy())
 
 
-def test_roundtrip():
-    data = len
-    assert decode.loads(encode.dumps(data)) == data
-
-    data = bytes(list(range(255)))
-    assert decode.loads(encode.dumps(data)) == data
-
-    data = datetime.datetime.now()
-    assert decode.loads(encode.dumps(data)) == data
-
-    data = datetime.date.today()
-    assert decode.loads(encode.dumps(data)) == data
-
-    data = datetime.timedelta(234, 23, 128736)
-    assert decode.loads(encode.dumps(data)) == data
-
-    # pickle encode / decode
-    data = datetime.timezone(datetime.timedelta(seconds=3600))
+@pytest.mark.parametrize(
+    "data",
+    [
+        len,
+        bytes(list(range(255))),
+        datetime.datetime.now(),
+        datetime.date.today(),
+        datetime.timedelta(234, 23, 128736),
+        datetime.timezone(datetime.timedelta(seconds=3600)),  # pickle encode / decode
+    ],
+    ids=[f"data{i}" for i in range(6)],
+)
+def test_roundtrip(data: Any) -> None:
     assert decode.loads(encode.dumps(data)) == data
 
 
-def test_dumps_python_call():
+def test_dumps_python_call() -> None:
     expected = (
         r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],'
         r'"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads",'

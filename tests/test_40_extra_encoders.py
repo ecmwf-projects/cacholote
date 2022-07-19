@@ -1,17 +1,19 @@
 import os.path
+from typing import TypeVar
 
 import pytest
 
 from callcache import cache, decode, encode, extra_encoders
 
 xr = pytest.importorskip("xarray")
+T = TypeVar("T")
 
 
-def func(a):
+def func(a: T) -> T:
     return a
 
 
-def test_dictify_xr_dataset(tmpdir):
+def test_dictify_xr_dataset(tmpdir: os.PathLike[str]) -> None:
     filecache_root = str(tmpdir)
     data_name = "a6c9d74e563abf0d5527a1c3bad999bde7d10ab0e66cfe33c2969098.nc"
     data_path = os.path.join(filecache_root, data_name)
@@ -42,17 +44,17 @@ def test_dictify_xr_dataset(tmpdir):
 
     data["data"].values[0] = 1
     with pytest.raises(RuntimeError):
-        extra_encoders.dictify_xr_dataset(data, filecache_root, data_name1)
+        extra_encoders.dictify_xr_dataset(data, filecache_root, data_path1)
 
 
-def test_roundtrip(tmpdir):
+def test_roundtrip(tmpdir: os.PathLike[str]) -> None:
     filecache_root = str(tmpdir)
     data = xr.Dataset(data_vars={"data": [0]})
     date_json = encode.dumps(data, filecache_root=filecache_root)
     assert decode.loads(date_json).identical(data)
 
 
-def test_caceable(tmpdir):
+def test_cacheable(tmpdir: os.PathLike[str]) -> None:
     cfunc = cache.cacheable(filecache_root=str(tmpdir))(func)
     cache.CACHE.clear()
 

@@ -1,9 +1,11 @@
+from typing import Any
+
 import pytest
 
 from callcache import cache
 
 
-def func(a, *args, b=None, **kwargs):
+def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
     if b is None:
         return locals()
     else:
@@ -14,7 +16,7 @@ def func(a, *args, b=None, **kwargs):
         return LocalClass()
 
 
-def test_DictStore():
+def test_DictStore() -> None:
     store = cache.DictStore(max_count=2)
 
     store.set("1", "a")
@@ -45,7 +47,7 @@ def test_DictStore():
 
 
 @pytest.mark.xfail()
-def test_MemcacheStore():
+def test_MemcacheStore() -> None:
     store = cache.MemcacheStore()
 
     store.set("1", "a")
@@ -70,7 +72,7 @@ def test_MemcacheStore():
 
 
 @pytest.mark.xfail()
-def test_DynamoDBStore():
+def test_DynamoDBStore() -> None:
     store = cache.DynamoDBStore("test_callcache")
 
     store.set("1", "a")
@@ -95,7 +97,7 @@ def test_DynamoDBStore():
 
 
 @pytest.mark.xfail()
-def test_FirestoreStore():
+def test_FirestoreStore() -> None:
     store = cache.FirestoreStore("test_callcache")
 
     store.set("1", "a")
@@ -119,14 +121,14 @@ def test_FirestoreStore():
     assert store.stats["hit"] == 0
 
 
-def test_hexdigestify():
+def test_hexdigestify() -> None:
     text = "some random Unicode text \U0001f4a9"
     expected = "278a2cefeef9a3269f4ba1c41ad733a4c07101ae6859f607c8a42cf2"
     res = cache.hexdigestify(text)
     assert res == expected
 
 
-def test_cacheable():
+def test_cacheable() -> None:
     cfunc = cache.cacheable()(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}

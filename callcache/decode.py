@@ -1,8 +1,9 @@
 import importlib
 import json
+from typing import Any, Dict, Union
 
 
-def import_object(fully_qualified_name: str):
+def import_object(fully_qualified_name: str) -> Any:
     # FIXME: apply exclude/include-rules to `fully_qualified_name`
     if ":" not in fully_qualified_name:
         raise ValueError(f"{fully_qualified_name} not in the form 'module:qualname'")
@@ -13,7 +14,7 @@ def import_object(fully_qualified_name: str):
     return obj
 
 
-def object_hook(obj: dict):
+def object_hook(obj: Dict[str, Any]) -> Any:
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         obj = import_object(obj["fully_qualified_name"])
     elif obj.get("type") == "python_call" and "callable" in obj:
@@ -27,5 +28,5 @@ def object_hook(obj: dict):
     return obj
 
 
-def loads(obj, **kwargs):
+def loads(obj: Union[str, bytes], **kwargs: Any) -> Any:
     return json.loads(obj, object_hook=object_hook, **kwargs)

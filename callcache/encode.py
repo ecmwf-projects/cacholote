@@ -7,10 +7,10 @@ import json
 import logging
 import operator
 import pickle
-import typing as T
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
-def inspect_fully_qualified_name(o) -> str:
+def inspect_fully_qualified_name(o: Callable[..., Any]) -> str:
     """Return the fully qualified name of a python object."""
     module = inspect.getmodule(o)
     if module is None:
@@ -18,7 +18,7 @@ def inspect_fully_qualified_name(o) -> str:
     return f"{module.__name__}:{o.__qualname__}"
 
 
-def dictify_python_object(o) -> T.Dict[str, str]:
+def dictify_python_object(o: Union[str, Callable[..., Any]]) -> Dict[str, str]:
     if isinstance(o, str):
         # NOTE: a stricter test would be decode.import_object(obj)
         if ":" not in o:
@@ -34,14 +34,14 @@ def dictify_python_object(o) -> T.Dict[str, str]:
 
 
 def dictify_python_call(
-    func: T.Union[collections.abc.Callable, str],
-    *args,
-    _callable_version: str = None,
-    **kwargs,
-) -> T.Dict[str, T.Any]:
+    func: Union[str, Callable[..., Any]],
+    *args: Any,
+    _callable_version: Optional[str] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
     kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
-    python_call_simple: T.Dict[str, T.Any] = {
+    python_call_simple: Dict[str, Any] = {
         "type": "python_call",
         "callable": callable_fqn,
     }
@@ -54,29 +54,29 @@ def dictify_python_call(
     return python_call_simple
 
 
-def dictify_datetime(o: datetime.datetime, **kwargs) -> T.Dict[str, T.Any]:
+def dictify_datetime(o: datetime.datetime, **kwargs: Any) -> Dict[str, Any]:
     # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
     return dictify_python_call("datetime:datetime.fromisoformat", o.isoformat())
 
 
-def dictify_date(o: datetime.date, **kwargs) -> T.Dict[str, T.Any]:
+def dictify_date(o: datetime.date, **kwargs: Any) -> Dict[str, Any]:
     return dictify_python_call("datetime:date.fromisoformat", o.isoformat())
 
 
-def dictify_timedelta(o: datetime.timedelta, **kwargs) -> T.Dict[str, T.Any]:
+def dictify_timedelta(o: datetime.timedelta, **kwargs: Any) -> Dict[str, Any]:
     return dictify_python_call("datetime:timedelta", o.days, o.seconds, o.microseconds)
 
 
-def dictify_bytes(o: bytes, **kwargs) -> T.Dict[str, T.Any]:
+def dictify_bytes(o: bytes, **kwargs: Any) -> Dict[str, Any]:
     ascii_decoded = binascii.b2a_base64(o).decode("ascii")
     return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
 
-def dictify_pickable(o, **kwargs) -> T.Dict[str, T.Any]:
+def dictify_pickable(o: Any, **kwargs: Any) -> Dict[str, Any]:
     return dictify_python_call(pickle.loads, pickle.dumps(o))
 
 
-FILECACHE_ENCODERS = [
+FILECACHE_ENCODERS: List[Tuple[Any, Callable[..., Any]]] = [
     (object, dictify_pickable),
     (collections.abc.Callable, dictify_python_object),
     (bytes, dictify_bytes),
@@ -86,7 +86,11 @@ FILECACHE_ENCODERS = [
 ]
 
 
-def filecache_default(o, filecache_root=".", encoders=FILECACHE_ENCODERS):
+def filecache_default(
+    o: Any,
+    filecache_root: str = ".",
+    encoders: List[Tuple[Any, Callable[..., Any]]] = FILECACHE_ENCODERS,
+) -> Any:
     for type_, encoder in reversed(encoders):
         if isinstance(o, type_):
             try:
@@ -96,13 +100,21 @@ def filecache_default(o, filecache_root=".", encoders=FILECACHE_ENCODERS):
     raise TypeError("can't encode object")
 
 
-def dumps(obj, separators=(",", ":"), filecache_root=".", **kwargs) -> str:
+def dumps(
+    obj: Any,
+    separators: Optional[Tuple[str, str]] = (",", ":"),
+    filecache_root: str = ".",
+    **kwargs: Any,
+) -> str:
     default = functools.partial(filecache_default, filecache_root=filecache_root)
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
 def dumps_python_call(
-    func: T.Union[T.Callable, str], *args, _filecache_root=".", **kwargs
+    func: Union[str, Callable[..., Any]],
+    *args: Any,
+    _filecache_root: str = ".",
+    **kwargs: Any,
 ) -> str:
     python_call = dictify_python_call(func, *args, **kwargs)
     return dumps(python_call, filecache_root=_filecache_root)

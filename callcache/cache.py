@@ -1,7 +1,17 @@
 import functools
 import hashlib
 import time
-import typing as T
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Literal,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 try:
     import boto3
@@ -17,22 +27,24 @@ except ModuleNotFoundError:
 
 from . import decode, encode
 
+F = TypeVar("F", bound=Callable[..., Any])
+
 
 class DictStore:
-    def __init__(self, max_count=10000):
+    def __init__(self, max_count: int = 10_000):
         self.max_count = max_count
         self.store = heapdict.heapdict()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
-    def clear(self):
+    def clear(self) -> None:
         self.store.clear()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
-    def _prune(self):
+    def _prune(self) -> None:
         while len(self.store) >= self.max_count:
             self.store.popitem()
 
-    def get(self, key):
+    def get(self, key: str) -> Optional[Any]:
         try:
             expires, value, expanded_key = self.store[key]
             if expires > time.time():
@@ -43,7 +55,13 @@ class DictStore:
         self.stats["miss"] += 1
         return None
 
-    def set(self, key, value, expire=2635200, expanded_key=None):
+    def set(
+        self,
+        key: str,
+        value: Any,
+        expire: float = 2_635_200,
+        expanded_key: Optional[str] = None,
+    ) -> Literal[True]:
         expires = time.time() + expire
         self._prune()
         self.store[key] = (expires, value, expanded_key)
@@ -51,7 +69,7 @@ class DictStore:
 
 
 class DynamoDBStore:
-    def __init__(self, table_name):
+    def __init__(self, table_name: str):
         self.table_name = table_name
         self.store = boto3.resource("dynamodb").Table(self.table_name)
         try:
@@ -60,7 +78,7 @@ class DynamoDBStore:
             self.create_store()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
-    def create_store(self):
+    def create_store(self) -> None:
         dynamodb = boto3.resource("dynamodb")
         self.store = dynamodb.create_table(
             TableName=self.table_name,
@@ -72,7 +90,13 @@ class DynamoDBStore:
             TableName=self.table_name
         )
 
-    def set(self, key, value, expire=2635200, expanded_key=None):
+    def set(
+        self,
+        key: str,
+        value: Any,
+        expire: float = 2_635_200,
+        expanded_key: Optional[str] = None,
+    ) -> Literal[True]:
         expires = int(time.time()) + expire
         self.store.put_item(
             Item={
@@ -84,7 +108,7 @@ class DynamoDBStore:
         )
         return True
 
-    def get(self, key):
+    def get(self, key: str) -> Optional[Any]:
         try:
             item = self.store.get_item(Key={"key": key})
             value = item["Item"]["response"]
@@ -97,7 +121,7 @@ class DynamoDBStore:
         self.stats["miss"] += 1
         return None
 
-    def clear(self):
+    def clear(self) -> None:
         with self.store.batch_writer() as batch:
             for item in self.store.scan()["Items"]:
                 batch.delete_item(Key={"key": item["key"]})
@@ -105,12 +129,18 @@ class DynamoDBStore:
 
 
 class FirestoreStore:
-    def __init__(self, table_name):
+    def __init__(self, table_name: str):
         self.table_name = table_name
         self.store = firestore.Client().collection(self.table_name)
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
-    def set(self, key, value, expire=2635200, expanded_key=None):
+    def set(
+        self,
+        key: str,
+        value: Any,
+        expire: float = 2_635_200,
+        expanded_key: Optional[str] = None,
+    ) -> Literal[True]:
         expires = int(time.time()) + expire
         self.store.document(key).set(
             {
@@ -122,7 +152,7 @@ class FirestoreStore:
         )
         return True
 
-    def get(self, key):
+    def get(self, key: str) -> Optional[Any]:
         try:
             item = self.store.document(key).get().to_dict()
             value = item["response"]
@@ -135,23 +165,25 @@ class FirestoreStore:
         self.stats["miss"] += 1
         return None
 
-    def clear(self):
+    def clear(self) -> None:
         for document in self.store.stream():
             document.reference.delete()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
 
 class MemcacheStore:
-    def __init__(self, servers=(("localhost", 11211),)):
+    def __init__(
+        self, servers: Iterable[Tuple[str, int]] = (("localhost", 11211),)
+    ) -> None:
         self.client = pymemcache.client.hash.HashClient(servers)
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
         self.set = self.client.set
 
-    def clear(self):
+    def clear(self) -> Any:
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
         return self.client.flush_all()
 
-    def get(self, key):
+    def get(self, key: str) -> Any:
         value = self.client.get(key)
         if value is None:
             self.stats["miss"] += 1
@@ -168,10 +200,16 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()
 
 
-def cacheable(filecache_root=".", cache_store=None, version=None):
-    def decorator(func: T.Callable):
+def cacheable(
+    filecache_root: str = ".",
+    cache_store: Optional[
+        Union[DictStore, DynamoDBStore, FirestoreStore, MemcacheStore]
+    ] = None,
+    version: Optional[str] = None,
+) -> Callable[[F], F]:
+    def decorator(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             nonlocal cache_store
             cache_store = cache_store or CACHE
             try:
@@ -180,7 +218,7 @@ def cacheable(filecache_root=".", cache_store=None, version=None):
                     *args,
                     _filecache_root=filecache_root,
                     _callable_version=version,
-                    **kwargs
+                    **kwargs,
                 )
             except TypeError:
                 cache_store.stats["bad_input"] += 1
@@ -198,6 +236,6 @@ def cacheable(filecache_root=".", cache_store=None, version=None):
                     return result
             return decode.loads(cached)
 
-        return wrapper
+        return cast(F, wrapper)
 
     return decorator
