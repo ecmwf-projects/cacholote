@@ -1,10 +1,12 @@
 import pathlib
+from typing import TYPE_CHECKING, Any, Dict, Union
 
 try:
     import netCDF4  # noqa
     import xarray as xr
 except ImportError:  # pragma: no cover
-    pass
+    if TYPE_CHECKING:
+        import xarray as xr
 
 try:
     import s3fs
@@ -14,18 +16,17 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-from typing import Any, Dict, Union
 
 from . import cache, encode
 
 
-def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> xr.Dataset:
+def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":
     store = s3fs.S3Map(root=s3_path, s3=s3, check=False)
     return xr.open_zarr(store=store, *args, **kwargs)  # type: ignore
 
 
 def dictify_xr_dataset_s3(
-    o: xr.Dataset,
+    o: "xr.Dataset",
     filecache_root: str = "s3://callcache",
     file_name_template: str = "{uuid}.zarr",
     **kwargs: Any,
@@ -47,7 +48,7 @@ def dictify_xr_dataset_s3(
 
 
 def dictify_xr_dataset(
-    o: Union[xr.DataArray, xr.Dataset],
+    o: Union["xr.DataArray", "xr.Dataset"],
     filecache_root: str = ".",
     file_name_template: str = "{uuid}.nc",
     **kwargs: Any,
