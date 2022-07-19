@@ -1,27 +1,24 @@
 import pathlib
 from typing import TYPE_CHECKING, Any, Dict, Union
 
-try:
-    import netCDF4  # noqa
-    import xarray as xr
-except ImportError:  # pragma: no cover
-    if TYPE_CHECKING:
-        import xarray as xr
+from . import cache, encode
 
 try:
     import s3fs
-    import zarr  # noqa
 
-    s3 = s3fs.S3FileSystem()
-except ImportError:  # pragma: no cover
+    S3 = s3fs.S3FileSystem()
+except ImportError:
     pass
 
-
-from . import cache, encode
+try:
+    import xarray as xr
+except ImportError:
+    if TYPE_CHECKING:
+        import xarray as xr
 
 
 def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":
-    store = s3fs.S3Map(root=s3_path, s3=s3, check=False)
+    store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     return xr.open_zarr(store=store, *args, **kwargs)  # type: ignore
 
 
@@ -35,8 +32,7 @@ def dictify_xr_dataset_s3(
     uuid = cache.hexdigestify(str(o.__dask_tokenize__()))  # type: ignore[no-untyped-call]
     file_name = file_name_template.format(**locals())
     s3_path = f"{filecache_root}/{file_name}"
-    print(s3_path)
-    store = s3fs.S3Map(root=s3_path, s3=s3, check=False)
+    store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     try:
         orig = xr.open_zarr(store=store, consolidated=True)  # type: ignore[no-untyped-call]
     except:
