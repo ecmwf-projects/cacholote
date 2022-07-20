@@ -27,9 +27,9 @@ except ImportError:
 
 try:
     import xarray as xr
-except ImportError:
+except ImportError as ex:
     if TYPE_CHECKING:
-        import xarray as xr
+        raise ex
 
 
 def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":

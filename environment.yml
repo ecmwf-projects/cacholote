@@ -10,7 +10,7 @@ dependencies:
 - pytest
 - pytest-cov
 - sphinx
-- sphinxcontrib-apidoc
+- sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - boto3
 - dask
