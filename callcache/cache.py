@@ -59,7 +59,7 @@ class DictStore:
         while len(self.store) >= self.max_count:
             self.store.popitem()
 
-    def get(self, key: str) -> object:
+    def get(self, key: str) -> Any:
         try:
             expires, value, expanded_key = self.store[key]
             if expires > time.time():
@@ -73,7 +73,7 @@ class DictStore:
     def set(
         self,
         key: str,
-        value: object,
+        value: Any,
         expire: float = 2_635_200,
         expanded_key: Optional[str] = None,
     ) -> Literal[True]:
@@ -108,7 +108,7 @@ class DynamoDBStore:
     def set(
         self,
         key: str,
-        value: object,
+        value: Any,
         expire: float = 2_635_200,
         expanded_key: Optional[str] = None,
     ) -> Literal[True]:
@@ -123,7 +123,7 @@ class DynamoDBStore:
         )
         return True
 
-    def get(self, key: str) -> object:
+    def get(self, key: str) -> Any:
         try:
             item = self.store.get_item(Key={"key": key})
             value = item["Item"]["response"]
@@ -152,7 +152,7 @@ class FirestoreStore:
     def set(
         self,
         key: str,
-        value: object,
+        value: Any,
         expire: float = 2_635_200,
         expanded_key: Optional[str] = None,
     ) -> Literal[True]:
@@ -167,7 +167,7 @@ class FirestoreStore:
         )
         return True
 
-    def get(self, key: str) -> object:
+    def get(self, key: str) -> Any:
         try:
             item = self.store.document(key).get().to_dict()
             value = item["response"]
@@ -198,7 +198,7 @@ class MemcacheStore:
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
         return self.client.flush_all()
 
-    def get(self, key: str) -> object:
+    def get(self, key: str) -> Any:
         value = self.client.get(key)
         if value is None:
             self.stats["miss"] += 1
@@ -224,7 +224,7 @@ def cacheable(
 ) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> object:
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             nonlocal cache_store
             cache_store = cache_store or CACHE
             try:
