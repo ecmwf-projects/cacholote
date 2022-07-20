@@ -3,7 +3,7 @@ import pytest
 from callcache import decode
 
 
-def test_import_object():
+def test_import_object() -> None:
     # Goedel-style self-reference :)
     res = decode.import_object("test_10_decode:test_import_object")
     assert res is test_import_object
@@ -15,7 +15,7 @@ def test_import_object():
         decode.import_object("builtins.len")
 
 
-def test_object_hook():
+def test_object_hook() -> None:
     object_simple = {
         "type": "python_object",
         "fully_qualified_name": "builtins:OSError",
@@ -48,8 +48,11 @@ def test_object_hook():
     assert res is unsupported_type
 
 
-def test_loads():
-    len_call_json = '{"type":"python_call","callable":{"type":"python_object","fully_qualified_name":"builtins:int"}}'
+def test_loads() -> None:
+    len_call_json = (
+        r'{"type":"python_call",'
+        r'"callable":{"type":"python_object","fully_qualified_name":"builtins:int"}}'
+    )
 
     res = decode.loads(len_call_json)
     assert res == int()
