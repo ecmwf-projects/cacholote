@@ -20,7 +20,7 @@ SETTINGS can be imported elsewhere to use global settings.
 
 import json
 from types import MappingProxyType, TracebackType
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Type
 
 _SETTINGS: Dict[str, Any] = {"filecache_root": "."}
 # Immutable settings to be used by other modules
@@ -42,9 +42,9 @@ class config:
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         _SETTINGS.update(self._old)
 
