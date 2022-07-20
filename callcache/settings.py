@@ -20,9 +20,9 @@ SETTINGS can be imported elsewhere to use global settings.
 
 import json
 from types import MappingProxyType, TracebackType
-from typing import Any
+from typing import Any, Dict
 
-_SETTINGS: dict[str, Any] = {"filecache_root": "."}
+_SETTINGS: Dict[str, Any] = {"filecache_root": "."}
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
 
