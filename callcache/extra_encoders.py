@@ -50,7 +50,7 @@ def dictify_xr_dataset_s3(
     store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     try:
         orig = xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
-    except:  # noqa
+    except:  # noqa: E722
         orig = None
         o.to_zarr(store=store)
     if orig is not None and not o.identical(orig):
@@ -70,7 +70,7 @@ def dictify_xr_dataset(
     path = str(pathlib.Path(filecache_root).absolute() / file_name)
     try:
         orig = xr.open_dataset(path)  # type: ignore
-    except:  # noqa
+    except:  # noqa: E722
         orig = None
         o.to_netcdf(path)
     if orig is not None and not o.identical(orig):

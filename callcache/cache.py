@@ -89,7 +89,7 @@ class DynamoDBStore:
         self.store = boto3.resource("dynamodb").Table(self.table_name)
         try:
             self.store.load()
-        except:  # noqa
+        except:  # noqa: E722
             self.create_store()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
@@ -131,7 +131,7 @@ class DynamoDBStore:
             if expires > time.time():
                 self.stats["hit"] += 1
                 return value
-        except:  # noqa
+        except:  # noqa: E722
             pass
         self.stats["miss"] += 1
         return None
@@ -175,7 +175,7 @@ class FirestoreStore:
             if expires > time.time():
                 self.stats["hit"] += 1
                 return value
-        except:  # noqa
+        except:  # noqa: E722
             pass
         self.stats["miss"] += 1
         return None
