@@ -14,7 +14,7 @@
 
 
 import pathlib
-from typing import TYPE_CHECKING, Any, Dict, Union
+from typing import Any, Dict, Union
 
 from . import cache, encode
 
@@ -27,9 +27,8 @@ except ImportError:
 
 try:
     import xarray as xr
-except ImportError as ex:
-    if TYPE_CHECKING:
-        raise ex
+except ImportError:
+    pass
 
 
 def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":
