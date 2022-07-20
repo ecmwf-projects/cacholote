@@ -59,7 +59,7 @@ class DictStore:
         while len(self.store) >= self.max_count:
             self.store.popitem()
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> object:
         try:
             expires, value, expanded_key = self.store[key]
             if expires > time.time():
@@ -73,7 +73,7 @@ class DictStore:
     def set(
         self,
         key: str,
-        value: Any,
+        value: object,
         expire: float = 2_635_200,
         expanded_key: Optional[str] = None,
     ) -> Literal[True]:
@@ -89,7 +89,7 @@ class DynamoDBStore:
         self.store = boto3.resource("dynamodb").Table(self.table_name)
         try:
             self.store.load()
-        except:
+        except:  # noqa
             self.create_store()
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
 
@@ -108,7 +108,7 @@ class DynamoDBStore:
     def set(
         self,
         key: str,
-        value: Any,
+        value: object,
         expire: float = 2_635_200,
         expanded_key: Optional[str] = None,
     ) -> Literal[True]:
@@ -123,7 +123,7 @@ class DynamoDBStore:
         )
         return True
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> object:
         try:
             item = self.store.get_item(Key={"key": key})
             value = item["Item"]["response"]
@@ -131,7 +131,7 @@ class DynamoDBStore:
             if expires > time.time():
                 self.stats["hit"] += 1
                 return value
-        except:
+        except:  # noqa
             pass
         self.stats["miss"] += 1
         return None
@@ -152,7 +152,7 @@ class FirestoreStore:
     def set(
         self,
         key: str,
-        value: Any,
+        value: object,
         expire: float = 2_635_200,
         expanded_key: Optional[str] = None,
     ) -> Literal[True]:
@@ -167,7 +167,7 @@ class FirestoreStore:
         )
         return True
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> object:
         try:
             item = self.store.document(key).get().to_dict()
             value = item["response"]
@@ -175,7 +175,7 @@ class FirestoreStore:
             if expires > time.time():
                 self.stats["hit"] += 1
                 return value
-        except:
+        except:  # noqa
             pass
         self.stats["miss"] += 1
         return None
@@ -198,7 +198,7 @@ class MemcacheStore:
         self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
         return self.client.flush_all()
 
-    def get(self, key: str) -> Any:
+    def get(self, key: str) -> object:
         value = self.client.get(key)
         if value is None:
             self.stats["miss"] += 1
@@ -224,7 +224,7 @@ def cacheable(
 ) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> object:
             nonlocal cache_store
             cache_store = cache_store or CACHE
             try:
@@ -249,6 +249,11 @@ def cacheable(
                 except Exception:
                     cache_store.stats["bad_output"] += 1
                     return result
+            elif not isinstance(cached, str):
+                # This check tells mypy that at this stage we can use json to load 'cached'
+                # TODO: Do we need to refactor to avoid this check?
+                raise TypeError("Internal ERROR: 'cached' must be a string")
+
             return decode.loads(cached)
 
         return cast(F, wrapper)
