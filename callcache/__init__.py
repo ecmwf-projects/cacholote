@@ -18,6 +18,7 @@ from . import extra_encoders
 from .cache import cacheable
 from .decode import loads, object_hook
 from .encode import dumps, filecache_default
+from .settings import SETTINGS, config
 
 try:
     # NOTE: the `version.py` file must not be present in the git repository
@@ -30,8 +31,10 @@ except ImportError:  # pragma: no cover
 extra_encoders.register_all()
 
 __all__ = [
+    "SETTINGS",
     "__version__",
     "cacheable",
+    "config",
     "dumps",
     "filecache_default",
     "loads",

@@ -16,7 +16,7 @@
 import pathlib
 from typing import Any, Dict, Union
 
-from . import cache, encode
+from . import cache, encode, settings
 
 try:
     import s3fs
@@ -38,14 +38,13 @@ def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":
 
 def dictify_xr_dataset_s3(
     o: "xr.Dataset",
-    filecache_root: str = "s3://callcache",
     file_name_template: str = "{uuid}.zarr",
     **kwargs: Any,
 ) -> Dict[str, Any]:
     # xarray >= 0.14.1 provide stable hashing
     uuid = cache.hexdigestify(str(o.__dask_tokenize__()))  # type: ignore[no-untyped-call]
     file_name = file_name_template.format(**locals())
-    s3_path = f"{filecache_root}/{file_name}"
+    s3_path = f"{settings.SETTINGS['filecache_root']}/{file_name}"
     store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     try:
         orig = xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
@@ -59,14 +58,13 @@ def dictify_xr_dataset_s3(
 
 def dictify_xr_dataset(
     o: Union["xr.DataArray", "xr.Dataset"],
-    filecache_root: str = ".",
     file_name_template: str = "{uuid}.nc",
     **kwargs: Any,
 ) -> Dict[str, Any]:
     # xarray >= 0.14.1 provide stable hashing
     uuid = cache.hexdigestify(str(o.__dask_tokenize__()))  # type: ignore[no-untyped-call]
     file_name = file_name_template.format(**locals())
-    path = str(pathlib.Path(filecache_root).absolute() / file_name)
+    path = str(pathlib.Path(settings.SETTINGS["filecache_root"]).absolute() / file_name)
     try:
         orig = xr.open_dataset(path)  # type: ignore
     except:  # noqa: E722

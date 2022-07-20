@@ -103,13 +103,12 @@ FILECACHE_ENCODERS: List[Tuple[Any, Callable[..., Any]]] = [
 
 def filecache_default(
     o: Any,
-    filecache_root: str = ".",
     encoders: List[Tuple[Any, Callable[..., Any]]] = FILECACHE_ENCODERS,
 ) -> Any:
     for type_, encoder in reversed(encoders):
         if isinstance(o, type_):
             try:
-                return encoder(o, filecache_root=filecache_root)
+                return encoder(o)
             except Exception:
                 logging.exception("can't pickle object")
     raise TypeError("can't encode object")
@@ -118,18 +117,16 @@ def filecache_default(
 def dumps(
     obj: Any,
     separators: Optional[Tuple[str, str]] = (",", ":"),
-    filecache_root: str = ".",
     **kwargs: Any,
 ) -> str:
-    default = functools.partial(filecache_default, filecache_root=filecache_root)
+    default = functools.partial(filecache_default)
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
 def dumps_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
-    _filecache_root: str = ".",
     **kwargs: Any,
 ) -> str:
     python_call = dictify_python_call(func, *args, **kwargs)
-    return dumps(python_call, filecache_root=_filecache_root)
+    return dumps(python_call)

@@ -216,7 +216,6 @@ def hexdigestify(text: str) -> str:
 
 
 def cacheable(
-    filecache_root: str = ".",
     cache_store: Optional[
         Union[DictStore, DynamoDBStore, FirestoreStore, MemcacheStore]
     ] = None,
@@ -231,7 +230,6 @@ def cacheable(
                 call_json = encode.dumps_python_call(
                     func,
                     *args,
-                    _filecache_root=filecache_root,
                     _callable_version=version,
                     **kwargs,
                 )
@@ -244,7 +242,7 @@ def cacheable(
             if cached is None:
                 result = func(*args, **kwargs)
                 try:
-                    cached = encode.dumps(result, filecache_root=filecache_root)
+                    cached = encode.dumps(result)
                     cache_store.set(hexdigest, cached, expanded_key=call_json)
                 except Exception:
                     cache_store.stats["bad_output"] += 1
