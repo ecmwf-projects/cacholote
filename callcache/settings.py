@@ -18,11 +18,15 @@ SETTINGS can be imported elsewhere to use global settings.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 from types import MappingProxyType, TracebackType
 from typing import Any, Dict, Optional, Type
 
-_SETTINGS: Dict[str, Any] = {"filecache_root": "."}
+import diskcache
+
+_SETTINGS: Dict[str, Any] = {
+    "filecache_root": ".",
+    "cache": diskcache.Cache(disk=diskcache.JSONDisk, statistics=True),
+}
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
 
@@ -47,6 +51,3 @@ class config:
         exc_tb: Optional[TracebackType],
     ) -> None:
         _SETTINGS.update(self._old)
-
-    def __repr__(self) -> str:
-        return json.dumps(_SETTINGS, sort_keys=True, indent=4)

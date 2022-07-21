@@ -58,18 +58,19 @@ def test_roundtrip(tmpdir: str) -> None:
 def test_cacheable(tmpdir: str) -> None:
     with callcache.config(filecache_root=tmpdir):
         cfunc = cache.cacheable()(func)
-        cache.CACHE.clear()
+        callcache.SETTINGS["cache"].clear()
+        callcache.SETTINGS["cache"].stats(reset=True)
 
         data = xr.Dataset(data_vars={"data": [0]})
         res = cfunc(data)
         assert res.identical(data)
-        assert cache.CACHE.stats["miss"] == 1
+        assert callcache.SETTINGS["cache"].stats() == (0, 1)
 
         # FIXME: why do we get two misses?
         res = cfunc(data)
         assert res.identical(data)
-        assert cache.CACHE.stats["miss"] == 2
+        assert callcache.SETTINGS["cache"].stats() == (0, 2)
 
         res = cfunc(data)
         assert res.identical(data)
-        assert cache.CACHE.stats["hit"] == 1
+        assert callcache.SETTINGS["cache"].stats() == (1, 2)

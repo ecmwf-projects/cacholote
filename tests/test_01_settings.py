@@ -22,7 +22,3 @@ def test_settings_context_manager() -> None:
     with callcache.config(filecache_root="dummy"):
         assert callcache.SETTINGS["filecache_root"] == "dummy"
     assert callcache.SETTINGS["filecache_root"] != "dummy"
-
-
-def test_settings_repr() -> None:
-    print(callcache.config())
