@@ -16,6 +16,7 @@
 import functools
 import hashlib
 import time
+import warnings
 from typing import (
     Any,
     Callable,
@@ -28,11 +29,14 @@ from typing import (
     cast,
 )
 
+import diskcache
+
+from .settings import SETTINGS
+
 try:
     import boto3
 except ModuleNotFoundError:
     pass
-import heapdict
 import pymemcache.client.hash
 
 try:
@@ -43,44 +47,6 @@ except ModuleNotFoundError:
 from . import decode, encode
 
 F = TypeVar("F", bound=Callable[..., Any])
-
-
-class DictStore:
-    def __init__(self, max_count: int = 10_000):
-        self.max_count = max_count
-        self.store = heapdict.heapdict()
-        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
-
-    def clear(self) -> None:
-        self.store.clear()
-        self.stats = {"hit": 0, "miss": 0, "bad_input": 0, "bad_output": 0}
-
-    def _prune(self) -> None:
-        while len(self.store) >= self.max_count:
-            self.store.popitem()
-
-    def get(self, key: str) -> Any:
-        try:
-            expires, value, expanded_key = self.store[key]
-            if expires > time.time():
-                self.stats["hit"] += 1
-                return value
-        except KeyError:
-            pass
-        self.stats["miss"] += 1
-        return None
-
-    def set(
-        self,
-        key: str,
-        value: Any,
-        expire: float = 2_635_200,
-        expanded_key: Optional[str] = None,
-    ) -> Literal[True]:
-        expires = time.time() + expire
-        self._prune()
-        self.store[key] = (expires, value, expanded_key)
-        return True
 
 
 class DynamoDBStore:
@@ -207,25 +173,20 @@ class MemcacheStore:
         return value and value.decode("utf-8")
 
 
-CACHE = DictStore()
-
-
 def hexdigestify(text: str) -> str:
     hash_req = hashlib.sha3_224(text.encode())
     return hash_req.hexdigest()
 
 
 def cacheable(
-    cache_store: Optional[
-        Union[DictStore, DynamoDBStore, FirestoreStore, MemcacheStore]
-    ] = None,
+    cache_store: Optional[Union[diskcache.Cache]] = None,
     version: Optional[str] = None,
 ) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             nonlocal cache_store
-            cache_store = cache_store or CACHE
+            cache_store = cache_store or SETTINGS["cache"]
             try:
                 call_json = encode.dumps_python_call(
                     func,
@@ -234,7 +195,7 @@ def cacheable(
                     **kwargs,
                 )
             except TypeError:
-                cache_store.stats["bad_input"] += 1
+                warnings.warn("bad input", UserWarning)
                 return func(*args, **kwargs)
 
             hexdigest = hexdigestify(call_json)
@@ -243,9 +204,9 @@ def cacheable(
                 result = func(*args, **kwargs)
                 try:
                     cached = encode.dumps(result)
-                    cache_store.set(hexdigest, cached, expanded_key=call_json)
+                    cache_store[hexdigest] = cached
                 except Exception:
-                    cache_store.stats["bad_output"] += 1
+                    warnings.warn("bad output", UserWarning)
                     return result
             elif not isinstance(cached, str):
                 # This check tells mypy that at this stage we can use json to load 'cached'

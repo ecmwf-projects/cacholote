@@ -14,8 +14,8 @@ dependencies:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - boto3
 - dask
+- diskcache
 - google-cloud-firestore
-- heapdict
 - netCDF4
 - pymemcache
 - s3fs
