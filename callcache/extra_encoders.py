@@ -44,7 +44,7 @@ def dictify_xr_dataset_s3(
     # xarray >= 0.14.1 provide stable hashing
     uuid = cache.hexdigestify(str(o.__dask_tokenize__()))  # type: ignore[no-untyped-call]
     file_name = file_name_template.format(**locals())
-    s3_path = f"{settings.SETTINGS['filecache_root']}/{file_name}"
+    s3_path = f"{settings.SETTINGS['cache'].directory}/{file_name}"
     store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     try:
         orig = xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
@@ -64,7 +64,9 @@ def dictify_xr_dataset(
     # xarray >= 0.14.1 provide stable hashing
     uuid = cache.hexdigestify(str(o.__dask_tokenize__()))  # type: ignore[no-untyped-call]
     file_name = file_name_template.format(**locals())
-    path = str(pathlib.Path(settings.SETTINGS["filecache_root"]).absolute() / file_name)
+    path = str(
+        pathlib.Path(settings.SETTINGS["cache"].directory).absolute() / file_name
+    )
     try:
         orig = xr.open_dataset(path)  # type: ignore
     except:  # noqa: E722

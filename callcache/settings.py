@@ -24,7 +24,6 @@ from typing import Any, Dict, Optional, Type
 import diskcache
 
 _SETTINGS: Dict[str, Any] = {
-    "filecache_root": ".",
     "cache": diskcache.Cache(disk=diskcache.JSONDisk, statistics=True),
 }
 # Immutable settings to be used by other modules
