@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional, Type
 import diskcache
 
 _SETTINGS: Dict[str, Any] = {
-    "cache": diskcache.Cache(disk=diskcache.JSONDisk, statistics=True),
+    "cache": diskcache.Cache(disk=diskcache.JSONDisk),
 }
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)

@@ -55,8 +55,6 @@ def test_roundtrip() -> None:
 
 def test_cacheable() -> None:
     cfunc = cache.cacheable()(func)
-    callcache.SETTINGS["cache"].clear()
-    callcache.SETTINGS["cache"].stats(reset=True)
 
     data = xr.Dataset(data_vars={"data": [0]})
     res = cfunc(data)
