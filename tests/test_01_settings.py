@@ -9,15 +9,16 @@ def test_settings_change() -> None:
     new_cache = Cache()
     assert old_cache is not new_cache
 
+    # context manager
+    with callcache.config(cache=new_cache):
+        assert callcache.SETTINGS["cache"] is new_cache
+    assert callcache.SETTINGS["cache"] is old_cache
+
     callcache.config(cache=new_cache)
     assert callcache.SETTINGS["cache"] is new_cache
 
     # Restore default
     callcache.config(cache=old_cache)
-    assert callcache.SETTINGS["cache"] is old_cache
-
-    with callcache.config(cache=new_cache):
-        assert callcache.SETTINGS["cache"] is new_cache
     assert callcache.SETTINGS["cache"] is old_cache
 
     with pytest.raises(
