@@ -2,8 +2,7 @@ from typing import Any
 
 import pytest
 
-import callcache
-from callcache import cache
+from callcache import cache, config
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
@@ -28,11 +27,11 @@ def test_cacheable() -> None:
     cfunc = cache.cacheable()(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert callcache.SETTINGS["cache"].stats() == (0, 1)
+    assert config.SETTINGS["cache"].stats() == (0, 1)
 
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert callcache.SETTINGS["cache"].stats() == (1, 1)
+    assert config.SETTINGS["cache"].stats() == (1, 1)
 
     class Dummy:
         pass

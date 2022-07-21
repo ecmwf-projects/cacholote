@@ -14,11 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import extra_encoders, extra_stores
+from . import config, extra_encoders, extra_stores
 from .cache import cacheable
 from .decode import loads, object_hook
 from .encode import dumps, filecache_default
-from .settings import SETTINGS, config
 
 try:
     # NOTE: the `version.py` file must not be present in the git repository

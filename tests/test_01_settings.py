@@ -1,27 +1,25 @@
 import pytest
 from diskcache import Cache
 
-import callcache
+from callcache import config
 
 
 def test_settings_change() -> None:
-    old_cache = callcache.SETTINGS["cache"]
+    old_cache = config.SETTINGS["cache"]
     new_cache = Cache()
     assert old_cache is not new_cache
 
     # context manager
-    with callcache.config(cache=new_cache):
-        assert callcache.SETTINGS["cache"] is new_cache
-    assert callcache.SETTINGS["cache"] is old_cache
+    with config.set(cache=new_cache):
+        assert config.SETTINGS["cache"] is new_cache
+    assert config.SETTINGS["cache"] is old_cache
 
-    callcache.config(cache=new_cache)
-    assert callcache.SETTINGS["cache"] is new_cache
+    config.set(cache=new_cache)
+    assert config.SETTINGS["cache"] is new_cache
 
     # Restore default
-    callcache.config(cache=old_cache)
-    assert callcache.SETTINGS["cache"] is old_cache
+    config.set(cache=old_cache)
+    assert config.SETTINGS["cache"] is old_cache
 
-    with pytest.raises(
-        ValueError, match="The following settings do NOT exist: {'dummy'}"
-    ):
-        callcache.config(dummy="dummy")
+    with pytest.raises(KeyError, match="Wrong settings. Available settings: "):
+        config.set(dummy="dummy")

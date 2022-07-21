@@ -30,14 +30,16 @@ _SETTINGS: Dict[str, Any] = {
 SETTINGS = MappingProxyType(_SETTINGS)
 
 
-class config:
+class set:
     # TODO: Add docstring
     def __init__(self, **kwargs: Any):
-        wrong_keys = set(kwargs) - set(_SETTINGS)
-        if wrong_keys:
-            raise ValueError(f"The following settings do NOT exist: {wrong_keys!r}")
+        try:
+            self._old = {key: _SETTINGS[key] for key in kwargs}
+        except KeyError as ex:
+            raise KeyError(
+                f"Wrong settings. Available settings: {list(_SETTINGS)}"
+            ) from ex
 
-        self._old = {key: _SETTINGS[key] for key in kwargs}
         _SETTINGS.update(kwargs)
 
     def __enter__(self) -> None:

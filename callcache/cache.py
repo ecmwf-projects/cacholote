@@ -21,7 +21,7 @@ from typing import Any, Callable, Optional, TypeVar, Union, cast
 import diskcache
 
 from . import decode, encode
-from .settings import SETTINGS
+from .config import SETTINGS
 
 F = TypeVar("F", bound=Callable[..., Any])
 
