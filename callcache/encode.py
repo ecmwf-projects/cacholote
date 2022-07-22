@@ -19,9 +19,9 @@ import datetime
 import functools
 import inspect
 import json
-import logging
 import operator
 import pickle
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
@@ -101,6 +101,10 @@ FILECACHE_ENCODERS: List[Tuple[Any, Callable[..., Any]]] = [
 ]
 
 
+class EncodeError(Exception):
+    pass
+
+
 def filecache_default(
     o: Any,
     encoders: List[Tuple[Any, Callable[..., Any]]] = FILECACHE_ENCODERS,
@@ -109,9 +113,9 @@ def filecache_default(
         if isinstance(o, type_):
             try:
                 return encoder(o)
-            except Exception:
-                logging.exception("can't pickle object")
-    raise TypeError("can't encode object")
+            except Exception as ex:
+                warnings.warn(f"{encoder!r} did not work: {ex!r}")
+    raise EncodeError("can't encode object")
 
 
 def dumps(

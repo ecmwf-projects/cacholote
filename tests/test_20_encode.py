@@ -96,8 +96,9 @@ def test_filecache_default() -> None:
     class Dummy:
         pass
 
-    with pytest.raises(TypeError):
-        encode.filecache_default(Dummy())
+    with pytest.warns(UserWarning):
+        with pytest.raises(encode.EncodeError):
+            encode.filecache_default(Dummy())
 
 
 @pytest.mark.parametrize(

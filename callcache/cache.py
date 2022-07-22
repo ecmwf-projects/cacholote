@@ -39,7 +39,7 @@ def cacheable(func: F) -> F:
                 *args,
                 **kwargs,
             )
-        except TypeError:
+        except encode.EncodeError:
             warnings.warn("bad input", UserWarning)
             return func(*args, **kwargs)
 
@@ -50,7 +50,7 @@ def cacheable(func: F) -> F:
             try:
                 cached = encode.dumps(result)
                 cache_store[hexdigest] = cached
-            except Exception:
+            except encode.EncodeError:
                 warnings.warn("bad output", UserWarning)
                 return result
         elif not isinstance(cached, str):
