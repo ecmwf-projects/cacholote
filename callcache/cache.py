@@ -16,9 +16,7 @@
 import functools
 import hashlib
 import warnings
-from typing import Any, Callable, Optional, TypeVar, Union, cast
-
-import diskcache
+from typing import Any, Callable, TypeVar, cast
 
 from . import decode, encode
 from .config import SETTINGS
@@ -31,20 +29,15 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()
 
 
-def cacheable(
-    cache_store: Optional[Union[diskcache.Cache]] = None,
-    version: Optional[str] = None,
-) -> Callable[[F], F]:
+def cacheable() -> Callable[[F], F]:
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            nonlocal cache_store
-            cache_store = cache_store or SETTINGS["cache"]
+            cache_store = SETTINGS["cache"]
             try:
                 call_json = encode.dumps_python_call(
                     func,
                     *args,
-                    _callable_version=version,
                     **kwargs,
                 )
             except TypeError:
