@@ -60,8 +60,6 @@ def dictify_xr_dataset_s3(
     except:  # noqa: E722
         orig = None
         obj.to_zarr(store=store)
-    if orig is not None and not obj.identical(orig):
-        raise RuntimeError(f"inconsistent array in file {s3_path}")
     return encode.dictify_python_call(open_zarr, s3_path)
 
 
@@ -78,8 +76,6 @@ def dictify_xr_dataset(
     except:  # noqa: E722
         orig = None
         obj.to_netcdf(path)
-    if orig is not None and not obj.identical(orig):
-        raise RuntimeError(f"inconsistent array in file {path}")
     return encode.dictify_python_call(xr.open_dataset, path)
 
 

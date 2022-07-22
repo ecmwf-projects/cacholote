@@ -41,10 +41,6 @@ def test_dictify_xr_dataset() -> None:
     res = extra_encoders.dictify_xr_dataset(data)
     assert res == expected
 
-    data["data"].values[0] = 1
-    with pytest.raises(RuntimeError):
-        extra_encoders.dictify_xr_dataset(data, data_path1)
-
 
 def test_roundtrip() -> None:
     data = xr.Dataset(data_vars={"data": [0]})

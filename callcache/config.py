@@ -55,8 +55,7 @@ def initialize_cache() -> diskcache.Cache:
     return diskcache.Cache(**kwargs, disk=diskcache.JSONDisk)
 
 
-if "cache" not in _SETTINGS:
-    _SETTINGS["cache"] = initialize_cache()
+_SETTINGS["cache"] = initialize_cache()
 
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
