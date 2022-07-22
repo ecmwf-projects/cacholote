@@ -56,9 +56,8 @@ def dictify_xr_dataset_s3(
     s3_path = f"{config.SETTINGS['cache'].directory}/{file_name}"
     store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     try:
-        orig = xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
+        xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
     except:  # noqa: E722
-        orig = None
         obj.to_zarr(store=store)
     return encode.dictify_python_call(open_zarr, s3_path)
 
@@ -72,9 +71,8 @@ def dictify_xr_dataset(
     file_name = file_name_template.format(**locals())
     path = str(pathlib.Path(config.SETTINGS["cache"].directory).absolute() / file_name)
     try:
-        orig = xr.open_dataset(path)  # type: ignore[no-untyped-call]
+        xr.open_dataset(path)  # type: ignore[no-untyped-call]
     except:  # noqa: E722
-        orig = None
         obj.to_netcdf(path)
     return encode.dictify_python_call(xr.open_dataset, path)
 
