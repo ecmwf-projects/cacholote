@@ -24,7 +24,7 @@ def test_hexdigestify() -> None:
 
 
 def test_cacheable() -> None:
-    cfunc = cache.cacheable()(func)
+    cfunc = cache.cacheable(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
     assert config.SETTINGS["cache"].stats() == (0, 1)

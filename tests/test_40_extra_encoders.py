@@ -49,7 +49,7 @@ def test_roundtrip() -> None:
 
 
 def test_cacheable() -> None:
-    cfunc = cache.cacheable()(func)
+    cfunc = cache.cacheable(func)
 
     data = xr.Dataset(data_vars={"data": [0]})
     res = cfunc(data)

@@ -29,38 +29,35 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()
 
 
-def cacheable() -> Callable[[F], F]:
-    def decorator(func: F) -> F:
-        @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            cache_store = SETTINGS["cache"]
+def cacheable(func: F) -> F:
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        cache_store = SETTINGS["cache"]
+        try:
+            call_json = encode.dumps_python_call(
+                func,
+                *args,
+                **kwargs,
+            )
+        except TypeError:
+            warnings.warn("bad input", UserWarning)
+            return func(*args, **kwargs)
+
+        hexdigest = hexdigestify(call_json)
+        cached = cache_store.get(hexdigest)
+        if cached is None:
+            result = func(*args, **kwargs)
             try:
-                call_json = encode.dumps_python_call(
-                    func,
-                    *args,
-                    **kwargs,
-                )
-            except TypeError:
-                warnings.warn("bad input", UserWarning)
-                return func(*args, **kwargs)
+                cached = encode.dumps(result)
+                cache_store[hexdigest] = cached
+            except Exception:
+                warnings.warn("bad output", UserWarning)
+                return result
+        elif not isinstance(cached, str):
+            # This check tells mypy that at this stage we can use json to load 'cached'
+            # TODO: Do we need to refactor to avoid this check?
+            raise TypeError("Internal ERROR: 'cached' must be a string")
 
-            hexdigest = hexdigestify(call_json)
-            cached = cache_store.get(hexdigest)
-            if cached is None:
-                result = func(*args, **kwargs)
-                try:
-                    cached = encode.dumps(result)
-                    cache_store[hexdigest] = cached
-                except Exception:
-                    warnings.warn("bad output", UserWarning)
-                    return result
-            elif not isinstance(cached, str):
-                # This check tells mypy that at this stage we can use json to load 'cached'
-                # TODO: Do we need to refactor to avoid this check?
-                raise TypeError("Internal ERROR: 'cached' must be a string")
+        return decode.loads(cached)
 
-            return decode.loads(cached)
-
-        return cast(F, wrapper)
-
-    return decorator
+    return cast(F, wrapper)
