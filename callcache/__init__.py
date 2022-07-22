@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import extra_encoders
+from . import config, extra_encoders, extra_stores
 from .cache import cacheable
 from .decode import loads, object_hook
 from .encode import dumps, filecache_default
@@ -32,7 +32,10 @@ extra_encoders.register_all()
 __all__ = [
     "__version__",
     "cacheable",
+    "config",
     "dumps",
+    "extra_encoders",
+    "extra_stores",
     "filecache_default",
     "loads",
     "object_hook",
