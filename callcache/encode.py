@@ -16,7 +16,6 @@
 import binascii
 import collections.abc
 import datetime
-import functools
 import inspect
 import json
 import operator
@@ -123,7 +122,7 @@ def dumps(
     separators: Optional[Tuple[str, str]] = (",", ":"),
     **kwargs: Any,
 ) -> str:
-    default = functools.partial(filecache_default)
+    default = filecache_default
     return json.dumps(obj, separators=separators, default=default, **kwargs)
 
 
