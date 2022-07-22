@@ -47,15 +47,12 @@ _SETTINGS: Dict[str, Any] = {
 
 def initialize_cache() -> diskcache.Cache:
     sig = inspect.signature(diskcache.Cache.__init__)
-
-    return diskcache.Cache(
-        **{
-            k: v
-            for k, v in _SETTINGS.items()
-            if k in diskcache.DEFAULT_SETTINGS or k in sig.parameters.keys()
-        },
-        disk=diskcache.JSONDisk,
-    )
+    kwargs = {
+        k: v
+        for k, v in _SETTINGS.items()
+        if k in diskcache.DEFAULT_SETTINGS or k in sig.parameters.keys()
+    }
+    return diskcache.Cache(**kwargs, disk=diskcache.JSONDisk)
 
 
 if "cache" not in _SETTINGS:
