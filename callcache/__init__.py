@@ -30,11 +30,11 @@ except ImportError:  # pragma: no cover
 extra_encoders.register_all()
 
 __all__ = [
-    "SETTINGS",
     "__version__",
     "cacheable",
     "config",
     "dumps",
+    "extra_encoders",
     "extra_stores",
     "filecache_default",
     "loads",
