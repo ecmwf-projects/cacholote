@@ -1,6 +1,6 @@
 {
   "template": "https://github.com/ecmwf-projects/cookiecutter-conda-package",
-  "commit": "8329975706fe45568991c997f9cedb3186e578ce",
+  "commit": "fff5ed99208b619da09b2fd8ed907d0df3a99e17",
   "checkout": null,
   "context": {
     "cookiecutter": {
@@ -9,7 +9,7 @@
       "project_short_description": "Efficiently cache calls to functions",
       "copyright_holder": "B-Open Solutions srl",
       "copyright_year": "2019",
-      "mypy_strict": true,
+      "mypy_strict": "True",
       "_template": "https://github.com/ecmwf-projects/cookiecutter-conda-package"
     }
   },
