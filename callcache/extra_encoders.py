@@ -71,7 +71,7 @@ def dictify_xr_dataset(
     file_name = file_name_template.format(**locals())
     path = str(pathlib.Path(config.SETTINGS["cache"].directory).absolute() / file_name)
     try:
-        xr.open_dataset(path)  # type: ignore[no-untyped-call]
+        xr.open_dataset(path)
     except:  # noqa: E722
         obj.to_netcdf(path)
     return encode.dictify_python_call(xr.open_dataset, path)

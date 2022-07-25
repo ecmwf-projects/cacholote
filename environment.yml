@@ -19,5 +19,5 @@ dependencies:
 - netCDF4
 - pymemcache
 - s3fs
-- xarray
+- xarray>=2022.6.0
 - zarr

@@ -14,7 +14,7 @@ def func(a: T) -> T:
 
 
 def test_dictify_xr_dataset() -> None:
-    data_name = "a7279f6557c7eb114f8287b308a5eb43b4a5567628369892d27291de.nc"
+    data_name = "1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784.nc"
     data_path = os.path.join(config.SETTINGS["cache"].directory, data_name)
     data = xr.Dataset(data_vars={"data": [0]})
     expected = {
@@ -25,7 +25,7 @@ def test_dictify_xr_dataset() -> None:
     res = extra_encoders.dictify_xr_dataset(data)
     assert res == expected
 
-    data_name1 = "2f621f66051eee9e5edc3e9c6e3642c82e5b24ff3e72b579ab9bb2ab.nc"
+    data_name1 = "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc"
     data_path1 = os.path.join(config.SETTINGS["cache"].directory, data_name1)
     expected = {
         "type": "python_call",
