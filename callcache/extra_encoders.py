@@ -53,7 +53,7 @@ def dictify_xr_dataset_s3(
     token = tokenize_xr_object(obj)
     uuid = cache.hexdigestify(token)
     file_name = file_name_template.format(**locals())
-    s3_path = f"{config.SETTINGS['cache'].directory}/{file_name}"
+    s3_path = f"{config.SETTINGS['directory']}/{file_name}"
     store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
     try:
         xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
@@ -69,7 +69,7 @@ def dictify_xr_dataset(
     token = tokenize_xr_object(obj)
     uuid = cache.hexdigestify(token)
     file_name = file_name_template.format(**locals())
-    path = str(pathlib.Path(config.SETTINGS["cache"].directory).absolute() / file_name)
+    path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / file_name)
     try:
         xr.open_dataset(path)
     except:  # noqa: E722
