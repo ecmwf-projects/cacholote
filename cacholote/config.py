@@ -73,9 +73,7 @@ class set:
 
             # infer settings from cache properties
             new_cache = kwargs["cache"]
-            for key in _SETTINGS.keys() - {
-                "cache",
-            }:
+            for key in _SETTINGS.keys() - kwargs.keys():
                 if isinstance(getattr(type(new_cache), key, None), property):
                     kwargs[key] = getattr(new_cache, key)
 
