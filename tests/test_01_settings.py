@@ -6,18 +6,21 @@ from diskcache import Cache
 from cacholote import config
 
 
-def test_set_cache() -> None:
+def test_set_cache(tmpdir: str) -> None:
+    newdir = os.path.join(tmpdir, "dummy")
     old_cache = config.SETTINGS["cache"]
-    new_cache = Cache()
+    new_cache = Cache(directory=newdir)
     assert old_cache is not new_cache
 
-    # context manager
     with config.set(cache=new_cache):
         assert config.SETTINGS["cache"] is new_cache
+        assert config.SETTINGS["directory"] == newdir
     assert config.SETTINGS["cache"] is old_cache
+    assert config.SETTINGS["directory"] == tmpdir
 
     config.set(cache=new_cache)
     assert config.SETTINGS["cache"] is new_cache
+    assert config.SETTINGS["directory"] == newdir
 
     with pytest.raises(
         ValueError, match=r"'cache' is mutually exclusive with all other settings"
