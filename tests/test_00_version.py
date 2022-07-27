@@ -1,5 +1,5 @@
-import callcache
+import cacholote
 
 
 def test_version() -> None:
-    assert callcache.__version__ != "999"
+    assert cacholote.__version__ != "999"

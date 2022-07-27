@@ -4,8 +4,8 @@
   "checkout": null,
   "context": {
     "cookiecutter": {
-      "project_name": "callcache",
-      "project_slug": "callcache",
+      "project_name": "cacholote",
+      "project_slug": "cacholote",
       "project_short_description": "Efficiently cache calls to functions",
       "copyright_holder": "B-Open Solutions srl",
       "copyright_year": "2019",

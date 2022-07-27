@@ -1,6 +1,6 @@
 import pytest
 
-from callcache import extra_stores
+from cacholote import extra_stores
 
 
 @pytest.mark.xfail()
@@ -30,7 +30,7 @@ def test_MemcacheStore() -> None:
 
 @pytest.mark.xfail()
 def test_DynamoDBStore() -> None:
-    store = extra_stores.DynamoDBStore("test_callcache")
+    store = extra_stores.DynamoDBStore("test_cacholote")
 
     store.set("1", "a")
 
@@ -55,7 +55,7 @@ def test_DynamoDBStore() -> None:
 
 @pytest.mark.xfail()
 def test_FirestoreStore() -> None:
-    store = extra_stores.FirestoreStore("test_callcache")
+    store = extra_stores.FirestoreStore("test_cacholote")
 
     store.set("1", "a")
 

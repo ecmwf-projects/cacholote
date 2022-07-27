@@ -1,4 +1,4 @@
-# Welcome to callcache's documentation!
+# Welcome to cacholote's documentation!
 
 Efficiently cache calls to functions.
 
@@ -6,7 +6,7 @@ Efficiently cache calls to functions.
 :caption: 'Contents:'
 :maxdepth: 2
 
-API Reference <_api/callcache/index>
+API Reference <_api/cacholote/index>
 ```
 
 # Indices and tables

@@ -1,4 +1,4 @@
-PROJECT := callcache
+PROJECT := cacholote
 CONDA := conda
 CONDAFLAGS :=
 COV_REPORT := html

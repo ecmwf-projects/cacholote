@@ -1,4 +1,4 @@
-# callcache
+# cacholote
 
 Efficiently cache calls to functions
 
