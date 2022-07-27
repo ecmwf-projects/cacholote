@@ -64,8 +64,20 @@ SETTINGS = MappingProxyType(_SETTINGS)
 class set:
     # TODO: Add docstring
     def __init__(self, **kwargs: Any):
-        if "cache" in kwargs and len(kwargs) != 1:
-            raise ValueError("'cache' is mutually exclusive with all other settings")
+
+        if "cache" in kwargs:
+            if len(kwargs) != 1:
+                raise ValueError(
+                    "'cache' is mutually exclusive with all other settings"
+                )
+
+            # infer settings from cache properties
+            new_cache = kwargs["cache"]
+            for key in _SETTINGS.keys() - {
+                "cache",
+            }:
+                if isinstance(getattr(type(new_cache), key, None), property):
+                    kwargs[key] = getattr(new_cache, key)
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
@@ -76,6 +88,7 @@ class set:
 
         _SETTINGS.update(kwargs)
         if "cache" not in kwargs:
+            self._old["cache"] = _SETTINGS["cache"]
             _SETTINGS["cache"] = initialize_cache()
 
     def __enter__(self) -> None:
@@ -88,5 +101,3 @@ class set:
         exc_tb: Optional[TracebackType],
     ) -> None:
         _SETTINGS.update(self._old)
-        if "cache" not in self._old:
-            _SETTINGS["cache"] = initialize_cache()
