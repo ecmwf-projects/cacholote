@@ -27,11 +27,11 @@ def test_cacheable() -> None:
     cfunc = cache.cacheable(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert config.SETTINGS["cache"].stats() == (0, 1)
+    assert config.SETTINGS["cache_store"].stats() == (0, 1)
 
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert config.SETTINGS["cache"].stats() == (1, 1)
+    assert config.SETTINGS["cache_store"].stats() == (1, 1)
 
     class Dummy:
         pass

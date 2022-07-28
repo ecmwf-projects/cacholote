@@ -32,7 +32,6 @@ def hexdigestify(text: str) -> str:
 def cacheable(func: F) -> F:
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        cache_store = SETTINGS["cache"]
         try:
             call_json = encode.dumps_python_call(
                 func,
@@ -44,12 +43,12 @@ def cacheable(func: F) -> F:
             return func(*args, **kwargs)
 
         hexdigest = hexdigestify(call_json)
-        cached = cache_store.get(hexdigest)
+        cached = SETTINGS["cache_store"].get(hexdigest)
         if cached is None:
             result = func(*args, **kwargs)
             try:
                 cached = encode.dumps(result)
-                cache_store[hexdigest] = cached
+                SETTINGS["cache_store"][hexdigest] = cached
             except encode.EncodeError:
                 warnings.warn("bad output", UserWarning)
                 return result

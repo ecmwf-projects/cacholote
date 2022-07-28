@@ -15,7 +15,7 @@ def func(a: T) -> T:
 
 def test_dictify_xr_dataset() -> None:
     data_name = "1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784.nc"
-    data_path = os.path.join(config.SETTINGS["cache"].directory, data_name)
+    data_path = os.path.join(config.SETTINGS["cache_store"].directory, data_name)
     data = xr.Dataset(data_vars={"data": [0]})
     expected = {
         "type": "python_call",
@@ -27,7 +27,7 @@ def test_dictify_xr_dataset() -> None:
     assert os.path.exists(data_path)
 
     data_name1 = "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc"
-    data_path1 = os.path.join(config.SETTINGS["cache"].directory, data_name1)
+    data_path1 = os.path.join(config.SETTINGS["cache_store"].directory, data_name1)
     expected = {
         "type": "python_call",
         "callable": "xarray.backends.api:open_dataset",
@@ -58,13 +58,13 @@ def test_cacheable() -> None:
     data = xr.Dataset(data_vars={"data": [0]})
     res = cfunc(data)
     assert res.identical(data)
-    assert config.SETTINGS["cache"].stats() == (0, 1)
+    assert config.SETTINGS["cache_store"].stats() == (0, 1)
 
     # FIXME: why do we get two misses?
     res = cfunc(data)
     assert res.identical(data)
-    assert config.SETTINGS["cache"].stats() == (0, 2)
+    assert config.SETTINGS["cache_store"].stats() == (0, 2)
 
     res = cfunc(data)
     assert res.identical(data)
-    assert config.SETTINGS["cache"].stats() == (1, 2)
+    assert config.SETTINGS["cache_store"].stats() == (1, 2)

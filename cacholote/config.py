@@ -45,7 +45,7 @@ _SETTINGS: Dict[str, Any] = {
 }
 
 
-def initialize_cache() -> diskcache.Cache:
+def initialize_cache_store() -> diskcache.Cache:
     sig = inspect.signature(diskcache.Cache.__init__)
     kwargs = {
         k: v
@@ -55,7 +55,7 @@ def initialize_cache() -> diskcache.Cache:
     return diskcache.Cache(**kwargs, disk=diskcache.JSONDisk)
 
 
-_SETTINGS["cache"] = initialize_cache()
+_SETTINGS["cache_store"] = initialize_cache_store()
 
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
@@ -65,17 +65,17 @@ class set:
     # TODO: Add docstring
     def __init__(self, **kwargs: Any):
 
-        if "cache" in kwargs:
+        if "cache_store" in kwargs:
             if len(kwargs) != 1:
                 raise ValueError(
-                    "'cache' is mutually exclusive with all other settings"
+                    "'cache_store' is mutually exclusive with all other settings"
                 )
 
-            # infer settings from cache properties
-            new_cache = kwargs["cache"]
+            # infer settings from cache_store properties
+            new_cache_store = kwargs["cache_store"]
             for key in _SETTINGS.keys() - kwargs.keys():
-                if isinstance(getattr(type(new_cache), key, None), property):
-                    kwargs[key] = getattr(new_cache, key)
+                if isinstance(getattr(type(new_cache_store), key, None), property):
+                    kwargs[key] = getattr(new_cache_store, key)
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
@@ -85,9 +85,9 @@ class set:
             ) from ex
 
         _SETTINGS.update(kwargs)
-        if "cache" not in kwargs:
-            self._old["cache"] = _SETTINGS["cache"]
-            _SETTINGS["cache"] = initialize_cache()
+        if "cache_store" not in kwargs:
+            self._old["cache_store"] = _SETTINGS["cache_store"]
+            _SETTINGS["cache_store"] = initialize_cache_store()
 
     def __enter__(self) -> None:
         pass
