@@ -50,10 +50,10 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             try:
                 cached = encode.dumps(result)
-                cache_store[hexdigest] = cached
             except encode.EncodeError:
                 warnings.warn("bad output", UserWarning)
                 return result
+            cache_store[hexdigest] = cached
 
         return decode.loads(cached)
 
