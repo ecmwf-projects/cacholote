@@ -3,7 +3,7 @@ import os
 import pytest
 from diskcache import Cache
 
-from callcache import config
+from cacholote import config
 
 
 def test_set_cache(tmpdir: str) -> None:

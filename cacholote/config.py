@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Type
 import diskcache
 
 _SETTINGS: Dict[str, Any] = {
-    "directory": os.path.join(tempfile.gettempdir(), "callcache"),  # cache directory
+    "directory": os.path.join(tempfile.gettempdir(), "cacholote"),  # cache directory
     "timeout": 60,  # SQLite connection timeout
     "statistics": 1,  # True
     "tag_index": 0,  # False

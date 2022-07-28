@@ -3,7 +3,7 @@ from typing import TypeVar
 
 import pytest
 
-from callcache import cache, config, decode, encode, extra_encoders
+from cacholote import cache, config, decode, encode, extra_encoders
 
 xr = pytest.importorskip("xarray")
 T = TypeVar("T")

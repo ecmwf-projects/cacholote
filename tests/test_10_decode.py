@@ -1,6 +1,6 @@
 import pytest
 
-from callcache import decode
+from cacholote import decode
 
 
 def test_import_object() -> None:

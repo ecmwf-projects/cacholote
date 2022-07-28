@@ -17,7 +17,7 @@ convention = "numpy"
 add_ignore = "D1"
 
 [tool.setuptools_scm]
-write_to = "callcache/version.py"
+write_to = "cacholote/version.py"
 write_to_template = '''
 # Do not change! Do not track in version control!
 __version__ = "{version}"

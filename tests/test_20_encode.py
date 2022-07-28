@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from callcache import decode, encode
+from cacholote import decode, encode
 
 
 def func(

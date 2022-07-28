@@ -1,6 +1,6 @@
 import pytest
 
-from callcache import config
+from cacholote import config
 
 
 @pytest.fixture(autouse=True)

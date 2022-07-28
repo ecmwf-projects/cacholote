@@ -9,17 +9,17 @@
 import os
 import sys
 
-import callcache
+import cacholote
 
 sys.path.insert(0, os.path.abspath("../"))
 
 # -- Project information -----------------------------------------------------
 
-project = "callcache"
+project = "cacholote"
 copyright = "2019, B-Open Solutions srl"
 author = "B-Open Solutions srl"
-version = callcache.__version__
-release = callcache.__version__
+version = cacholote.__version__
+release = cacholote.__version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -37,7 +37,7 @@ extensions = [
 autodoc_typehints = "none"
 
 # autoapi configuration
-autoapi_dirs = ["../callcache"]
+autoapi_dirs = ["../cacholote"]
 autoapi_ignore = ["*/version.py"]
 autoapi_options = [
     "members",
