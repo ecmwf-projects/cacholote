@@ -43,19 +43,17 @@ def cacheable(func: F) -> F:
             return func(*args, **kwargs)
 
         hexdigest = hexdigestify(call_json)
-        cached = SETTINGS["cache_store"].get(hexdigest)
-        if cached is None:
+        cache_store = SETTINGS["cache_store"]
+        try:
+            cached = cache_store[hexdigest]
+        except KeyError:
             result = func(*args, **kwargs)
             try:
                 cached = encode.dumps(result)
-                SETTINGS["cache_store"][hexdigest] = cached
+                cache_store[hexdigest] = cached
             except encode.EncodeError:
                 warnings.warn("bad output", UserWarning)
                 return result
-        elif not isinstance(cached, str):
-            # This check tells mypy that at this stage we can use json to load 'cached'
-            # TODO: Do we need to refactor to avoid this check?
-            raise TypeError("Internal ERROR: 'cached' must be a string")
 
         return decode.loads(cached)
 
