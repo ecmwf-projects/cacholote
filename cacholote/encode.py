@@ -24,22 +24,22 @@ import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 
-def inspect_fully_qualified_name(o: Callable[..., Any]) -> str:
+def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
     """Return the fully qualified name of a python object."""
-    module = inspect.getmodule(o)
+    module = inspect.getmodule(obj)
     if module is None:
-        raise ValueError(f"can't getmodule for {o!r}")
-    return f"{module.__name__}:{o.__qualname__}"
+        raise ValueError(f"can't getmodule for {obj!r}")
+    return f"{module.__name__}:{obj.__qualname__}"
 
 
-def dictify_python_object(o: Union[str, Callable[..., Any]]) -> Dict[str, str]:
-    if isinstance(o, str):
+def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]:
+    if isinstance(obj, str):
         # NOTE: a stricter test would be decode.import_object(obj)
-        if ":" not in o:
-            raise ValueError(f"{o} not in the form 'module:qualname'")
-        fully_qualified_name = o
+        if ":" not in obj:
+            raise ValueError(f"{obj} not in the form 'module:qualname'")
+        fully_qualified_name = obj
     else:
-        fully_qualified_name = inspect_fully_qualified_name(o)
+        fully_qualified_name = inspect_fully_qualified_name(obj)
     object_simple = {
         "type": "python_object",
         "fully_qualified_name": fully_qualified_name,
@@ -68,26 +68,28 @@ def dictify_python_call(
     return python_call_simple
 
 
-def dictify_datetime(o: datetime.datetime, **kwargs: Any) -> Dict[str, Any]:
+def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:
     # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
-    return dictify_python_call("datetime:datetime.fromisoformat", o.isoformat())
+    return dictify_python_call("datetime:datetime.fromisoformat", obj.isoformat())
 
 
-def dictify_date(o: datetime.date, **kwargs: Any) -> Dict[str, Any]:
-    return dictify_python_call("datetime:date.fromisoformat", o.isoformat())
+def dictify_date(obj: datetime.date) -> Dict[str, Any]:
+    return dictify_python_call("datetime:date.fromisoformat", obj.isoformat())
 
 
-def dictify_timedelta(o: datetime.timedelta, **kwargs: Any) -> Dict[str, Any]:
-    return dictify_python_call("datetime:timedelta", o.days, o.seconds, o.microseconds)
+def dictify_timedelta(obj: datetime.timedelta) -> Dict[str, Any]:
+    return dictify_python_call(
+        "datetime:timedelta", obj.days, obj.seconds, obj.microseconds
+    )
 
 
-def dictify_bytes(o: bytes, **kwargs: Any) -> Dict[str, Any]:
-    ascii_decoded = binascii.b2a_base64(o).decode("ascii")
+def dictify_bytes(obj: bytes) -> Dict[str, Any]:
+    ascii_decoded = binascii.b2a_base64(obj).decode("ascii")
     return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
 
-def dictify_pickable(o: Any, **kwargs: Any) -> Dict[str, Any]:
-    return dictify_python_call(pickle.loads, pickle.dumps(o))
+def dictify_pickable(obj: Any) -> Dict[str, Any]:
+    return dictify_python_call(pickle.loads, pickle.dumps(obj))
 
 
 FILECACHE_ENCODERS: List[Tuple[Any, Callable[..., Any]]] = [
@@ -105,13 +107,13 @@ class EncodeError(Exception):
 
 
 def filecache_default(
-    o: Any,
+    obj: Any,
     encoders: List[Tuple[Any, Callable[..., Any]]] = FILECACHE_ENCODERS,
 ) -> Any:
     for type_, encoder in reversed(encoders):
-        if isinstance(o, type_):
+        if isinstance(obj, type_):
             try:
-                return encoder(o)
+                return encoder(obj)
             except Exception as ex:
                 warnings.warn(f"{encoder!r} did not work: {ex!r}")
     raise EncodeError("can't encode object")
