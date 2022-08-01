@@ -12,12 +12,8 @@ dependencies:
 - sphinx
 - sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
-- boto3
 - dask
 - diskcache
-- google-cloud-firestore
 - netCDF4
-- pymemcache
-- s3fs
 - xarray>=2022.6.0
 - zarr

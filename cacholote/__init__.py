@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import config, extra_encoders, extra_stores
+from . import config, extra_encoders
 from .cache import cacheable
 from .decode import loads, object_hook
 from .encode import dumps, filecache_default

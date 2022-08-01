@@ -21,7 +21,7 @@ from typing import Any, Dict, Union
 def import_object(fully_qualified_name: str) -> Any:
     # FIXME: apply exclude/include-rules to `fully_qualified_name`
     if ":" not in fully_qualified_name:
-        raise ValueError(f"{fully_qualified_name} not in the form 'module:qualname'")
+        raise ValueError(f"{fully_qualified_name!r} not in the form 'module:qualname'")
     module_name, _, object_name = fully_qualified_name.partition(":")
     obj = importlib.import_module(module_name)
     for attr_name in object_name.split("."):

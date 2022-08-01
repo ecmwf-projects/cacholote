@@ -11,7 +11,9 @@ def test_import_object() -> None:
     res = decode.import_object("builtins:len")
     assert res is len
 
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError, match=r"'builtins.len' not in the form 'module:qualname'"
+    ):
         decode.import_object("builtins.len")
 
 

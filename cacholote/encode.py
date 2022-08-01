@@ -50,7 +50,6 @@ def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]
 def dictify_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
-    _callable_version: Optional[str] = None,
     **kwargs: Any,
 ) -> Dict[str, Any]:
     kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
@@ -59,8 +58,6 @@ def dictify_python_call(
         "type": "python_call",
         "callable": callable_fqn,
     }
-    if _callable_version is not None:
-        python_call_simple["version"] = _callable_version
     if args:
         python_call_simple["args"] = args
     if kwargs:
