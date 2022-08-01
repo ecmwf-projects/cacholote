@@ -1,8 +1,17 @@
-from typing import Any
+from typing import Any, Dict, List
 
 import pytest
 
 from cacholote import cache, config
+
+SETTINGS_LIST: List[Dict[str, Any]] = [{}]
+try:
+    import redislite
+
+    SETTINGS_LIST.append({"cache_store": redislite.Redis()})
+    HAS_REDISLITE = True
+except ImportError:
+    HAS_REDISLITE = False
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
@@ -23,24 +32,38 @@ def test_hexdigestify() -> None:
     assert res == expected
 
 
-def test_cacheable() -> None:
-    cfunc = cache.cacheable(func)
-    res = cfunc("test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert config.SETTINGS["cache_store"].stats() == (0, 1)
+@pytest.mark.parametrize("settings", SETTINGS_LIST)
+def test_cacheable(settings: Dict[str, Any]) -> None:
 
-    res = cfunc("test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    assert config.SETTINGS["cache_store"].stats() == (1, 1)
+    with config.set(**settings):
+        cache_store = config.SETTINGS["cache_store"]
+        is_redis = HAS_REDISLITE and isinstance(cache_store, redislite.Redis)
 
-    class Dummy:
-        pass
+        cfunc = cache.cacheable(func)
+        res = cfunc("test")
+        assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
+        if is_redis:
+            assert cache_store.info()["keyspace_hits"] == 0
+            assert cache_store.info()["keyspace_misses"] == 1
+        else:
+            assert cache_store.stats() == (0, 1)
 
-    inst = Dummy()
-    with pytest.warns(UserWarning, match="bad input"):
-        res = cfunc(inst)
-    assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
+        res = cfunc("test")
+        assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
+        if is_redis:
+            assert cache_store.info()["keyspace_misses"] == 1
+            assert cache_store.info()["keyspace_hits"] == 1
+        else:
+            assert cache_store.stats() == (1, 1)
 
-    with pytest.warns(UserWarning, match="bad output"):
-        res = cfunc("test", b=1)
-    assert res.__class__.__name__ == "LocalClass"
+        class Dummy:
+            pass
+
+        inst = Dummy()
+        with pytest.warns(UserWarning, match="bad input"):
+            res = cfunc(inst)
+        assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
+
+        with pytest.warns(UserWarning, match="bad output"):
+            res = cfunc("test", b=1)
+        assert res.__class__.__name__ == "LocalClass"

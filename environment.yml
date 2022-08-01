@@ -14,6 +14,7 @@ dependencies:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - dask
 - diskcache
+- redislite
 - netCDF4
 - xarray>=2022.6.0
 - zarr
