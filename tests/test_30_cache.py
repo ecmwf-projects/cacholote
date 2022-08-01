@@ -46,14 +46,16 @@ def test_cacheable(settings: Dict[str, Any]) -> None:
             assert cache_store.info()["keyspace_hits"] == 0
             assert cache_store.info()["keyspace_misses"] == 1
         else:
+            # diskcache
             assert cache_store.stats() == (0, 1)
 
         res = cfunc("test")
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
         if is_redis:
-            assert cache_store.info()["keyspace_misses"] == 1
             assert cache_store.info()["keyspace_hits"] == 1
+            assert cache_store.info()["keyspace_misses"] == 1
         else:
+            # diskcache
             assert cache_store.stats() == (1, 1)
 
         class Dummy:
