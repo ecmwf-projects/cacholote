@@ -45,7 +45,7 @@ with cacholote.config.set(directory="new/path/to/cache/dir"):
     sleep(10)
 
 # Show all available settings:
-print(cacholote.config["SETTINGS"])
+print(cacholote.config.SETTINGS)
 
 # To use a custom key/value store other than diskcache (e.g., Redis/Pymemcache):
 import redis
