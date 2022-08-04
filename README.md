@@ -21,6 +21,38 @@ Before pushing to GitHub, run the following commands:
 1. Run the static type checker: `make type-check`
 1. Build the documentation (see [Sphinx tutorial](https://www.sphinx-doc.org/en/master/tutorial/)): `make docs-build`
 
+## Quick-start
+
+```python
+import time
+import timeit
+import cacholote
+
+cacholote.config.set(directory="path/to/cache/dir")
+
+@cacholote.cacheable
+def sleep(x):
+    time.sleep(x)
+    return x
+
+times = timeit.repeat(lambda: sleep(10), number=5, repeat=5)
+print(times)  # First execution takes about 10s, then almost 0s
+
+assert sleep(10) == 10
+
+# Change settings using a context manager
+with cacholote.config.set(directory="new/path/to/cache/dir"):
+    sleep(10)
+
+# Show all available settings:
+print(cacholote.config["SETTINGS"])
+
+# To use a custom key/value store other than diskcache (e.g., Redis/Pymemcache):
+import redis
+cacholote.config.set(cache_store=redis.Redis())
+
+```
+
 ## License
 
 ```
