@@ -40,7 +40,7 @@ print(times)  # First execution takes about 10s, then almost 0s
 
 assert sleep(10) == 10
 
-# Change settings using a context manager
+# Change settings using a context manager:
 with cacholote.config.set(directory="new/path/to/cache/dir"):
     sleep(10)
 
