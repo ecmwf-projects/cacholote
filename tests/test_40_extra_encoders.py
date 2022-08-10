@@ -68,3 +68,23 @@ def test_cacheable() -> None:
     res = cfunc(data)
     assert res.identical(data)
     assert config.SETTINGS["cache_store"].stats() == (1, 2)
+
+
+def test_copy_file_to_cache_directory(tmpdir: str) -> None:
+    tmpfile = os.path.join(tmpdir, "dummy.txt")
+    with open(tmpfile, "w") as f:
+        f.write("dummy")
+    cfunc = cache.cacheable(func)
+
+    assert cfunc(open(tmpfile)).read() == "dummy"
+    cached_file = os.path.join(
+        tmpdir, "6b4e03423667dbb73b6e15454f0eb1abd4597f9a1b078e3f5b5a6bc7"
+    )
+    assert os.path.exists(cached_file)
+    assert config.SETTINGS["cache_store"].stats() == (0, 1)
+
+    # skip copying a file already in cache directory
+    mtime = os.path.getmtime(cached_file)
+    assert cfunc(open(tmpfile)).read() == "dummy"
+    assert mtime == os.path.getmtime(cached_file)
+    assert config.SETTINGS["cache_store"].stats() == (1, 1)
