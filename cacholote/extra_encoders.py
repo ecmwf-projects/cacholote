@@ -11,11 +11,15 @@ except ImportError:
 
 
 def dictify_xr_dataarray(obj: "xr.DataArray") -> Dict[str, Any]:
-    return encode.dictify_python_call("xarray:DataArray.from_dict", obj.to_dict())
+    return encode.dictify_python_call(
+        "xarray:DataArray.from_dict", obj.to_dict(data=True, encoding=True)
+    )
 
 
 def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
-    return encode.dictify_python_call("xarray:Dataset.from_dict", obj.to_dict())
+    return encode.dictify_python_call(
+        "xarray:Dataset.from_dict", obj.to_dict(data=True, encoding=True)
+    )
 
 
 def register_all() -> None:
