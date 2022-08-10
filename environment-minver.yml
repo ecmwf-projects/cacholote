@@ -3,6 +3,7 @@ channels:
 - nodefaults
 dependencies:
 - make
+- pystac
 - pytest
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
