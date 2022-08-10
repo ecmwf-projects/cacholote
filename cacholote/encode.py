@@ -108,7 +108,6 @@ def filecache_default(
     encoders: List[Tuple[Any, Callable[..., Any]]] = FILECACHE_ENCODERS,
 ) -> Any:
     for type_, encoder in reversed(encoders):
-        print(obj, type_)
         if isinstance(obj, type_):
             try:
                 return encoder(obj)
