@@ -76,15 +76,25 @@ def test_copy_file_to_cache_directory(tmpdir: str) -> None:
         f.write("dummy")
     cfunc = cache.cacheable(func)
 
-    assert cfunc(open(tmpfile)).read() == "dummy"
+    res = cfunc(open(tmpfile))
+    assert res.read() == "dummy"
     cached_file = os.path.join(
-        tmpdir, "6b4e03423667dbb73b6e15454f0eb1abd4597f9a1b078e3f5b5a6bc7"
+        tmpdir, "6b4e03423667dbb73b6e15454f0eb1abd4597f9a1b078e3f5b5a6bc7.txt"
     )
     assert os.path.exists(cached_file)
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
 
     # skip copying a file already in cache directory
     mtime = os.path.getmtime(cached_file)
-    assert cfunc(open(tmpfile)).read() == "dummy"
+    res = cfunc(open(tmpfile))
+    assert res.read() == "dummy"
     assert mtime == os.path.getmtime(cached_file)
     assert config.SETTINGS["cache_store"].stats() == (1, 1)
+
+    # do not crash if cached file is removed
+    os.remove(cached_file)
+    with pytest.warns(UserWarning):
+        res = cfunc(open(tmpfile))
+    assert res.read() == "dummy"
+    assert os.path.exists(cached_file)
+    assert config.SETTINGS["cache_store"].stats() == (2, 1)

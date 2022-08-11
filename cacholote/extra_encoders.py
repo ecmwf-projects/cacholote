@@ -16,6 +16,7 @@
 import hashlib
 import inspect
 import io
+import os
 import pathlib
 import shutil
 from typing import Any, Dict, Union
@@ -102,7 +103,13 @@ def dictify_io_object(
             hexdigest = hexdigestify_file(f)
     else:
         hexdigest = hexdigestify_file(obj)
-    path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / hexdigest)
+    _, ext = os.path.splitext(obj.name)
+    path = str(
+        pathlib.Path(config.SETTINGS["directory"]).absolute() / (hexdigest + ext)
+    )
+
+    if "w" in obj.mode:
+        raise ValueError("Read-only objects can be cached.")
 
     params = inspect.signature(open).parameters
     kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
