@@ -13,7 +13,12 @@
 # limitations under the License.
 
 
+import hashlib
+import inspect
+import io
+import os
 import pathlib
+import shutil
 from typing import Any, Dict, Union
 
 from . import cache, config, encode
@@ -77,7 +82,49 @@ def dictify_xr_dataset(
     return encode.dictify_python_call(xr.open_dataset, path)
 
 
+def hexdigestify_file(
+    f: Union[io.TextIOWrapper, io.BufferedReader],
+    buf_size: int = io.DEFAULT_BUFFER_SIZE,
+) -> str:
+    hash_req = hashlib.sha3_224()
+    while True:
+        data = f.read(buf_size)
+        if not data:
+            break
+        hash_req.update(data.encode() if isinstance(data, str) else data)
+    return hash_req.hexdigest()
+
+
+def dictify_io_object(
+    obj: Union[io.TextIOWrapper, io.BufferedReader]
+) -> Dict[str, Any]:
+    if obj.closed:
+        with open(obj.name, "rb") as f:
+            hexdigest = hexdigestify_file(f)
+    else:
+        hexdigest = hexdigestify_file(obj)
+    _, ext = os.path.splitext(obj.name)
+    path = str(
+        pathlib.Path(config.SETTINGS["directory"]).absolute() / (hexdigest + ext)
+    )
+
+    if "w" in obj.mode:
+        raise ValueError("write-mode objects can NOT be cached.")
+
+    params = inspect.signature(open).parameters
+    kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+
+    try:
+        open(path, **kwargs)
+    except:  # noqa: E722
+        shutil.copyfile(obj.name, path)
+
+    return encode.dictify_python_call(open, path, **kwargs)
+
+
 def register_all() -> None:
+    encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
+    encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
     try:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
     except NameError:

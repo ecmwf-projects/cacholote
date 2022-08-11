@@ -46,7 +46,11 @@ def cacheable(func: F) -> F:
         cache_store = SETTINGS["cache_store"]
         try:
             cached = cache_store[hexdigest]
-        except KeyError:
+            return decode.loads(cached)
+        except Exception as ex:
+            if not isinstance(ex, KeyError):
+                warnings.warn(str(ex), UserWarning)
+
             result = func(*args, **kwargs)
             try:
                 cached = encode.dumps(result)
