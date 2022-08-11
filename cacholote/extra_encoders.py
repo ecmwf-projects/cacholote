@@ -109,7 +109,7 @@ def dictify_io_object(
     )
 
     if "w" in obj.mode:
-        raise ValueError("Read-only objects can be cached.")
+        raise ValueError("write-mode objects can NOT be cached.")
 
     params = inspect.signature(open).parameters
     kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
