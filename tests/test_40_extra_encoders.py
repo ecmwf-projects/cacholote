@@ -47,8 +47,8 @@ def test_dictify_xr_dataset(ds: xr.Dataset) -> None:
 
 
 def test_roundtrip(ds: xr.Dataset) -> None:
-    date_json = encode.dumps(ds)
-    xr.testing.assert_identical(decode.loads(date_json), ds)
+    ds_json = encode.dumps(ds)
+    xr.testing.assert_identical(decode.loads(ds_json), ds)
 
 
 def test_cacheable(ds: xr.Dataset) -> None:
@@ -60,12 +60,12 @@ def test_cacheable(ds: xr.Dataset) -> None:
 
     res = cfunc(ds)
     mtime = os.path.getmtime(local_path)
-    assert res.identical(ds)
+    xr.testing.assert_identical(res, ds)
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
 
     res = cfunc(ds)
     assert mtime == os.path.getmtime(local_path)
-    assert res.identical(ds)
+    xr.testing.assert_identical(res, ds)
     assert config.SETTINGS["cache_store"].stats() == (1, 1)
 
 
