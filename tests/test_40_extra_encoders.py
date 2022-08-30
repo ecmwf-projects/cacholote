@@ -5,8 +5,10 @@ import pytest
 
 from cacholote import cache, config, decode, encode, extra_encoders
 
-pytest.importorskip("xarray")
-import xarray as xr  # noqa: E402 (import xarray after importorskip for mypy)
+try:
+    import xarray as xr
+except ImportError:
+    pytest.importorskip("xarray")
 
 T = TypeVar("T")
 
