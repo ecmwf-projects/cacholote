@@ -17,6 +17,8 @@ import importlib
 import json
 from typing import Any, Dict, Union
 
+from . import config
+
 
 def import_object(fully_qualified_name: str) -> Any:
     # FIXME: apply exclude/include-rules to `fully_qualified_name`
@@ -40,10 +42,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         args = obj.get("args", ())
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
-    elif (
-        obj.get("type") in ["application/netcdf", "application/wmo-GRIB2"]
-        and "file:local_path" in obj
-    ):
+    elif obj.get("type") in config.EXTENSIONS and "file:local_path" in obj:
         import xarray as xr
 
         open_kwargs = obj.get("xarray:open_kwargs", {})
