@@ -76,7 +76,7 @@ def dictify_xr_dataset(
     href = file_name_template.format(**locals())
     local_path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / href)
     try:
-        xr.open_dataset(local_path)
+        xr.open_dataset(local_path, chunks="auto")
     except:  # noqa: E722
         obj.to_netcdf(local_path)
     return encode.dictify_xarray_asset(
