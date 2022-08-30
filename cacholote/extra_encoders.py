@@ -80,7 +80,7 @@ def dictify_xr_dataset(
     except:  # noqa: E722
         obj.to_netcdf(local_path)
     return encode.dictify_xarray_asset(
-        filetype="netcdf", checksum=uuid, size=obj.nbytes
+        filetype="application/netcdf", checksum=uuid, size=obj.nbytes
     )
 
 

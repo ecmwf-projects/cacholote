@@ -76,7 +76,13 @@ def dictify_xarray_asset(
     storage_options: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
-    extension = ".nc" if filetype == "netcdf" else f".{filetype}"
+    if filetype == "application/netcdf":
+        extension = ".nc"
+    elif filetype == "application/wmo-GRIB2":
+        extension = ".grb2"
+    else:
+
+        extension = f".{filetype.split('/')[-1]}"
     href = f"./{checksum}{extension}"
 
     return {

@@ -20,7 +20,7 @@ def test_dictify_xr_dataset() -> None:
     )
     data = xr.Dataset(data_vars={"data": [0]})
     expected = {
-        "type": "netcdf",
+        "type": "application/netcdf",
         "href": "./1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784.nc",
         "file:checksum": "1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784",
         "file:size": 8,
@@ -38,7 +38,7 @@ def test_dictify_xr_dataset() -> None:
         "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
     )
     expected = {
-        "type": "netcdf",
+        "type": "application/netcdf",
         "href": "./e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
         "file:checksum": "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852",
         "file:size": 8,

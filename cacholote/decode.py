@@ -40,7 +40,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         args = obj.get("args", ())
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
-    elif obj.get("type") == "netcdf" and "file:local_path" in obj:
+    elif obj.get("type") == "application/netcdf" and "file:local_path" in obj:
         import xarray as xr
 
         open_kwargs = obj.get("xarray:open_kwargs", {})
