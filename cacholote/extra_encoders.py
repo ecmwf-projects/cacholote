@@ -24,64 +24,38 @@ from typing import Any, Dict, Union
 from . import cache, config, encode
 
 try:
-    import s3fs
-
-    S3 = s3fs.S3FileSystem()
-except ImportError:
-    pass
-
-try:
     import xarray as xr
 except ImportError:
     pass
 
-try:
-    import dask
-except ImportError:
-    pass
-
-
-def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":
-    store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
-    return xr.open_zarr(store=store, *args, **kwargs)  # type: ignore
-
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
+    import dask
+
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         return str(dask.base.tokenize(obj))  # type: ignore[no-untyped-call]
 
 
-def dictify_xr_dataset_s3(
-    obj: "xr.Dataset",
-    file_name_template: str = "{uuid}.zarr",
-) -> Dict[str, Any]:
-    token = tokenize_xr_object(obj)
-    uuid = cache.hexdigestify(token)
-    file_name = file_name_template.format(**locals())
-    s3_path = f"{config.SETTINGS['directory']}/{file_name}"
-    store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
-    try:
-        xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
-    except:  # noqa: E722
-        obj.to_zarr(store=store)
-    return encode.dictify_python_call(open_zarr, s3_path)
-
-
 def dictify_xr_dataset(
     obj: Union["xr.DataArray", "xr.Dataset"],
-    file_name_template: str = "./{uuid}.nc",
 ) -> Dict[str, Any]:
     token = tokenize_xr_object(obj)
-    uuid = cache.hexdigestify(token)
-    href = file_name_template.format(**locals())
-    local_path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / href)
+    checksum = cache.hexdigestify(token)
+    xr_json = encode.dictify_xarray_asset(checksum=checksum, size=obj.nbytes)
     try:
-        xr.open_dataset(local_path, chunks="auto")
+        xr.open_dataset(xr_json["file:local_path"], chunks="auto")
     except:  # noqa: E722
-        obj.to_netcdf(local_path)
-    return encode.dictify_xarray_asset(
-        filetype="application/netcdf", checksum=uuid, size=obj.nbytes
-    )
+        if xr_json["type"] == "application/netcdf":
+            obj.to_netcdf(xr_json["file:local_path"])
+        elif xr_json["type"] == "application/wmo-GRIB2":
+            import cfgrib.xarray_to_grib
+
+            cfgrib.xarray_to_grib.to_grib(
+                obj, xr_json["file:local_path"], grib_keys={"edition": 2}
+            )
+        else:
+            raise ValueError(f"Type {xr_json['type']} is NOT supported.")
+    return xr_json
 
 
 def hexdigestify_file(

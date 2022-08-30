@@ -12,10 +12,12 @@ dependencies:
 - sphinx
 - sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
+- cfgrib
 - dask
 - diskcache
 - netCDF4
 - pip
+- pooch
 - xarray>=2022.6.0
 - zarr
 - pip:

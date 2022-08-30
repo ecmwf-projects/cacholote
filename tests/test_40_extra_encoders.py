@@ -1,3 +1,4 @@
+import glob
 import os
 from typing import TypeVar
 
@@ -19,54 +20,91 @@ def func(a: T) -> T:
 
 @pytest.fixture
 def ds() -> xr.Dataset:
-    # See: https://github.com/pydata/xarray/issues/6970
-    return xr.Dataset(data_vars={"data": [0]}, attrs={})
+    import pooch
+
+    fname = pooch.retrieve(
+        url="https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib",
+        known_hash="c144fde61ca5d53702bf6f212775ef2cc783bdd66b6865160bf597c1b35ed898",
+    )
+    ds = xr.open_dataset(fname)
+    del ds.attrs["history"]
+
+    return ds.sel(number=0)
 
 
-def test_dictify_xr_dataset(ds: xr.Dataset) -> None:
+xr_parametrize = (
+    "xarray_cache_type,extension",
+    [("application/netcdf", ".nc"), ("application/wmo-GRIB2", ".grb2")],
+)
+
+
+@pytest.mark.parametrize(*xr_parametrize)
+def test_dictify_xr_dataset(
+    ds: xr.Dataset, xarray_cache_type: str, extension: str
+) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
-        "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
+        f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
     )
     expected = {
-        "type": "application/netcdf",
-        "href": "./e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
-        "file:checksum": "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852",
-        "file:size": 8,
+        "type": xarray_cache_type,
+        "href": f"./285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        "file:checksum": "285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4",
+        "file:size": 470024,
         "file:local_path": local_path,
         "xarray:open_kwargs": {},
         "xarray:storage_options": {},
     }
-    res = extra_encoders.dictify_xr_dataset(ds)
+    with config.set(xarray_cache_type=xarray_cache_type):
+        res = extra_encoders.dictify_xr_dataset(ds)
     assert res == expected
     assert os.path.exists(local_path)
 
-    ds1 = xr.open_dataset(local_path)
-    res = extra_encoders.dictify_xr_dataset(ds1)
-    assert res == expected
+
+@pytest.mark.parametrize(*xr_parametrize)
+def test_xr_roundtrip(ds: xr.Dataset, xarray_cache_type: str, extension: str) -> None:
+    with config.set(xarray_cache_type=xarray_cache_type):
+        ds_json = encode.dumps(ds)
+        res = decode.loads(ds_json)
+
+    if xarray_cache_type == "application/wmo-GRIB2":
+        xr.testing.assert_equal(res, ds)
+    else:
+        xr.testing.assert_identical(res, ds)
 
 
-def test_roundtrip(ds: xr.Dataset) -> None:
-    ds_json = encode.dumps(ds)
-    xr.testing.assert_identical(decode.loads(ds_json), ds)
-
-
-def test_cacheable(ds: xr.Dataset) -> None:
+@pytest.mark.parametrize(*xr_parametrize)
+def test_xr_cacheable(ds: xr.Dataset, xarray_cache_type: str, extension: str) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
-        "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
+        f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
     )
-    cfunc = cache.cacheable(func)
 
-    res = cfunc(ds)
-    mtime = os.path.getmtime(local_path)
-    xr.testing.assert_identical(res, ds)
-    assert config.SETTINGS["cache_store"].stats() == (0, 1)
+    with config.set(xarray_cache_type=xarray_cache_type):
+        cfunc = cache.cacheable(func)
 
-    res = cfunc(ds)
-    assert mtime == os.path.getmtime(local_path)
-    xr.testing.assert_identical(res, ds)
-    assert config.SETTINGS["cache_store"].stats() == (1, 1)
+        # 1: create cached data
+        res = cfunc(ds)
+        assert config.SETTINGS["cache_store"].stats() == (0, 1)
+        mtime = os.path.getmtime(local_path)
+
+        if xarray_cache_type == "application/wmo-GRIB2":
+            xr.testing.assert_equal(res, ds)
+        else:
+            xr.testing.assert_identical(res, ds)
+
+        # 2: use cached data
+        res = cfunc(ds)
+        assert config.SETTINGS["cache_store"].stats() == (1, 1)
+        assert mtime == os.path.getmtime(local_path)
+        assert glob.glob(
+            os.path.join(config.SETTINGS["cache_store"].directory, f"*{extension}")
+        ) == [local_path]
+
+        if xarray_cache_type == "application/wmo-GRIB2":
+            xr.testing.assert_equal(res, ds)
+        else:
+            xr.testing.assert_identical(res, ds)
 
 
 def test_copy_file_to_cache_directory(tmpdir: str) -> None:

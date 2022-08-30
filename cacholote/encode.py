@@ -69,29 +69,23 @@ def dictify_python_call(
 
 
 def dictify_xarray_asset(
-    filetype: str,
     checksum: str,
     size: int,
     open_kwargs: Dict[str, Any] = {},
     storage_options: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
-    if filetype == "application/netcdf":
-        extension = ".nc"
-    elif filetype == "application/wmo-GRIB2":
-        extension = ".grb2"
-    else:
-
-        extension = f".{filetype.split('/')[-1]}"
-    href = f"./{checksum}{extension}"
+    filetype = config.SETTINGS["xarray_cache_type"]
+    extension = config.EXTENSIONS[filetype]
 
     return {
         "type": filetype,
-        "href": href,
+        "href": f"./{checksum}{extension}",
         "file:checksum": checksum,
         "file:size": size,
         "file:local_path": str(
-            pathlib.Path(config.SETTINGS["directory"]).absolute() / href
+            pathlib.Path(config.SETTINGS["directory"]).absolute()
+            / f"{checksum}{extension}"
         ),
         "xarray:open_kwargs": open_kwargs,
         "xarray:storage_options": storage_options,
