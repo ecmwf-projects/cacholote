@@ -31,7 +31,7 @@ def import_object(fully_qualified_name: str) -> Any:
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
-        obj = import_object(obj["fully_qualified_name"])
+        return import_object(obj["fully_qualified_name"])
     elif obj.get("type") == "python_call" and "callable" in obj:
         if callable(obj["callable"]):
             func = obj["callable"]
@@ -39,7 +39,19 @@ def object_hook(obj: Dict[str, Any]) -> Any:
             func = import_object(obj["callable"])
         args = obj.get("args", ())
         kwargs = obj.get("kwargs", {})
-        obj = func(*args, **kwargs)
+        return func(*args, **kwargs)
+    elif obj.get("type") == "application/netcdf" and "file:local_path" in obj:
+        import xarray as xr
+
+        open_kwargs = obj.get("xarray:open_kwargs", {})
+        storage_options = obj.get("xarray:storage_options", {})
+        if storage_options:
+            import fsspec
+
+            store = fsspec.get_mapper(obj["file:local_path"], **storage_options)
+        else:
+            store = obj["file:local_path"]
+        return xr.open_dataset(store, **open_kwargs)
     return obj
 
 

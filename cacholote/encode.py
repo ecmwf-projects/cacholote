@@ -19,9 +19,12 @@ import datetime
 import inspect
 import json
 import operator
+import pathlib
 import pickle
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+from . import config
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
@@ -63,6 +66,36 @@ def dictify_python_call(
     if kwargs:
         python_call_simple["kwargs"] = kwargs
     return python_call_simple
+
+
+def dictify_xarray_asset(
+    filetype: str,
+    checksum: str,
+    size: int,
+    open_kwargs: Dict[str, Any] = {},
+    storage_options: Dict[str, Any] = {},
+) -> Dict[str, Any]:
+
+    if filetype == "application/netcdf":
+        extension = ".nc"
+    elif filetype == "application/wmo-GRIB2":
+        extension = ".grb2"
+    else:
+
+        extension = f".{filetype.split('/')[-1]}"
+    href = f"./{checksum}{extension}"
+
+    return {
+        "type": filetype,
+        "href": href,
+        "file:checksum": checksum,
+        "file:size": size,
+        "file:local_path": str(
+            pathlib.Path(config.SETTINGS["directory"]).absolute() / href
+        ),
+        "xarray:open_kwargs": open_kwargs,
+        "xarray:storage_options": storage_options,
+    }
 
 
 def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:

@@ -69,17 +69,19 @@ def dictify_xr_dataset_s3(
 
 def dictify_xr_dataset(
     obj: Union["xr.DataArray", "xr.Dataset"],
-    file_name_template: str = "{uuid}.nc",
+    file_name_template: str = "./{uuid}.nc",
 ) -> Dict[str, Any]:
     token = tokenize_xr_object(obj)
     uuid = cache.hexdigestify(token)
-    file_name = file_name_template.format(**locals())
-    path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / file_name)
+    href = file_name_template.format(**locals())
+    local_path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / href)
     try:
-        xr.open_dataset(path)
+        xr.open_dataset(local_path, chunks="auto")
     except:  # noqa: E722
-        obj.to_netcdf(path)
-    return encode.dictify_python_call(xr.open_dataset, path)
+        obj.to_netcdf(local_path)
+    return encode.dictify_xarray_asset(
+        filetype="application/netcdf", checksum=uuid, size=obj.nbytes
+    )
 
 
 def hexdigestify_file(
