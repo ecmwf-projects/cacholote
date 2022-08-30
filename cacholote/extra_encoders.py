@@ -54,7 +54,8 @@ def dictify_xr_dataset(
                 obj, xr_json["file:local_path"], grib_keys={"edition": 2}
             )
         else:
-            raise ValueError(f"Type {xr_json['type']} is NOT supported.")
+            # Should never get here! xarray_cache_type is checked in config.py
+            raise ValueError(f"type {xr_json['type']} is NOT supported.")
     return xr_json
 
 
