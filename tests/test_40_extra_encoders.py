@@ -5,7 +5,9 @@ import pytest
 
 from cacholote import cache, config, decode, encode, extra_encoders
 
-xr = pytest.importorskip("xarray")
+pytest.importorskip("xarray")
+import xarray as xr  # noqa: E402 (import xarray after importorskip for mypy)
+
 T = TypeVar("T")
 
 
@@ -13,27 +15,14 @@ def func(a: T) -> T:
     return a
 
 
-def test_dictify_xr_dataset() -> None:
-    local_path = os.path.join(
-        config.SETTINGS["cache_store"].directory,
-        "1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784.nc",
-    )
-    data = xr.Dataset(data_vars={"data": [0]})
-    expected = {
-        "type": "application/netcdf",
-        "href": "./1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784.nc",
-        "file:checksum": "1dd1448f0d6de747f46e528dc156981434ff6d92dbf1b84383bc5784",
-        "file:size": 8,
-        "file:local_path": local_path,
-        "xarray:open_kwargs": {},
-        "xarray:storage_options": {},
-    }
-    res = extra_encoders.dictify_xr_dataset(data)
-    print(res)
-    assert res == expected
-    assert os.path.exists(local_path)
+@pytest.fixture
+def ds() -> xr.Dataset:
+    # See: https://github.com/pydata/xarray/issues/6970
+    return xr.Dataset(data_vars={"data": [0]}, attrs={})
 
-    local_path1 = os.path.join(
+
+def test_dictify_xr_dataset(ds: xr.Dataset) -> None:
+    local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
         "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
     )
@@ -42,45 +31,40 @@ def test_dictify_xr_dataset() -> None:
         "href": "./e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
         "file:checksum": "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852",
         "file:size": 8,
-        "file:local_path": local_path1,
+        "file:local_path": local_path,
         "xarray:open_kwargs": {},
         "xarray:storage_options": {},
     }
-    data = xr.open_dataset(local_path)
-    res = extra_encoders.dictify_xr_dataset(data)
+    res = extra_encoders.dictify_xr_dataset(ds)
     assert res == expected
-    assert os.path.exists(local_path1)
+    assert os.path.exists(local_path)
 
-    # skip saving a file already present on disk
-    mtime = os.path.getmtime(local_path1)
-    data = xr.open_dataset(local_path1)
-    res = extra_encoders.dictify_xr_dataset(data)
+    ds1 = xr.open_dataset(local_path)
+    res = extra_encoders.dictify_xr_dataset(ds1)
     assert res == expected
-    assert mtime == os.path.getmtime(local_path1)
 
 
-def test_roundtrip() -> None:
-    data = xr.Dataset(data_vars={"data": [0]})
-    date_json = encode.dumps(data)
-    assert decode.loads(date_json).identical(data)
+def test_roundtrip(ds: xr.Dataset) -> None:
+    date_json = encode.dumps(ds)
+    xr.testing.assert_identical(decode.loads(date_json), ds)
 
 
-def test_cacheable() -> None:
+def test_cacheable(ds: xr.Dataset) -> None:
+    local_path = os.path.join(
+        config.SETTINGS["cache_store"].directory,
+        "e7d452a747061ab880887d88814bfb0c27593a73cb7736d2dc340852.nc",
+    )
     cfunc = cache.cacheable(func)
 
-    data = xr.Dataset(data_vars={"data": [0]})
-    res = cfunc(data)
-    assert res.identical(data)
+    res = cfunc(ds)
+    mtime = os.path.getmtime(local_path)
+    assert res.identical(ds)
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
 
-    # FIXME: why do we get two misses?
-    res = cfunc(data)
-    assert res.identical(data)
-    assert config.SETTINGS["cache_store"].stats() == (0, 2)
-
-    res = cfunc(data)
-    assert res.identical(data)
-    assert config.SETTINGS["cache_store"].stats() == (1, 2)
+    res = cfunc(ds)
+    assert mtime == os.path.getmtime(local_path)
+    assert res.identical(ds)
+    assert config.SETTINGS["cache_store"].stats() == (1, 1)
 
 
 def test_copy_file_to_cache_directory(tmpdir: str) -> None:
