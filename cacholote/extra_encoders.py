@@ -23,14 +23,22 @@ from typing import Any, Dict, Union
 from . import cache, encode
 
 try:
+    import dask
     import xarray as xr
+
+    HAS_XARRAY_AND_DASK = True
 except ImportError:
-    pass
+    HAS_XARRAY_AND_DASK = False
+
+try:
+    import magic
+
+    HAS_MAGIC = True
+except ImportError:
+    HAS_MAGIC = False
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
-    import dask
-
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         return str(dask.base.tokenize(obj))  # type: ignore[no-untyped-call]
 
@@ -74,7 +82,6 @@ def hexdigestify_file(
 def dictify_io_object(
     obj: Union[io.TextIOWrapper, io.BufferedReader]
 ) -> Dict[str, Any]:
-    import magic
 
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
@@ -111,9 +118,8 @@ def dictify_io_object(
 
 
 def register_all() -> None:
-    encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
-    encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
-    try:
+    if HAS_MAGIC:
+        encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
+        encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
+    if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
-    except NameError:
-        pass
