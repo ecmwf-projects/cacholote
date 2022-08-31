@@ -107,6 +107,28 @@ def test_xr_cacheable(ds: xr.Dataset, xarray_cache_type: str, extension: str) ->
             xr.testing.assert_identical(res, ds)
 
 
+def test_dictify_io_object(tmpdir: str) -> None:
+    tmpfile = os.path.join(tmpdir, "dummy.txt")
+    with open(tmpfile, "w") as f:
+        f.write("dummy")
+
+    local_path = os.path.join(
+        config.SETTINGS["cache_store"].directory,
+        "f6e6e2cc3b79d2ff7163fe28e6324870bfe8cf16a912dfc2ebceee7a.txt",
+    )
+    expected = {
+        "type": "text/plain",
+        "href": "./f6e6e2cc3b79d2ff7163fe28e6324870bfe8cf16a912dfc2ebceee7a.txt",
+        "file:checksum": "f6e6e2cc3b79d2ff7163fe28e6324870bfe8cf16a912dfc2ebceee7a",
+        "file:size": 5,
+        "file:local_path": local_path,
+        "io:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
+    }
+    res = extra_encoders.dictify_io_object(open(tmpfile))
+    assert res == expected
+    assert os.path.exists(local_path)
+
+
 def test_copy_file_to_cache_directory(tmpdir: str) -> None:
     tmpfile = os.path.join(tmpdir, "dummy.txt")
     cached_file = os.path.join(
