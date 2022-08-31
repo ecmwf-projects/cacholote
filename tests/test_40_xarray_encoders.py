@@ -8,7 +8,7 @@ from cacholote import cache, config, decode, encode, extra_encoders
 
 try:
     import xarray as xr
-except ImportError:
+finally:
     pytest.importorskip("xarray")
     pytest.importorskip("dask")
 
