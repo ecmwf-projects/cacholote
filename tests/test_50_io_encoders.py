@@ -29,7 +29,7 @@ def test_dictify_io_object(tmpdir: str) -> None:
         "file:checksum": "f6e6e2cc3b79d2ff7163fe28e6324870bfe8cf16a912dfc2ebceee7a",
         "file:size": 5,
         "file:local_path": local_path,
-        "io:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
+        "tmp:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
     }
     res = extra_encoders.dictify_io_object(open(tmpfile))
     assert res == expected

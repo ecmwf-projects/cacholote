@@ -55,9 +55,9 @@ def object_hook(obj: Dict[str, Any]) -> Any:
             store = obj["file:local_path"]
         return xr.open_dataset(store, **open_kwargs)
 
-    if {"io:open_kwargs", "file:local_path"} <= set(obj):
+    if {"tmp:open_kwargs", "file:local_path"} <= set(obj):
 
-        return open(obj["file:local_path"], **obj["io:open_kwargs"])
+        return open(obj["file:local_path"], **obj["tmp:open_kwargs"])
 
     return obj
 

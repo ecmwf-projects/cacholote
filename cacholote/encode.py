@@ -90,9 +90,12 @@ def dictify_io_asset(
     extension: str = "",
     open_kwargs: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
-    file_kwargs = locals()
-    extra_kwargs = {"io:open_kwargs": file_kwargs.pop("open_kwargs")}
-    return {**dictify_file(**file_kwargs), **extra_kwargs}
+
+    asset_dict = dictify_file(
+        filetype=filetype, checksum=checksum, size=size, extension=extension
+    )
+    asset_dict.update({"tmp:open_kwargs": open_kwargs})
+    return asset_dict
 
 
 def dictify_xarray_asset(
@@ -102,19 +105,20 @@ def dictify_xarray_asset(
     storage_options: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
-    file_kwargs = locals()
-    file_kwargs.update(
+    asset_dict = dictify_file(
+        filetype=config.SETTINGS["xarray_cache_type"],
+        checksum=checksum,
+        size=size,
+        extension=config.EXTENSIONS[config.SETTINGS["xarray_cache_type"]],
+    )
+    asset_dict.update(
         {
-            "filetype": config.SETTINGS["xarray_cache_type"],
-            "extension": config.EXTENSIONS[config.SETTINGS["xarray_cache_type"]],
+            "xarray:open_kwargs": open_kwargs,
+            "xarray:storage_options": storage_options,
         }
     )
-    extra_kwargs = {
-        "xarray:open_kwargs": file_kwargs.pop("open_kwargs"),
-        "xarray:storage_options": file_kwargs.pop("storage_options"),
-    }
 
-    return {**dictify_file(**file_kwargs), **extra_kwargs}
+    return asset_dict
 
 
 def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:
