@@ -29,6 +29,7 @@ import diskcache
 
 _SETTINGS: Dict[str, Any] = {
     "directory": os.path.join(tempfile.gettempdir(), "cacholote"),  # cache directory
+    "xarray_cache_type": "application/netcdf",
     "timeout": 60,  # SQLite connection timeout
     "statistics": 1,  # True
     "tag_index": 0,  # False
@@ -43,6 +44,7 @@ _SETTINGS: Dict[str, Any] = {
     "disk_min_file_size": 2**15,  # 32kb
     "disk_pickle_protocol": pickle.HIGHEST_PROTOCOL,
 }
+EXTENSIONS = {"application/netcdf": ".nc", "application/wmo-GRIB2": ".grb2"}
 
 
 def initialize_cache_store() -> diskcache.Cache:
@@ -76,6 +78,12 @@ class set:
             for key in _SETTINGS.keys() - kwargs.keys():
                 if isinstance(getattr(type(new_cache_store), key, None), property):
                     kwargs[key] = getattr(new_cache_store, key)
+
+        if (
+            "xarray_cache_type" in kwargs
+            and kwargs["xarray_cache_type"] not in EXTENSIONS
+        ):
+            raise ValueError(f"'xarray_cache_type' must be one of {list(EXTENSIONS)}")
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}

@@ -17,33 +17,25 @@ import hashlib
 import inspect
 import io
 import os
-import pathlib
 import shutil
 from typing import Any, Dict, Union
 
-from . import cache, config, encode
-
-try:
-    import s3fs
-
-    S3 = s3fs.S3FileSystem()
-except ImportError:
-    pass
-
-try:
-    import xarray as xr
-except ImportError:
-    pass
+from . import cache, encode
 
 try:
     import dask
+    import xarray as xr
+
+    HAS_XARRAY_AND_DASK = True
 except ImportError:
-    pass
+    HAS_XARRAY_AND_DASK = False
 
+try:
+    import magic
 
-def open_zarr(s3_path: str, *args: Any, **kwargs: Any) -> "xr.Dataset":
-    store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
-    return xr.open_zarr(store=store, *args, **kwargs)  # type: ignore
+    HAS_MAGIC = True
+except ImportError:
+    HAS_MAGIC = False
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
@@ -51,37 +43,27 @@ def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
         return str(dask.base.tokenize(obj))  # type: ignore[no-untyped-call]
 
 
-def dictify_xr_dataset_s3(
-    obj: "xr.Dataset",
-    file_name_template: str = "{uuid}.zarr",
-) -> Dict[str, Any]:
-    token = tokenize_xr_object(obj)
-    uuid = cache.hexdigestify(token)
-    file_name = file_name_template.format(**locals())
-    s3_path = f"{config.SETTINGS['directory']}/{file_name}"
-    store = s3fs.S3Map(root=s3_path, s3=S3, check=False)
-    try:
-        xr.open_zarr(store=store)  # type: ignore[no-untyped-call]
-    except:  # noqa: E722
-        obj.to_zarr(store=store)
-    return encode.dictify_python_call(open_zarr, s3_path)
-
-
 def dictify_xr_dataset(
     obj: Union["xr.DataArray", "xr.Dataset"],
-    file_name_template: str = "./{uuid}.nc",
 ) -> Dict[str, Any]:
     token = tokenize_xr_object(obj)
-    uuid = cache.hexdigestify(token)
-    href = file_name_template.format(**locals())
-    local_path = str(pathlib.Path(config.SETTINGS["directory"]).absolute() / href)
+    checksum = cache.hexdigestify(token)
+    xr_json = encode.dictify_xarray_asset(checksum=checksum, size=obj.nbytes)
     try:
-        xr.open_dataset(local_path, chunks="auto")
+        xr.open_dataset(xr_json["file:local_path"], chunks="auto")
     except:  # noqa: E722
-        obj.to_netcdf(local_path)
-    return encode.dictify_xarray_asset(
-        filetype="application/netcdf", checksum=uuid, size=obj.nbytes
-    )
+        if xr_json["type"] == "application/netcdf":
+            obj.to_netcdf(xr_json["file:local_path"])
+        elif xr_json["type"] == "application/wmo-GRIB2":
+            import cfgrib.xarray_to_grib
+
+            cfgrib.xarray_to_grib.to_grib(
+                obj, xr_json["file:local_path"], grib_keys={"edition": 2}
+            )
+        else:
+            # Should never get here! xarray_cache_type is checked in config.py
+            raise ValueError(f"type {xr_json['type']} is NOT supported.")
+    return xr_json
 
 
 def hexdigestify_file(
@@ -100,34 +82,44 @@ def hexdigestify_file(
 def dictify_io_object(
     obj: Union[io.TextIOWrapper, io.BufferedReader]
 ) -> Dict[str, Any]:
-    if obj.closed:
-        with open(obj.name, "rb") as f:
-            hexdigest = hexdigestify_file(f)
-    else:
-        hexdigest = hexdigestify_file(obj)
-    _, ext = os.path.splitext(obj.name)
-    path = str(
-        pathlib.Path(config.SETTINGS["directory"]).absolute() / (hexdigest + ext)
-    )
 
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
+    filetype = magic.from_file(obj.name, mime=True)
+
+    if obj.closed:
+        with open(obj.name, "rb") as f:
+            checksum = hexdigestify_file(f)
+    else:
+        checksum = hexdigestify_file(obj)
+
+    size = os.path.getsize(obj.name)
+
+    _, extension = os.path.splitext(obj.name)
+
     params = inspect.signature(open).parameters
-    kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+    open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+
+    io_json = encode.dictify_io_asset(
+        filetype=filetype,
+        checksum=checksum,
+        size=size,
+        extension=extension,
+        open_kwargs=open_kwargs,
+    )
 
     try:
-        open(path, **kwargs)
+        open(io_json["file:local_path"], **open_kwargs)
     except:  # noqa: E722
-        shutil.copyfile(obj.name, path)
+        shutil.copyfile(obj.name, io_json["file:local_path"])
 
-    return encode.dictify_python_call(open, path, **kwargs)
+    return io_json
 
 
 def register_all() -> None:
-    encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
-    encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
-    try:
+    if HAS_MAGIC:
+        encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
+        encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
+    if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
-    except NameError:
-        pass

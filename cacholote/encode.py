@@ -68,34 +68,57 @@ def dictify_python_call(
     return python_call_simple
 
 
-def dictify_xarray_asset(
+def dictify_file(
+    filetype: str, checksum: str, size: int, extension: str = ""
+) -> Dict[str, Any]:
+    return {
+        "type": filetype,
+        "href": f"./{checksum}{extension}",
+        "file:checksum": checksum,
+        "file:size": size,
+        "file:local_path": str(
+            pathlib.Path(config.SETTINGS["directory"]).absolute()
+            / f"{checksum}{extension}"
+        ),
+    }
+
+
+def dictify_io_asset(
     filetype: str,
+    checksum: str,
+    size: int,
+    extension: str = "",
+    open_kwargs: Dict[str, Any] = {},
+) -> Dict[str, Any]:
+
+    asset_dict = dictify_file(
+        filetype=filetype, checksum=checksum, size=size, extension=extension
+    )
+    asset_dict.update({"tmp:open_kwargs": open_kwargs})
+    return asset_dict
+
+
+def dictify_xarray_asset(
     checksum: str,
     size: int,
     open_kwargs: Dict[str, Any] = {},
     storage_options: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
-    if filetype == "application/netcdf":
-        extension = ".nc"
-    elif filetype == "application/wmo-GRIB2":
-        extension = ".grb2"
-    else:
+    asset_dict = dictify_file(
+        filetype=config.SETTINGS["xarray_cache_type"],
+        checksum=checksum,
+        size=size,
+        extension=config.EXTENSIONS[config.SETTINGS["xarray_cache_type"]],
+    )
+    asset_dict.update(
+        {
+            "xarray:open_kwargs": open_kwargs,
+            "xarray:storage_options": storage_options,
+        }
+    )
 
-        extension = f".{filetype.split('/')[-1]}"
-    href = f"./{checksum}{extension}"
-
-    return {
-        "type": filetype,
-        "href": href,
-        "file:checksum": checksum,
-        "file:size": size,
-        "file:local_path": str(
-            pathlib.Path(config.SETTINGS["directory"]).absolute() / href
-        ),
-        "xarray:open_kwargs": open_kwargs,
-        "xarray:storage_options": storage_options,
-    }
+    return asset_dict
 
 
 def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:
