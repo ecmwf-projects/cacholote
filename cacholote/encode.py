@@ -68,16 +68,9 @@ def dictify_python_call(
     return python_call_simple
 
 
-def dictify_xarray_asset(
-    checksum: str,
-    size: int,
-    open_kwargs: Dict[str, Any] = {},
-    storage_options: Dict[str, Any] = {},
+def dictify_file(
+    filetype: str, checksum: str, size: int, extension: str = ""
 ) -> Dict[str, Any]:
-
-    filetype = config.SETTINGS["xarray_cache_type"]
-    extension = config.EXTENSIONS[filetype]
-
     return {
         "type": filetype,
         "href": f"./{checksum}{extension}",
@@ -87,9 +80,45 @@ def dictify_xarray_asset(
             pathlib.Path(config.SETTINGS["directory"]).absolute()
             / f"{checksum}{extension}"
         ),
-        "xarray:open_kwargs": open_kwargs,
-        "xarray:storage_options": storage_options,
     }
+
+
+def dictify_io_asset(
+    filetype: str,
+    checksum: str,
+    size: int,
+    extension: str = "",
+    open_kwargs: Dict[str, Any] = {},
+) -> Dict[str, Any]:
+
+    asset_dict = dictify_file(
+        filetype=filetype, checksum=checksum, size=size, extension=extension
+    )
+    asset_dict.update({"tmp:open_kwargs": open_kwargs})
+    return asset_dict
+
+
+def dictify_xarray_asset(
+    checksum: str,
+    size: int,
+    open_kwargs: Dict[str, Any] = {},
+    storage_options: Dict[str, Any] = {},
+) -> Dict[str, Any]:
+
+    asset_dict = dictify_file(
+        filetype=config.SETTINGS["xarray_cache_type"],
+        checksum=checksum,
+        size=size,
+        extension=config.EXTENSIONS[config.SETTINGS["xarray_cache_type"]],
+    )
+    asset_dict.update(
+        {
+            "xarray:open_kwargs": open_kwargs,
+            "xarray:storage_options": storage_options,
+        }
+    )
+
+    return asset_dict
 
 
 def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:

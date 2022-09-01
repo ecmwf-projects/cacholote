@@ -18,6 +18,7 @@ dependencies:
 - netCDF4
 - pip
 - pooch
+- python-magic
 - xarray>=2022.6.0
 - zarr
 - pip:

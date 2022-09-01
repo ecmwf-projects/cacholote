@@ -17,21 +17,28 @@ import hashlib
 import inspect
 import io
 import os
-import pathlib
 import shutil
 from typing import Any, Dict, Union
 
-from . import cache, config, encode
+from . import cache, encode
 
 try:
+    import dask
     import xarray as xr
+
+    HAS_XARRAY_AND_DASK = True
 except ImportError:
-    pass
+    HAS_XARRAY_AND_DASK = False
+
+try:
+    import magic
+
+    HAS_MAGIC = True
+except ImportError:
+    HAS_MAGIC = False
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
-    import dask
-
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         return str(dask.base.tokenize(obj))  # type: ignore[no-untyped-call]
 
@@ -75,34 +82,44 @@ def hexdigestify_file(
 def dictify_io_object(
     obj: Union[io.TextIOWrapper, io.BufferedReader]
 ) -> Dict[str, Any]:
-    if obj.closed:
-        with open(obj.name, "rb") as f:
-            hexdigest = hexdigestify_file(f)
-    else:
-        hexdigest = hexdigestify_file(obj)
-    _, ext = os.path.splitext(obj.name)
-    path = str(
-        pathlib.Path(config.SETTINGS["directory"]).absolute() / (hexdigest + ext)
-    )
 
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
+    filetype = magic.from_file(obj.name, mime=True)
+
+    if obj.closed:
+        with open(obj.name, "rb") as f:
+            checksum = hexdigestify_file(f)
+    else:
+        checksum = hexdigestify_file(obj)
+
+    size = os.path.getsize(obj.name)
+
+    _, extension = os.path.splitext(obj.name)
+
     params = inspect.signature(open).parameters
-    kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+    open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+
+    io_json = encode.dictify_io_asset(
+        filetype=filetype,
+        checksum=checksum,
+        size=size,
+        extension=extension,
+        open_kwargs=open_kwargs,
+    )
 
     try:
-        open(path, **kwargs)
+        open(io_json["file:local_path"], **open_kwargs)
     except:  # noqa: E722
-        shutil.copyfile(obj.name, path)
+        shutil.copyfile(obj.name, io_json["file:local_path"])
 
-    return encode.dictify_python_call(open, path, **kwargs)
+    return io_json
 
 
 def register_all() -> None:
-    encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
-    encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
-    try:
+    if HAS_MAGIC:
+        encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
+        encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
+    if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
-    except NameError:
-        pass
