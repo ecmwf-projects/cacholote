@@ -80,7 +80,8 @@ def hexdigestify_file(
 
 
 def dictify_io_object(
-    obj: Union[io.TextIOWrapper, io.BufferedReader]
+    obj: Union[io.TextIOWrapper, io.BufferedReader],
+    delete_original: bool = False,
 ) -> Dict[str, Any]:
 
     if "w" in obj.mode:
@@ -112,7 +113,10 @@ def dictify_io_object(
     try:
         open(io_json["file:local_path"], **open_kwargs)
     except:  # noqa: E722
-        shutil.copyfile(obj.name, io_json["file:local_path"])
+        if delete_original:
+            os.rename(obj.name, io_json["file:local_path"])
+        else:
+            shutil.copyfile(obj.name, io_json["file:local_path"])
 
     return io_json
 
