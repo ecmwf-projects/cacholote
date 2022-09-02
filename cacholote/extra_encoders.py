@@ -101,24 +101,22 @@ def dictify_io_object(
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
 
-    io_json = encode.dictify_io_asset(
+    try:
+        config.get_cache_files_directory().open(checksum + extension, **open_kwargs)
+    except:  # noqa: E722
+        config.get_cache_files_directory().put_file(obj.name, checksum + extension)
+        if delete_original:
+            # TODO: when cache is a local file system, then it would be better
+            # to mv rather than put then rm
+            os.remove(obj.name)
+
+    return encode.dictify_io_asset(
         filetype=filetype,
         checksum=checksum,
         size=size,
         extension=extension,
         open_kwargs=open_kwargs,
     )
-
-    try:
-        config.get_cache_files_directory().open(io_json["href"], **open_kwargs)
-    except:  # noqa: E722
-        config.get_cache_files_directory().put_file(obj.name, io_json["href"])
-        if delete_original:
-            # TODO: when cache is a local file system, then it would be better
-            # to mv rather than put then rm
-            os.remove(obj.name)
-
-    return io_json
 
 
 def register_all() -> None:
