@@ -71,14 +71,14 @@ def dictify_python_call(
 def dictify_file(
     filetype: str, checksum: str, size: int, extension: str = ""
 ) -> Dict[str, Any]:
+    root = config.get_cache_files_directory().path
     return {
         "type": filetype,
         "href": f"./{checksum}{extension}",
         "file:checksum": checksum,
         "file:size": size,
         "file:local_path": str(
-            pathlib.Path(config.SETTINGS["directory"]).absolute()
-            / f"{checksum}{extension}"
+            pathlib.Path(root).absolute() / f"{checksum}{extension}"
         ),
     }
 

@@ -15,6 +15,7 @@ dependencies:
 - cfgrib
 - dask
 - diskcache
+- fsspec
 - netCDF4
 - pip
 - pooch

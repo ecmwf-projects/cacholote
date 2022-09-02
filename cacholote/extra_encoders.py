@@ -17,10 +17,9 @@ import hashlib
 import inspect
 import io
 import os
-import shutil
 from typing import Any, Dict, Union
 
-from . import cache, encode
+from . import cache, config, encode
 
 try:
     import dask
@@ -111,12 +110,13 @@ def dictify_io_object(
     )
 
     try:
-        open(io_json["file:local_path"], **open_kwargs)
+        config.get_cache_files_directory().open(io_json["href"], **open_kwargs)
     except:  # noqa: E722
+        config.get_cache_files_directory().put_file(obj.name, io_json["href"])
         if delete_original:
-            os.rename(obj.name, io_json["file:local_path"])
-        else:
-            shutil.copyfile(obj.name, io_json["file:local_path"])
+            # TODO: when cache is a local file system, then it would be better
+            # to mv rather than put then rm
+            os.remove(obj.name)
 
     return io_json
 

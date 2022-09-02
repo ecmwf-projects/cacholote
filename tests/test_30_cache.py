@@ -39,6 +39,8 @@ def test_cacheable(settings: Dict[str, Any]) -> None:
         cache_store = config.SETTINGS["cache_store"]
         is_redis = HAS_REDISLITE and isinstance(cache_store, redislite.Redis)
 
+        print(config.SETTINGS)
+
         cfunc = cache.cacheable(func)
         res = cfunc("test")
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}

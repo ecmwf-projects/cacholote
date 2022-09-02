@@ -5,4 +5,4 @@ from cacholote import config
 
 @pytest.fixture(autouse=True)
 def set_tmpdir(tmpdir: str) -> None:
-    config.set(directory=tmpdir)
+    config.set(cache_db_directory=tmpdir)

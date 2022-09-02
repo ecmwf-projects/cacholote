@@ -17,6 +17,8 @@ import importlib
 import json
 from typing import Any, Dict, Union
 
+from . import config
+
 
 def import_object(fully_qualified_name: str) -> Any:
     # FIXME: apply exclude/include-rules to `fully_qualified_name`
@@ -57,7 +59,9 @@ def object_hook(obj: Dict[str, Any]) -> Any:
 
     if {"tmp:open_kwargs", "file:local_path"} <= set(obj):
 
-        return open(obj["file:local_path"], **obj["tmp:open_kwargs"])
+        return config.get_cache_files_directory().open(
+            obj["href"], **obj["tmp:open_kwargs"]
+        )
 
     return obj
 

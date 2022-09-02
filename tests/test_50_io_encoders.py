@@ -14,7 +14,8 @@ def func(a: T) -> T:
     return a
 
 
-def test_dictify_io_object(tmpdir: str) -> None:
+@pytest.mark.parametrize("delete_original", [True, False])
+def test_dictify_io_object(tmpdir: str, delete_original: bool) -> None:
     tmpfile = os.path.join(tmpdir, "dummy.txt")
     with open(tmpfile, "w") as f:
         f.write("dummy")
@@ -31,9 +32,12 @@ def test_dictify_io_object(tmpdir: str) -> None:
         "file:local_path": local_path,
         "tmp:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
     }
-    res = extra_encoders.dictify_io_object(open(tmpfile))
+    res = extra_encoders.dictify_io_object(
+        open(tmpfile), delete_original=delete_original
+    )
     assert res == expected
     assert os.path.exists(local_path)
+    assert os.path.exists(tmpfile) is not delete_original
 
 
 def test_copy_file_to_cache_directory(tmpdir: str) -> None:
