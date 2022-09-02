@@ -91,10 +91,10 @@ class set:
 
 
 def get_cache_files_directory() -> fsspec.AbstractFileSystem:
-    if _SETTINGS["cache_db_directory"] is None and _SETTINGS["cache_files_directory"]:
-        raise ValueError("Please set 'cache_files_directory' must be set.")
 
     if _SETTINGS["cache_files_directory"] is None:
+        if _SETTINGS["cache_db_directory"] is None:
+            raise ValueError("Please set 'cache_files_directory'")
         return fsspec.implementations.dirfs.DirFileSystem(
             _SETTINGS["cache_db_directory"], fsspec.filesystem("file")
         )
