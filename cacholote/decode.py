@@ -17,7 +17,7 @@ import importlib
 import json
 from typing import Any, Dict, Union
 
-from . import config
+import fsspec
 
 
 def import_object(fully_qualified_name: str) -> Any:
@@ -50,18 +50,16 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         open_kwargs = obj.get("xarray:open_kwargs", {})
         storage_options = obj.get("xarray:storage_options", {})
         if storage_options:
-            import fsspec
-
             store = fsspec.get_mapper(obj["file:local_path"], **storage_options)
         else:
             store = obj["file:local_path"]
         return xr.open_dataset(store, **open_kwargs)
 
-    if {"tmp:open_kwargs", "file:local_path"} <= set(obj):
+    if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
 
-        return config.get_cache_files_directory().open(
-            obj["href"], **obj["tmp:open_kwargs"]
-        )
+        return fsspec.open(
+            obj["href"], **obj["tmp:open_kwargs"], **obj["tmp:storage_options"]
+        ).open()
 
     return obj
 

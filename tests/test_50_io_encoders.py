@@ -26,11 +26,12 @@ def test_dictify_io_object(tmpdir: str, delete_original: bool) -> None:
     )
     expected = {
         "type": "text/plain",
-        "href": "./f6e6e2cc3b79d2ff7163fe28e6324870bfe8cf16a912dfc2ebceee7a.txt",
+        "href": local_path,
         "file:checksum": "f6e6e2cc3b79d2ff7163fe28e6324870bfe8cf16a912dfc2ebceee7a",
         "file:size": 5,
         "file:local_path": local_path,
         "tmp:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
+        "tmp:storage_options": {},
     }
     res = extra_encoders.dictify_io_object(
         open(tmpfile), delete_original=delete_original

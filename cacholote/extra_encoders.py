@@ -111,19 +111,18 @@ def dictify_io_object(
         open_kwargs=open_kwargs,
     )
 
-    cache_dir = config.get_cache_files_directory()
-    local_path = io_json["file:local_path"]
-    basename = os.path.basename(io_json["file:local_path"])
+    cache_dir_fs = config.get_cache_files_directory()
+    local_path = io_json.get("file:local_path", None)
+    basename = io_json["href"].rsplit("/")[-1]
     try:
-        cache_dir.open(basename, **open_kwargs)
+        cache_dir_fs.open(
+            basename, **io_json["tmp:open_kwargs"], **io_json["tmp:storage_options"]
+        )
     except:  # noqa: E722
-        if (
-            isinstance(cache_dir.fs, fsspec.implementations.local.LocalFileSystem)
-            and delete_original
-        ):
+        if local_path is not None and delete_original:
             fsspec.filesystem("file").move(obj.name, local_path)
         else:
-            cache_dir.put_file(obj.name, basename)
+            cache_dir_fs.put_file(obj.name, basename)
             if delete_original:
                 fsspec.filesystem("file").rm(obj.name)
 

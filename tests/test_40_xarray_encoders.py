@@ -49,7 +49,7 @@ def test_dictify_xr_dataset(
     )
     expected = {
         "type": xarray_cache_type,
-        "href": f"./285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        "href": local_path,
         "file:checksum": "285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4",
         "file:size": 470024,
         "file:local_path": local_path,

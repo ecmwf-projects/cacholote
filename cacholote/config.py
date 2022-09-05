@@ -30,7 +30,8 @@ import fsspec.implementations.local
 
 _SETTINGS: Dict[str, Any] = {
     "cache_db_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
-    "cache_files_directory": None,
+    "cache_files_urlpath": None,
+    "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
 }
 
@@ -102,11 +103,15 @@ class set:
 
 def get_cache_files_directory() -> fsspec.implementations.dirfs.DirFileSystem:
 
-    if _SETTINGS["cache_files_directory"] is None:
-        if _SETTINGS["cache_db_directory"] is None:
-            raise ValueError("Please set 'cache_files_directory'")
-        return fsspec.implementations.dirfs.DirFileSystem(
-            path=_SETTINGS["cache_db_directory"], fs=fsspec.filesystem("file")
-        )
+    if _SETTINGS["cache_files_urlpath"] is _SETTINGS["cache_db_directory"] is None:
+        raise ValueError("Please set 'cache_files_directory'")
 
-    return _SETTINGS["cache_files_directory"]
+    if _SETTINGS["cache_files_urlpath"] is None:
+        urlpath = _SETTINGS["cache_db_directory"]
+    else:
+        urlpath = _SETTINGS["cache_files_urlpath"]
+    urlpath = str(urlpath)
+
+    protocol = fsspec.utils.get_protocol(urlpath)
+    fs = fsspec.filesystem(protocol, **_SETTINGS["cache_files_storage_options"])
+    return fsspec.implementations.dirfs.DirFileSystem(path=urlpath, fs=fs)
