@@ -26,6 +26,7 @@ from typing import Any, Dict, Optional, Type
 import diskcache
 import fsspec
 import fsspec.implementations.dirfs
+import fsspec.implementations.local
 
 _SETTINGS: Dict[str, Any] = {
     "cache_db_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
@@ -57,6 +58,15 @@ class set:
             raise ValueError(
                 "'cache_store' and 'cache_db_directory' are mutually exclusive"
             )
+
+        if "cache_files_directory" in kwargs and not isinstance(
+            kwargs["cache_files_directory"],
+            fsspec.implementations.local.LocalFileSystem,
+        ):
+            raise ValueError(
+                "'cache_files_directory' must be of type 'LocalFileSystem'"
+            )
+
         if (
             "xarray_cache_type" in kwargs
             and kwargs["xarray_cache_type"] not in EXTENSIONS
@@ -90,13 +100,13 @@ class set:
         _SETTINGS.update(self._old)
 
 
-def get_cache_files_directory() -> fsspec.AbstractFileSystem:
+def get_cache_files_directory() -> fsspec.implementations.dirfs.DirFileSystem:
 
     if _SETTINGS["cache_files_directory"] is None:
         if _SETTINGS["cache_db_directory"] is None:
             raise ValueError("Please set 'cache_files_directory'")
         return fsspec.implementations.dirfs.DirFileSystem(
-            _SETTINGS["cache_db_directory"], fsspec.filesystem("file")
+            path=_SETTINGS["cache_db_directory"], fs=fsspec.filesystem("file")
         )
 
     return _SETTINGS["cache_files_directory"]

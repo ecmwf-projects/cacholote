@@ -19,6 +19,9 @@ import io
 import os
 from typing import Any, Dict, Union
 
+import fsspec
+import fsspec.implementations.local
+
 from . import cache, config, encode
 
 try:
@@ -100,23 +103,31 @@ def dictify_io_object(
 
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
-
-    try:
-        config.get_cache_files_directory().open(checksum + extension, **open_kwargs)
-    except:  # noqa: E722
-        config.get_cache_files_directory().put_file(obj.name, checksum + extension)
-        if delete_original:
-            # TODO: when cache is a local file system, then it would be better
-            # to mv rather than put then rm
-            os.remove(obj.name)
-
-    return encode.dictify_io_asset(
+    io_json = encode.dictify_io_asset(
         filetype=filetype,
         checksum=checksum,
         size=size,
         extension=extension,
         open_kwargs=open_kwargs,
     )
+
+    cache_dir = config.get_cache_files_directory()
+    local_path = io_json["file:local_path"]
+    basename = os.path.basename(io_json["file:local_path"])
+    try:
+        cache_dir.open(basename, **open_kwargs)
+    except:  # noqa: E722
+        if (
+            isinstance(cache_dir.fs, fsspec.implementations.local.LocalFileSystem)
+            and delete_original
+        ):
+            fsspec.filesystem("file").move(obj.name, local_path)
+        else:
+            cache_dir.put_file(obj.name, basename)
+            if delete_original:
+                fsspec.filesystem("file").rm(obj.name)
+
+    return io_json
 
 
 def register_all() -> None:
