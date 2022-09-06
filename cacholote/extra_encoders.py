@@ -91,14 +91,9 @@ def dictify_io_object(
 
     filetype = magic.from_file(obj.name, mime=True)
 
-    if obj.closed:
-        with open(obj.name, "rb") as f:
-            checksum = hexdigestify_file(f)
-    else:
-        checksum = hexdigestify_file(obj)
-
-    size = os.path.getsize(obj.name)
-
+    with fsspec.open(obj.name, "rb") as f:
+        checksum = hexdigestify_file(f)
+        size = f.size
     _, extension = os.path.splitext(obj.name)
 
     params = inspect.signature(open).parameters
