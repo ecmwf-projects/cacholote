@@ -2,6 +2,7 @@ import glob
 import os
 from typing import TypeVar
 
+import fsspec
 import pytest
 
 from cacholote import cache, config, decode, encode, extra_encoders
@@ -21,13 +22,11 @@ def func(a: T) -> T:
 
 @pytest.fixture
 def ds() -> xr.Dataset:
-    import pooch
-
-    fname = pooch.retrieve(
-        url="https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib",
-        known_hash="c144fde61ca5d53702bf6f212775ef2cc783bdd66b6865160bf597c1b35ed898",
-    )
-    ds = xr.open_dataset(fname)
+    with fsspec.open(
+        "filecache::https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
+    ) as of:
+        fname = of.name
+    ds = xr.open_dataset(fname, engine="cfgrib")
     del ds.attrs["history"]
 
     return ds.sel(number=0)
