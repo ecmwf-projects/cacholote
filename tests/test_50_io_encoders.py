@@ -6,8 +6,6 @@ import pytest
 
 from cacholote import cache, config, extra_encoders
 
-pytest.importorskip("magic")
-
 T = TypeVar("T")
 
 
