@@ -16,7 +16,7 @@
 import hashlib
 import inspect
 import io
-import os
+import mimetypes
 from typing import Any, Dict, Union
 
 import fsspec
@@ -39,6 +39,10 @@ try:
 except ImportError:
     HAS_MAGIC = False
 
+for ext in (".grib", ".grb", ".grb1", ".grb2"):
+    if ext not in mimetypes.types_map:
+        mimetypes.add_type("application/x-grib", ext, strict=False)
+
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
@@ -54,14 +58,12 @@ def dictify_xr_dataset(
     try:
         xr.open_dataset(xr_json["file:local_path"], chunks="auto")
     except:  # noqa: E722
-        if xr_json["type"] == "application/netcdf":
+        if xr_json["type"] == "application/x-netcdf":
             obj.to_netcdf(xr_json["file:local_path"])
-        elif xr_json["type"] == "application/wmo-GRIB2":
+        elif xr_json["type"] == "application/x-grib":
             import cfgrib.xarray_to_grib
 
-            cfgrib.xarray_to_grib.to_grib(
-                obj, xr_json["file:local_path"], grib_keys={"edition": 2}
-            )
+            cfgrib.xarray_to_grib.to_grib(obj, xr_json["file:local_path"])
         else:
             # Should never get here! xarray_cache_type is checked in config.py
             raise ValueError(f"type {xr_json['type']} is NOT supported.")
@@ -89,12 +91,20 @@ def dictify_io_object(
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
-    filetype = magic.from_file(obj.name, mime=True)
+    filetype = mimetypes.guess_type(obj.name)[0]
+    if filetype is None and HAS_MAGIC:
+        with fsspec.open(obj.name, "rb") as f:
+            filetype = magic.from_buffer(f.read(), mime=True)
+    if filetype is None or filetype == "application/octet-stream":
+        filetype = "unknown"
 
     with fsspec.open(obj.name, "rb") as f:
         checksum = hexdigestify_file(f)
+
+    with fsspec.open(obj.name, "rb") as f:
         size = f.size
-    _, extension = os.path.splitext(obj.name)
+
+    extension = f".{obj.name.rsplit('.', 1)[-1]}" if "." in obj.name else ""
 
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
@@ -108,7 +118,7 @@ def dictify_io_object(
 
     cache_dir_fs = config.get_cache_files_directory()
     local_path = io_json.get("file:local_path", None)
-    basename = io_json["href"].rsplit("/")[-1]
+    basename = io_json["href"].rsplit("/", 1)[-1]
     try:
         cache_dir_fs.open(
             basename, **io_json["tmp:open_kwargs"], **io_json["tmp:storage_options"]
@@ -125,8 +135,7 @@ def dictify_io_object(
 
 
 def register_all() -> None:
-    if HAS_MAGIC:
-        encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
-        encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
+    encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
+    encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
     if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
