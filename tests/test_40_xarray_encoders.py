@@ -2,7 +2,6 @@ import glob
 import os
 from typing import TypeVar
 
-import fsspec
 import pytest
 
 from cacholote import cache, config, decode, encode, extra_encoders
@@ -10,8 +9,10 @@ from cacholote import cache, config, decode, encode, extra_encoders
 try:
     import xarray as xr
 finally:
-    pytest.importorskip("xarray")
     pytest.importorskip("dask")
+    pytest.importorskip("xarray")
+    pytest.importorskip("zarr")
+
 
 T = TypeVar("T")
 
@@ -22,84 +23,55 @@ def func(a: T) -> T:
 
 @pytest.fixture
 def ds() -> xr.Dataset:
-    url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
-    with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
-        fname = of.name
-    ds = xr.open_dataset(fname, engine="cfgrib")
-    del ds.attrs["history"]
-    return ds.sel(number=0)
+    return xr.Dataset({"foo": 0}, attrs={})
 
 
-xr_parametrize = (
-    "xarray_cache_type,extension",
-    [("application/x-netcdf", ".nc"), ("application/x-grib", ".grb")],
-)
-
-
-@pytest.mark.parametrize(*xr_parametrize)
-def test_dictify_xr_dataset(
-    ds: xr.Dataset, xarray_cache_type: str, extension: str
-) -> None:
+def test_dictify_xr_dataset(ds: xr.Dataset) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
-        f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        "8671e37e1cb2cbfdc00e80ecf2efcf3ed972385eeb5d4bc58d329af0.zarr",
     )
     expected = {
-        "type": xarray_cache_type,
+        "type": "application/vnd+zarr",
         "href": local_path,
-        "file:checksum": "285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4",
-        "file:size": 470024,
+        "file:checksum": "8671e37e1cb2cbfdc00e80ecf2efcf3ed972385eeb5d4bc58d329af0",
+        "file:size": 8,
         "file:local_path": local_path,
-        "xarray:open_kwargs": {},
+        "xarray:open_kwargs": {"consolidated": True, "engine": "zarr"},
         "xarray:storage_options": {},
     }
-    with config.set(xarray_cache_type=xarray_cache_type):
-        res = extra_encoders.dictify_xr_dataset(ds)
+    res = extra_encoders.dictify_xr_dataset(ds)
     assert res == expected
     assert os.path.exists(local_path)
 
 
-@pytest.mark.parametrize(*xr_parametrize)
-def test_xr_roundtrip(ds: xr.Dataset, xarray_cache_type: str, extension: str) -> None:
-    with config.set(xarray_cache_type=xarray_cache_type):
-        ds_json = encode.dumps(ds)
-        res = decode.loads(ds_json)
-
-    if xarray_cache_type == "application/x-grib":
-        xr.testing.assert_equal(res, ds)
-    else:
-        xr.testing.assert_identical(res, ds)
+def test_xr_roundtrip(ds: xr.Dataset) -> None:
+    ds_json = encode.dumps(ds)
+    res = decode.loads(ds_json)
+    xr.testing.assert_identical(res, ds)
 
 
-@pytest.mark.parametrize(*xr_parametrize)
-def test_xr_cacheable(ds: xr.Dataset, xarray_cache_type: str, extension: str) -> None:
+def test_xr_cacheable(ds: xr.Dataset) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
-        f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        "8671e37e1cb2cbfdc00e80ecf2efcf3ed972385eeb5d4bc58d329af0.zarr",
     )
 
-    with config.set(xarray_cache_type=xarray_cache_type):
-        cfunc = cache.cacheable(func)
+    cfunc = cache.cacheable(func)
 
-        # 1: create cached data
-        res = cfunc(ds)
-        assert config.SETTINGS["cache_store"].stats() == (0, 1)
-        mtime = os.path.getmtime(local_path)
+    # 1: create cached data
+    res = cfunc(ds)
+    assert config.SETTINGS["cache_store"].stats() == (0, 1)
+    mtime = os.path.getmtime(local_path)
+    xr.testing.assert_identical(res, ds)
+    xr.testing.assert_identical(xr.open_dataset(local_path, engine="zarr"), ds)
 
-        if xarray_cache_type == "application/x-grib":
-            xr.testing.assert_equal(res, ds)
-        else:
-            xr.testing.assert_identical(res, ds)
-
-        # 2: use cached data
-        res = cfunc(ds)
-        assert config.SETTINGS["cache_store"].stats() == (1, 1)
-        assert mtime == os.path.getmtime(local_path)
-        assert glob.glob(
-            os.path.join(config.SETTINGS["cache_store"].directory, f"*{extension}")
-        ) == [local_path]
-
-        if xarray_cache_type == "application/x-grib":
-            xr.testing.assert_equal(res, ds)
-        else:
-            xr.testing.assert_identical(res, ds)
+    # 2: use cached data
+    res = cfunc(ds)
+    assert config.SETTINGS["cache_store"].stats() == (1, 1)
+    assert mtime == os.path.getmtime(local_path)
+    assert glob.glob(
+        os.path.join(config.SETTINGS["cache_store"].directory, "*.zarr")
+    ) == [local_path]
+    xr.testing.assert_identical(res, ds)
+    xr.testing.assert_identical(xr.open_dataset(local_path, engine="zarr"), ds)

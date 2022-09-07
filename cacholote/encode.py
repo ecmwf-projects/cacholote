@@ -112,18 +112,17 @@ def dictify_io_asset(
 def dictify_xarray_asset(
     checksum: str,
     size: int,
-    open_kwargs: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
     asset_dict = dictify_file(
-        filetype=config.SETTINGS["xarray_cache_type"],
+        filetype="application/vnd+zarr",
         checksum=checksum,
         size=size,
-        extension=config.EXTENSIONS[config.SETTINGS["xarray_cache_type"]],
+        extension=".zarr",
     )
     asset_dict.update(
         {
-            "xarray:open_kwargs": open_kwargs,
+            "xarray:open_kwargs": {"consolidated": True, "engine": "zarr"},
             "xarray:storage_options": config._SETTINGS["cache_files_storage_options"],
         }
     )

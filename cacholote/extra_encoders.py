@@ -48,9 +48,16 @@ for ext in (".grib", ".grb", ".grb1", ".grb2"):
 
 def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
     fs = fsspec.filesystem(
-        fsspec.utils.get_protocol(io_json["href"]), **io_json["tmp:storage_options"]
+        fsspec.utils.get_protocol(io_json["href"]),
+        check=True,
+        **io_json["tmp:storage_options"],
     )
     return fs.open(io_json["href"], **io_json["tmp:open_kwargs"])
+
+
+def open_xr_from_json(xr_json: Dict[str, Any]) -> "xr.Dataset":
+    store = fsspec.get_mapper(xr_json["href"], **xr_json["xarray:storage_options"])
+    return xr.open_dataset(store, **xr_json["xarray:open_kwargs"])
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
@@ -65,17 +72,12 @@ def dictify_xr_dataset(
     checksum = cache.hexdigestify(token)
     xr_json = encode.dictify_xarray_asset(checksum=checksum, size=obj.nbytes)
     try:
-        xr.open_dataset(xr_json["file:local_path"], chunks="auto")
+        open_xr_from_json(xr_json)
     except:  # noqa: E722
-        if xr_json["type"] == "application/x-netcdf":
-            obj.to_netcdf(xr_json["file:local_path"])
-        elif xr_json["type"] == "application/x-grib":
-            import cfgrib.xarray_to_grib
+        cache_dir_fs = config.get_cache_files_directory()
+        store = cache_dir_fs.get_mapper(f"{checksum}.zarr", create=True)
+        obj.to_zarr(store, consolidated=True)
 
-            cfgrib.xarray_to_grib.to_grib(obj, xr_json["file:local_path"])
-        else:
-            # Should never get here! xarray_cache_type is checked in config.py
-            raise ValueError(f"type {xr_json['type']} is NOT supported.")
     return xr_json
 
 

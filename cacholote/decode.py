@@ -17,8 +17,6 @@ import importlib
 import json
 from typing import Any, Dict, Union
 
-import fsspec
-
 from . import extra_encoders
 
 
@@ -47,15 +45,8 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         return func(*args, **kwargs)
 
     if {"xarray:open_kwargs", "file:local_path"} <= set(obj):
-        import xarray as xr
 
-        open_kwargs = obj.get("xarray:open_kwargs", {})
-        storage_options = obj.get("xarray:storage_options", {})
-        if storage_options:
-            store = fsspec.get_mapper(obj["file:local_path"], **storage_options)
-        else:
-            store = obj["file:local_path"]
-        return xr.open_dataset(store, **open_kwargs)
+        return extra_encoders.open_xr_from_json(obj)
 
     if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
 

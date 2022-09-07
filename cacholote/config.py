@@ -29,16 +29,15 @@ import fsspec.implementations.dirfs
 import fsspec.implementations.local
 
 _SETTINGS: Dict[str, Any] = {
-    "cache_db_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
+    "cache_store_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
     "cache_files_urlpath": None,
     "cache_files_storage_options": {},
-    "xarray_cache_type": "application/netcdf",
 }
 
 
 def _initialize_cache_store() -> None:
     _SETTINGS["cache_store"] = diskcache.Cache(
-        _SETTINGS["cache_db_directory"], disk=diskcache.JSONDisk, statistics=1
+        _SETTINGS["cache_store_directory"], disk=diskcache.JSONDisk, statistics=1
     )
 
 
@@ -46,18 +45,15 @@ _initialize_cache_store()
 
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
-EXTENSIONS = MappingProxyType(
-    {"application/x-netcdf": ".nc", "application/x-grib": ".grb"}
-)
 
 
 class set:
     # TODO: Add docstring
     def __init__(self, **kwargs: Any):
 
-        if "cache_store" in kwargs and "cache_db_directory" in kwargs:
+        if "cache_store" in kwargs and "cache_store_directory" in kwargs:
             raise ValueError(
-                "'cache_store' and 'cache_db_directory' are mutually exclusive"
+                "'cache_store' and 'cache_store_directory' are mutually exclusive"
             )
 
         if "cache_files_directory" in kwargs and not isinstance(
@@ -68,14 +64,8 @@ class set:
                 "'cache_files_directory' must be of type 'LocalFileSystem'"
             )
 
-        if (
-            "xarray_cache_type" in kwargs
-            and kwargs["xarray_cache_type"] not in EXTENSIONS
-        ):
-            raise ValueError(f"'xarray_cache_type' must be one of {list(EXTENSIONS)}")
-
         if "cache_store" in kwargs:
-            kwargs["cache_db_directory"] = None
+            kwargs["cache_store_directory"] = None
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
@@ -85,7 +75,7 @@ class set:
             ) from ex
 
         _SETTINGS.update(kwargs)
-        if kwargs.get("cache_db_directory", None) is not None:
+        if kwargs.get("cache_store_directory", None) is not None:
             self._old["cache_store"] = _SETTINGS["cache_store"]
             _initialize_cache_store()
 
@@ -103,11 +93,11 @@ class set:
 
 def get_cache_files_directory() -> fsspec.implementations.dirfs.DirFileSystem:
 
-    if _SETTINGS["cache_files_urlpath"] is _SETTINGS["cache_db_directory"] is None:
+    if _SETTINGS["cache_files_urlpath"] is _SETTINGS["cache_store_directory"] is None:
         raise ValueError("Please set 'cache_files_directory'")
 
     if _SETTINGS["cache_files_urlpath"] is None:
-        urlpath = _SETTINGS["cache_db_directory"]
+        urlpath = _SETTINGS["cache_store_directory"]
     else:
         urlpath = _SETTINGS["cache_files_urlpath"]
     urlpath = str(urlpath)
