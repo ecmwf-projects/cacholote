@@ -62,17 +62,14 @@ def open_xr_from_json(xr_json: Dict[str, Any]) -> "xr.Dataset":
     return xr.open_dataset(store, **open_kwargs)
 
 
-def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
-    with dask.config.set({"tokenize.ensure-deterministic": True}):
-        return str(dask.base.tokenize(obj))  # type: ignore[no-untyped-call]
-
-
 def dictify_xr_dataset(
     obj: Union["xr.DataArray", "xr.Dataset"],
 ) -> Dict[str, Any]:
-    token = tokenize_xr_object(obj)
+    with dask.config.set({"tokenize.ensure-deterministic": True}):
+        token = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
     checksum = cache.hexdigestify(token)
     xr_json = encode.dictify_xarray_asset(checksum=checksum, size=obj.nbytes)
+
     try:
         open_xr_from_json(xr_json)
     except:  # noqa: E722
