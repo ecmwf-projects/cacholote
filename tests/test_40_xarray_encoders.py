@@ -63,6 +63,14 @@ def test_xr_cacheable(ds: xr.Dataset) -> None:
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
     mtime = os.path.getmtime(local_path)
     xr.testing.assert_identical(res, ds)
+    assert ds["foo"].encoding == {}
+    assert set(res["foo"].encoding) == {
+        "chunks",
+        "compressor",
+        "dtype",
+        "filters",
+        "preferred_chunks",
+    }
 
     # 2: use cached data
     res = cfunc(ds)
@@ -72,3 +80,11 @@ def test_xr_cacheable(ds: xr.Dataset) -> None:
         os.path.join(config.SETTINGS["cache_store"].directory, "*.zarr")
     ) == [local_path]
     xr.testing.assert_identical(res, ds)
+    assert ds["foo"].encoding == {}
+    assert set(res["foo"].encoding) == {
+        "chunks",
+        "compressor",
+        "dtype",
+        "filters",
+        "preferred_chunks",
+    }
