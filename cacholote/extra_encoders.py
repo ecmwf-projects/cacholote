@@ -99,7 +99,7 @@ def dictify_io_object(
     delete_original: bool = False,
 ) -> Dict[str, Any]:
 
-    # The typo of obj is io.IOBase because all fsspec open objects are inherited from that.
+    # The type of obj is io.IOBase because all fsspec open objects are inherited from that.
     # The attributes ignored below DO exist in fsspec classes and io.TextIOWrapper and io.BufferedReader.
     if "w" in obj.mode:  # type: ignore[attr-defined]
         raise ValueError("write-mode objects can NOT be cached.")
@@ -136,7 +136,6 @@ def dictify_io_object(
     )
     try:
         open_io_from_json(io_json)
-
     except:  # noqa: E722
         cache_local_path = io_json.get("file:local_path", None)
         cache_dir_fs = config.get_cache_files_directory()
@@ -146,10 +145,10 @@ def dictify_io_object(
         if protocol_in == "file":
             # IN is local
             if cache_local_path is not None and delete_original:
-                # IN and OUT are local
+                # OUT is local
                 fsspec.filesystem("file").move(path_in, cache_local_path)
             else:
-                # IN is local, OUT is not local
+                # OUT is not local
                 cache_dir_fs.put_file(path_in, cache_basename)
                 if delete_original:
                     fsspec.filesystem("file").rm(path_in)
@@ -159,15 +158,15 @@ def dictify_io_object(
                 warnings.warn("Can NOT delete original file.")
 
             with tempfile.TemporaryDirectory() as tmpdirname:
+                # Download loacally in tmp directory
                 with fsspec.open(
                     f"filecache::{path_in}", filecache={"cache_storage": tmpdirname}
                 ) as f:
-                    # Download locally
                     if cache_local_path:
-                        # IN is not local, OUT is local
+                        # OUT is local
                         fsspec.filesystem("file").move(f.name, cache_local_path)
                     else:
-                        # IN is not local, OUT is not local
+                        # OUT is not local
                         cache_dir_fs.put_file(f.name, cache_basename)
 
     return io_json
