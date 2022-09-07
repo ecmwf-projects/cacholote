@@ -19,6 +19,8 @@ from typing import Any, Dict, Union
 
 import fsspec
 
+from . import extra_encoders
+
 
 def import_object(fully_qualified_name: str) -> Any:
     # FIXME: apply exclude/include-rules to `fully_qualified_name`
@@ -57,9 +59,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
 
     if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
 
-        return fsspec.open(
-            obj["href"], **obj["tmp:open_kwargs"], **obj["tmp:storage_options"]
-        ).open()
+        return extra_encoders.open_io_from_json(obj)
 
     return obj
 

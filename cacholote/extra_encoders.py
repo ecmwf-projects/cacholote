@@ -17,6 +17,8 @@ import hashlib
 import inspect
 import io
 import mimetypes
+import tempfile
+import warnings
 from typing import Any, Dict, Union
 
 import fsspec
@@ -42,6 +44,15 @@ except ImportError:
 for ext in (".grib", ".grb", ".grb1", ".grb2"):
     if ext not in mimetypes.types_map:
         mimetypes.add_type("application/x-grib", ext, strict=False)
+
+
+def open_io_from_json(io_json: Dict[str, Any]) -> io.IOBase:
+    fs = fsspec.filesystem(
+        fsspec.utils.get_protocol(io_json["href"]), **io_json["tmp:storage_options"]
+    )
+    f: io.IOBase = fs.open(io_json["href"], **io_json["tmp:open_kwargs"])
+
+    return f
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
@@ -71,7 +82,7 @@ def dictify_xr_dataset(
 
 
 def hexdigestify_file(
-    f: Union[io.TextIOWrapper, io.BufferedReader],
+    f: io.IOBase,
     buf_size: int = io.DEFAULT_BUFFER_SIZE,
 ) -> str:
     hash_req = hashlib.sha3_224()
@@ -84,27 +95,35 @@ def hexdigestify_file(
 
 
 def dictify_io_object(
-    obj: Union[io.TextIOWrapper, io.BufferedReader],
+    obj: io.IOBase,
     delete_original: bool = False,
 ) -> Dict[str, Any]:
 
-    if "w" in obj.mode:
+    # The typo of obj is io.IOBase because all fsspec open objects are inherited from that.
+    # The attributes ignored below DO exist in fsspec classes and io.TextIOWrapper and io.BufferedReader.
+    if "w" in obj.mode:  # type: ignore[attr-defined]
         raise ValueError("write-mode objects can NOT be cached.")
 
-    filetype = mimetypes.guess_type(obj.name)[0]
-    if filetype is None and HAS_MAGIC:
-        with fsspec.open(obj.name, "rb") as f:
-            filetype = magic.from_buffer(f.read(), mime=True)
-    if filetype is None or filetype == "application/octet-stream":
-        filetype = "unknown"
+    try:
+        path = obj.path  # type: ignore[attr-defined]
+    except AttributeError:
+        path = obj.name  # type: ignore[attr-defined]
 
-    with fsspec.open(obj.name, "rb") as f:
+    filetype = mimetypes.guess_type(path)[0]
+    if filetype is None and HAS_MAGIC:
+        with fsspec.open(path, "rb") as f:
+            filetype = magic.from_buffer(f.read(), mime=True)
+            if filetype == "application/octet-stream":
+                filetype = None
+    filetype = filetype or "unknown"
+
+    with fsspec.open(path, "rb") as f:
         checksum = hexdigestify_file(f)
 
-    with fsspec.open(obj.name, "rb") as f:
+    with fsspec.open(path, "rb") as f:
         size = f.size
 
-    extension = f".{obj.name.rsplit('.', 1)[-1]}" if "." in obj.name else ""
+    extension = f".{path.rsplit('.', 1)[-1]}" if "." in path else ""
 
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
@@ -115,27 +134,35 @@ def dictify_io_object(
         extension=extension,
         open_kwargs=open_kwargs,
     )
-
-    cache_dir_fs = config.get_cache_files_directory()
-    local_path = io_json.get("file:local_path", None)
-    basename = io_json["href"].rsplit("/", 1)[-1]
     try:
-        cache_dir_fs.open(
-            basename, **io_json["tmp:open_kwargs"], **io_json["tmp:storage_options"]
-        )
+        open_io_from_json(io_json)
+
     except:  # noqa: E722
-        if local_path is not None and delete_original:
-            fsspec.filesystem("file").move(obj.name, local_path)
+        protocol = fsspec.utils.get_protocol(path)
+        local_path = io_json.get("file:local_path", None)
+        cache_dir_fs = config.get_cache_files_directory()
+        basename = io_json["href"].rsplit("/", 1)[-1]
+        if protocol == "file":
+            if local_path is not None and delete_original:
+                fsspec.filesystem("file").move(path, local_path)
+            else:
+                cache_dir_fs.put_file(path, basename)
+                if delete_original:
+                    fsspec.filesystem("file").rm(path)
         else:
-            cache_dir_fs.put_file(obj.name, basename)
+            # TODO! https://github.com/fsspec/filesystem_spec/issues/909
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                with fsspec.open(
+                    f"filecache::{path}", filecache={"cache_storage": tmpdirname}
+                ) as of:
+                    cache_dir_fs.put_file(of.name, basename)
             if delete_original:
-                fsspec.filesystem("file").rm(obj.name)
+                warnings.warn("Can NOT delete original file")
 
     return io_json
 
 
 def register_all() -> None:
-    encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
-    encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
+    encode.FILECACHE_ENCODERS.append((io.IOBase, dictify_io_object))
     if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))

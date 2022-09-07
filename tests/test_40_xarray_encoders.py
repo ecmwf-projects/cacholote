@@ -23,7 +23,8 @@ def func(a: T) -> T:
 @pytest.fixture
 def ds() -> xr.Dataset:
     with fsspec.open(
-        "filecache::https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
+        "simplecache::https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib",
+        simplecache={"same_names": True},
     ) as of:
         fname = of.name
     ds = xr.open_dataset(fname, engine="cfgrib")
