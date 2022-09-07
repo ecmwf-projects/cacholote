@@ -82,7 +82,7 @@ def dictify_xr_dataset(
 
 
 def hexdigestify_file(
-    f: io.IOBase,
+    f: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
     buf_size: int = io.DEFAULT_BUFFER_SIZE,
 ) -> str:
     hash_req = hashlib.sha3_224()
@@ -95,19 +95,17 @@ def hexdigestify_file(
 
 
 def dictify_io_object(
-    obj: io.IOBase,
+    obj: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
     delete_original: bool = False,
 ) -> Dict[str, Any]:
 
-    # The type of obj is io.IOBase because all fsspec open objects are inherited from that.
-    # The attributes ignored below DO exist in fsspec classes and io.TextIOWrapper and io.BufferedReader.
-    if "w" in obj.mode:  # type: ignore[attr-defined]
+    if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
-    try:
-        path_in = obj.path  # type: ignore[attr-defined]
-    except AttributeError:
-        path_in = obj.name  # type: ignore[attr-defined]
+    if isinstance(obj, fsspec.spec.AbstractBufferedFile):
+        path_in = obj.path
+    else:
+        path_in = obj.name
 
     filetype = mimetypes.guess_type(path_in)[0]
     if filetype is None and HAS_MAGIC:
@@ -173,6 +171,7 @@ def dictify_io_object(
 
 
 def register_all() -> None:
-    encode.FILECACHE_ENCODERS.append((io.IOBase, dictify_io_object))
+    for cls in (io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile):
+        encode.FILECACHE_ENCODERS.append((cls, dictify_io_object))
     if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))

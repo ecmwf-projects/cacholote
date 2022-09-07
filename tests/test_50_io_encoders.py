@@ -1,5 +1,6 @@
 import io
 import os
+from typing import Union
 
 import fsspec
 import pytest
@@ -7,11 +8,13 @@ import pytest
 from cacholote import cache, config, extra_encoders
 
 
-def func(use_fsspec: bool) -> io.IOBase:
+def func(
+    use_fsspec: bool,
+) -> Union[io.BufferedReader, fsspec.spec.AbstractBufferedFile]:
     url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
     if use_fsspec:
         fs = fsspec.filesystem("https")
-        f: io.IOBase = fs.open(url, "rb")
+        f: fsspec.spec.AbstractBufferedFile = fs.open(url, "rb")
         return f
 
     with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
@@ -54,6 +57,7 @@ def test_copy_file_to_cache_directory(tmpdir: str, use_fsspec: bool) -> None:
     cfunc = cache.cacheable(func)
 
     res = cfunc(use_fsspec)
+    assert res.name == cached_file
     assert extra_encoders.hexdigestify_file(res) == checksum
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
     assert len(config.SETTINGS["cache_store"]) == 1
@@ -61,6 +65,7 @@ def test_copy_file_to_cache_directory(tmpdir: str, use_fsspec: bool) -> None:
     # skip copying a file already in cache directory
     mtime = os.path.getmtime(cached_file)
     res = cfunc(use_fsspec)
+    assert res.name == cached_file
     assert extra_encoders.hexdigestify_file(res) == checksum
     assert mtime == os.path.getmtime(cached_file)
     assert config.SETTINGS["cache_store"].stats() == (1, 1)
@@ -70,6 +75,7 @@ def test_copy_file_to_cache_directory(tmpdir: str, use_fsspec: bool) -> None:
     os.remove(cached_file)
     with pytest.warns(UserWarning, match=f"No such file or directory: {cached_file!r}"):
         res = cfunc(use_fsspec)
+    assert res.name == cached_file
     assert extra_encoders.hexdigestify_file(res) == checksum
     assert config.SETTINGS["cache_store"].stats() == (2, 1)
     assert len(config.SETTINGS["cache_store"]) == 1
