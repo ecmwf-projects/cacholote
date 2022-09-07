@@ -46,13 +46,11 @@ for ext in (".grib", ".grb", ".grb1", ".grb2"):
         mimetypes.add_type("application/x-grib", ext, strict=False)
 
 
-def open_io_from_json(io_json: Dict[str, Any]) -> io.IOBase:
+def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
     fs = fsspec.filesystem(
         fsspec.utils.get_protocol(io_json["href"]), **io_json["tmp:storage_options"]
     )
-    f: io.IOBase = fs.open(io_json["href"], **io_json["tmp:open_kwargs"])
-
-    return f
+    return fs.open(io_json["href"], **io_json["tmp:open_kwargs"])
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
