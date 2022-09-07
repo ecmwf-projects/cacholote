@@ -105,25 +105,25 @@ def dictify_io_object(
         raise ValueError("write-mode objects can NOT be cached.")
 
     try:
-        path = obj.path  # type: ignore[attr-defined]
+        path_in = obj.path  # type: ignore[attr-defined]
     except AttributeError:
-        path = obj.name  # type: ignore[attr-defined]
+        path_in = obj.name  # type: ignore[attr-defined]
 
-    filetype = mimetypes.guess_type(path)[0]
+    filetype = mimetypes.guess_type(path_in)[0]
     if filetype is None and HAS_MAGIC:
-        with fsspec.open(path, "rb") as f:
+        with fsspec.open(path_in, "rb") as f:
             filetype = magic.from_buffer(f.read(), mime=True)
             if filetype == "application/octet-stream":
                 filetype = None
     filetype = filetype or "unknown"
 
-    with fsspec.open(path, "rb") as f:
+    with fsspec.open(path_in, "rb") as f:
         checksum = hexdigestify_file(f)
 
-    with fsspec.open(path, "rb") as f:
+    with fsspec.open(path_in, "rb") as f:
         size = f.size
 
-    extension = f".{path.rsplit('.', 1)[-1]}" if "." in path else ""
+    extension = f".{path_in.rsplit('.', 1)[-1]}" if "." in path_in else ""
 
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
@@ -138,26 +138,37 @@ def dictify_io_object(
         open_io_from_json(io_json)
 
     except:  # noqa: E722
-        protocol = fsspec.utils.get_protocol(path)
-        local_path = io_json.get("file:local_path", None)
+        cache_local_path = io_json.get("file:local_path", None)
         cache_dir_fs = config.get_cache_files_directory()
-        basename = io_json["href"].rsplit("/", 1)[-1]
-        if protocol == "file":
-            if local_path is not None and delete_original:
-                fsspec.filesystem("file").move(path, local_path)
+        cache_basename = io_json["href"].rsplit("/", 1)[-1]
+
+        protocol_in = fsspec.utils.get_protocol(path_in)
+        if protocol_in == "file":
+            # IN is local
+            if cache_local_path is not None and delete_original:
+                # IN and OUT are local
+                fsspec.filesystem("file").move(path_in, cache_local_path)
             else:
-                cache_dir_fs.put_file(path, basename)
+                # IN is local, OUT is not local
+                cache_dir_fs.put_file(path_in, cache_basename)
                 if delete_original:
-                    fsspec.filesystem("file").rm(path)
+                    fsspec.filesystem("file").rm(path_in)
         else:
-            # TODO! https://github.com/fsspec/filesystem_spec/issues/909
+            # IN is not local
+            if delete_original:
+                warnings.warn("Can NOT delete original file.")
+
             with tempfile.TemporaryDirectory() as tmpdirname:
                 with fsspec.open(
-                    f"filecache::{path}", filecache={"cache_storage": tmpdirname}
-                ) as of:
-                    cache_dir_fs.put_file(of.name, basename)
-            if delete_original:
-                warnings.warn("Can NOT delete original file")
+                    f"filecache::{path_in}", filecache={"cache_storage": tmpdirname}
+                ) as f:
+                    # Download locally
+                    if cache_local_path:
+                        # IN is not local, OUT is local
+                        fsspec.filesystem("file").move(f.name, cache_local_path)
+                    else:
+                        # IN is not local, OUT is not local
+                        cache_dir_fs.put_file(f.name, cache_basename)
 
     return io_json
 
