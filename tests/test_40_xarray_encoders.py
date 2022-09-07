@@ -22,14 +22,11 @@ def func(a: T) -> T:
 
 @pytest.fixture
 def ds() -> xr.Dataset:
-    with fsspec.open(
-        "simplecache::https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib",
-        simplecache={"same_names": True},
-    ) as of:
+    url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
+    with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
         fname = of.name
     ds = xr.open_dataset(fname, engine="cfgrib")
     del ds.attrs["history"]
-
     return ds.sel(number=0)
 
 

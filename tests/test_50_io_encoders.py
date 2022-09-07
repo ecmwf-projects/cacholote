@@ -13,6 +13,7 @@ def func(use_fsspec: bool) -> io.IOBase:
         fs = fsspec.filesystem("https")
         f: io.IOBase = fs.open(url, "rb")
         return f
+
     with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
         return open(of.name, "rb")
 
