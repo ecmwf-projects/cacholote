@@ -57,7 +57,9 @@ def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFi
 
 def open_xr_from_json(xr_json: Dict[str, Any]) -> "xr.Dataset":
     store = fsspec.get_mapper(xr_json["href"], **xr_json["xarray:storage_options"])
-    return xr.open_dataset(store, **xr_json["xarray:open_kwargs"])
+    open_kwargs = dict(xr_json["xarray:open_kwargs"])
+    open_kwargs.setdefault("chunks", "auto")
+    return xr.open_dataset(store, **open_kwargs)
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:

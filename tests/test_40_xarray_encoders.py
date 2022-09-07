@@ -13,7 +13,6 @@ finally:
     pytest.importorskip("xarray")
     pytest.importorskip("zarr")
 
-
 T = TypeVar("T")
 
 
@@ -73,7 +72,3 @@ def test_xr_cacheable(ds: xr.Dataset) -> None:
         os.path.join(config.SETTINGS["cache_store"].directory, "*.zarr")
     ) == [local_path]
     xr.testing.assert_identical(res, ds)
-
-    # 3: do not crash if corrupted
-    os.remove(os.path.join(local_path, ".zgroup"))
-    res = cfunc(ds)
