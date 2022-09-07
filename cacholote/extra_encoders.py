@@ -18,7 +18,6 @@ import inspect
 import io
 import mimetypes
 import tempfile
-import warnings
 from typing import Any, Dict, Union
 
 import fsspec
@@ -149,10 +148,6 @@ def dictify_io_object(
                 if delete_original:
                     fsspec.filesystem("file").rm(path_in)
         else:
-            # IN is not local
-            if delete_original:
-                warnings.warn("Can NOT delete original file.")
-
             with tempfile.TemporaryDirectory() as tmpdirname:
                 # Download loacally in tmp directory
                 with fsspec.open(
@@ -164,7 +159,9 @@ def dictify_io_object(
                     else:
                         # OUT is not local
                         cache_dir_fs.put_file(f.name, cache_basename)
-
+                        # IN is not local
+            if delete_original:
+                cache_dir_fs.rm(cache_basename)
     return io_json
 
 
