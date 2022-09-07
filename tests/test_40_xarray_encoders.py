@@ -64,7 +64,6 @@ def test_xr_cacheable(ds: xr.Dataset) -> None:
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
     mtime = os.path.getmtime(local_path)
     xr.testing.assert_identical(res, ds)
-    xr.testing.assert_identical(xr.open_dataset(local_path, engine="zarr"), ds)
 
     # 2: use cached data
     res = cfunc(ds)
@@ -74,4 +73,7 @@ def test_xr_cacheable(ds: xr.Dataset) -> None:
         os.path.join(config.SETTINGS["cache_store"].directory, "*.zarr")
     ) == [local_path]
     xr.testing.assert_identical(res, ds)
-    xr.testing.assert_identical(xr.open_dataset(local_path, engine="zarr"), ds)
+
+    # 3: do not crash if corrupted
+    os.remove(os.path.join(local_path, ".zgroup"))
+    res = cfunc(ds)
