@@ -101,17 +101,11 @@ class set:
         _SETTINGS.update(self._old)
 
 
-def get_cache_files_directory() -> fsspec.implementations.dirfs.DirFileSystem:
+def get_cache_files_directory() -> str:
 
     if _SETTINGS["cache_files_urlpath"] is _SETTINGS["cache_db_directory"] is None:
         raise ValueError("Please set 'cache_files_directory'")
 
     if _SETTINGS["cache_files_urlpath"] is None:
-        urlpath = _SETTINGS["cache_db_directory"]
-    else:
-        urlpath = _SETTINGS["cache_files_urlpath"]
-    urlpath = str(urlpath)
-
-    protocol = fsspec.utils.get_protocol(urlpath)
-    fs = fsspec.filesystem(protocol, **_SETTINGS["cache_files_storage_options"])
-    return fsspec.implementations.dirfs.DirFileSystem(path=urlpath, fs=fs)
+        return str(_SETTINGS["cache_db_directory"])
+    return str(_SETTINGS["cache_files_urlpath"])

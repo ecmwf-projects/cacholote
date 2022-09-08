@@ -17,13 +17,13 @@ import hashlib
 import inspect
 import io
 import mimetypes
-import tempfile
 from typing import Any, Dict, Union
 
 import fsspec
+import fsspec.generic
 import fsspec.implementations.local
 
-from . import cache, config, encode
+from . import cache, encode
 
 try:
     import dask
@@ -46,10 +46,9 @@ for ext in (".grib", ".grb", ".grb1", ".grb2"):
 
 
 def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
-    fs = fsspec.filesystem(
-        fsspec.utils.get_protocol(io_json["href"]), **io_json["tmp:storage_options"]
-    )
-    return fs.open(io_json["href"], **io_json["tmp:open_kwargs"])
+    return fsspec.open(
+        io_json["href"], **io_json["tmp:open_kwargs"], **io_json["tmp:storage_options"]
+    ).open()
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
@@ -132,36 +131,12 @@ def dictify_io_object(
     try:
         open_io_from_json(io_json)
     except:  # noqa: E722
-        cache_local_path = io_json.get("file:local_path", None)
-        cache_dir_fs = config.get_cache_files_directory()
-        cache_basename = io_json["href"].rsplit("/", 1)[-1]
-
-        protocol_in = fsspec.utils.get_protocol(path_in)
-        if protocol_in == "file":
-            # IN is local
-            if cache_local_path is not None and delete_original:
-                # OUT is local
-                fsspec.filesystem("file").move(path_in, cache_local_path)
-            else:
-                # OUT is not local
-                cache_dir_fs.put_file(path_in, cache_basename)
-                if delete_original:
-                    fsspec.filesystem("file").rm(path_in)
+        fs = fsspec.generic.GenericFileSystem(default_method="options")
+        if delete_original:
+            fs.move(path_in, io_json["href"], **io_json["tmp:storage_options"])
         else:
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                # Download loacally in tmp directory
-                with fsspec.open(
-                    f"filecache::{path_in}", filecache={"cache_storage": tmpdirname}
-                ) as f:
-                    if cache_local_path:
-                        # OUT is local
-                        fsspec.filesystem("file").move(f.name, cache_local_path)
-                    else:
-                        # OUT is not local
-                        cache_dir_fs.put_file(f.name, cache_basename)
-                        # IN is not local
-            if delete_original:
-                cache_dir_fs.rm(cache_basename)
+            fs.copy(path_in, io_json["href"], **io_json["tmp:storage_options"])
+
     return io_json
 
 

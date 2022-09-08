@@ -74,9 +74,7 @@ def dictify_python_call(
 def dictify_file(
     filetype: str, checksum: str, size: int, extension: str = ""
 ) -> Dict[str, Any]:
-    href = posixpath.join(
-        config.get_cache_files_directory().storage_options["path"], checksum + extension
-    )
+    href = posixpath.join(config.get_cache_files_directory(), checksum + extension)
     file_json = {
         "type": filetype,
         "href": href,
