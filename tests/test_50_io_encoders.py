@@ -7,7 +7,8 @@ from cacholote import cache, config, extra_encoders
 
 
 def func(url: str) -> fsspec.spec.AbstractBufferedFile:
-    return fsspec.open(url, "rb").open()
+    with fsspec.open(url, "rb") as f:
+        return f
 
 
 @pytest.mark.parametrize("delete_original", [True, False])
