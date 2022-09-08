@@ -13,12 +13,14 @@
 # limitations under the License.
 
 
-import hashlib
 import inspect
 import io
-import os
-import shutil
+import mimetypes
 from typing import Any, Dict, Union
+
+import fsspec
+import fsspec.generic
+import fsspec.implementations.local
 
 from . import cache, encode
 
@@ -37,6 +39,16 @@ try:
 except ImportError:
     HAS_MAGIC = False
 
+for ext in (".grib", ".grb", ".grb1", ".grb2"):
+    if ext not in mimetypes.types_map:
+        mimetypes.add_type("application/x-grib", ext, strict=False)
+
+
+def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
+    return fsspec.open(
+        io_json["href"], **io_json["tmp:open_kwargs"], **io_json["tmp:storage_options"]
+    ).open()
+
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
@@ -52,56 +64,48 @@ def dictify_xr_dataset(
     try:
         xr.open_dataset(xr_json["file:local_path"], chunks="auto")
     except:  # noqa: E722
-        if xr_json["type"] == "application/netcdf":
+        if xr_json["type"] == "application/x-netcdf":
             obj.to_netcdf(xr_json["file:local_path"])
-        elif xr_json["type"] == "application/wmo-GRIB2":
+        elif xr_json["type"] == "application/x-grib":
             import cfgrib.xarray_to_grib
 
-            cfgrib.xarray_to_grib.to_grib(
-                obj, xr_json["file:local_path"], grib_keys={"edition": 2}
-            )
+            cfgrib.xarray_to_grib.to_grib(obj, xr_json["file:local_path"])
         else:
             # Should never get here! xarray_cache_type is checked in config.py
             raise ValueError(f"type {xr_json['type']} is NOT supported.")
     return xr_json
 
 
-def hexdigestify_file(
-    f: Union[io.TextIOWrapper, io.BufferedReader],
-    buf_size: int = io.DEFAULT_BUFFER_SIZE,
-) -> str:
-    hash_req = hashlib.sha3_224()
-    while True:
-        data = f.read(buf_size)
-        if not data:
-            break
-        hash_req.update(data.encode() if isinstance(data, str) else data)
-    return hash_req.hexdigest()
-
-
 def dictify_io_object(
-    obj: Union[io.TextIOWrapper, io.BufferedReader],
+    obj: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
     delete_original: bool = False,
 ) -> Dict[str, Any]:
 
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
-    filetype = magic.from_file(obj.name, mime=True)
-
-    if obj.closed:
-        with open(obj.name, "rb") as f:
-            checksum = hexdigestify_file(f)
+    if isinstance(obj, fsspec.spec.AbstractBufferedFile):
+        path_in = obj.path
+        fs_in = obj.fs
     else:
-        checksum = hexdigestify_file(obj)
+        path_in = obj.name
+        fs_in = fsspec.filesystem("file")
 
-    size = os.path.getsize(obj.name)
+    filetype = mimetypes.guess_type(path_in)[0]
+    if filetype is None and HAS_MAGIC:
+        with fs_in.open(path_in, "rb") as f:
+            filetype = magic.from_buffer(f.read(), mime=True)
+            if filetype == "application/octet-stream":
+                filetype = None
+    filetype = filetype or "unknown"
 
-    _, extension = os.path.splitext(obj.name)
+    size = fs_in.size(path_in)
+    checksum = fs_in.checksum(path_in)
+
+    extension = f".{path_in.rsplit('.', 1)[-1]}" if "." in path_in else ""
 
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
-
     io_json = encode.dictify_io_asset(
         filetype=filetype,
         checksum=checksum,
@@ -109,21 +113,33 @@ def dictify_io_object(
         extension=extension,
         open_kwargs=open_kwargs,
     )
-
     try:
-        open(io_json["file:local_path"], **open_kwargs)
+        open_io_from_json(io_json)
     except:  # noqa: E722
-        if delete_original:
-            os.rename(obj.name, io_json["file:local_path"])
+        protocol_out = fsspec.utils.get_protocol(io_json["href"])
+        fs_out = fsspec.filesystem(protocol_out, **io_json["tmp:storage_options"])
+        if fs_in == fs_out:
+            if delete_original:
+                fs_in.mv(path_in, io_json["href"])
+            else:
+                fs_in.cp(path_in, io_json["href"])
         else:
-            shutil.copyfile(obj.name, io_json["file:local_path"])
+            with fs_in.open(path_in) as f_in, fsspec.open(
+                io_json["href"], "wb", **io_json["tmp:storage_options"]
+            ) as f_out:
+                while True:
+                    data = f_in.read(io.DEFAULT_BUFFER_SIZE)
+                    if not data:
+                        break
+                    f_out.write(data)
+            if delete_original:
+                fs_in.rm(path_in)
 
     return io_json
 
 
 def register_all() -> None:
-    if HAS_MAGIC:
-        encode.FILECACHE_ENCODERS.append((io.TextIOWrapper, dictify_io_object))
-        encode.FILECACHE_ENCODERS.append((io.BufferedReader, dictify_io_object))
+    for cls in (io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile):
+        encode.FILECACHE_ENCODERS.append((cls, dictify_io_object))
     if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))

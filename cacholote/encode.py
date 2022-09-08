@@ -19,10 +19,13 @@ import datetime
 import inspect
 import json
 import operator
-import pathlib
+import os
 import pickle
+import posixpath
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+import fsspec
 
 from . import config
 
@@ -69,23 +72,24 @@ def dictify_python_call(
 
 
 def dictify_file(
-    filetype: str, checksum: str, size: int, extension: str = ""
+    filetype: str, checksum: Union[int, str], size: int, extension: str = ""
 ) -> Dict[str, Any]:
-    return {
+    href = posixpath.join(config.get_cache_files_directory(), f"{checksum}{extension}")
+    file_json = {
         "type": filetype,
-        "href": f"./{checksum}{extension}",
+        "href": href,
         "file:checksum": checksum,
         "file:size": size,
-        "file:local_path": str(
-            pathlib.Path(config.SETTINGS["directory"]).absolute()
-            / f"{checksum}{extension}"
-        ),
     }
+    if fsspec.utils.get_protocol(href) == "file":
+        file_json["file:local_path"] = os.path.abspath(href)
+
+    return file_json
 
 
 def dictify_io_asset(
     filetype: str,
-    checksum: str,
+    checksum: Union[int, str],
     size: int,
     extension: str = "",
     open_kwargs: Dict[str, Any] = {},
@@ -94,15 +98,19 @@ def dictify_io_asset(
     asset_dict = dictify_file(
         filetype=filetype, checksum=checksum, size=size, extension=extension
     )
-    asset_dict.update({"tmp:open_kwargs": open_kwargs})
+    asset_dict.update(
+        {
+            "tmp:open_kwargs": open_kwargs,
+            "tmp:storage_options": config._SETTINGS["cache_files_storage_options"],
+        }
+    )
     return asset_dict
 
 
 def dictify_xarray_asset(
-    checksum: str,
+    checksum: Union[int, str],
     size: int,
     open_kwargs: Dict[str, Any] = {},
-    storage_options: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
     asset_dict = dictify_file(
@@ -114,7 +122,7 @@ def dictify_xarray_asset(
     asset_dict.update(
         {
             "xarray:open_kwargs": open_kwargs,
-            "xarray:storage_options": storage_options,
+            "xarray:storage_options": config._SETTINGS["cache_files_storage_options"],
         }
     )
 

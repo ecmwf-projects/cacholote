@@ -18,72 +18,64 @@ SETTINGS can be imported elsewhere to use global settings.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 import os
-import pickle
 import tempfile
 from types import MappingProxyType, TracebackType
 from typing import Any, Dict, Optional, Type
 
 import diskcache
+import fsspec
+import fsspec.implementations.dirfs
+import fsspec.implementations.local
 
 _SETTINGS: Dict[str, Any] = {
-    "directory": os.path.join(tempfile.gettempdir(), "cacholote"),  # cache directory
+    "cache_db_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
+    "cache_files_urlpath": None,
+    "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
-    "timeout": 60,  # SQLite connection timeout
-    "statistics": 1,  # True
-    "tag_index": 0,  # False
-    "eviction_policy": "least-recently-stored",
-    "size_limit": 2**30,  # 1gb
-    "cull_limit": 10,
-    "sqlite_auto_vacuum": 1,  # FULL
-    "sqlite_cache_size": 2**13,  # 8,192 pages
-    "sqlite_journal_mode": "wal",
-    "sqlite_mmap_size": 2**26,  # 64mb
-    "sqlite_synchronous": 1,  # NORMAL
-    "disk_min_file_size": 2**15,  # 32kb
-    "disk_pickle_protocol": pickle.HIGHEST_PROTOCOL,
 }
-EXTENSIONS = {"application/netcdf": ".nc", "application/wmo-GRIB2": ".grb2"}
 
 
-def initialize_cache_store() -> diskcache.Cache:
-    sig = inspect.signature(diskcache.Cache.__init__)
-    kwargs = {
-        k: v
-        for k, v in _SETTINGS.items()
-        if k in diskcache.DEFAULT_SETTINGS or k in sig.parameters.keys()
-    }
-    return diskcache.Cache(**kwargs, disk=diskcache.JSONDisk)
+def _initialize_cache_store() -> None:
+    _SETTINGS["cache_store"] = diskcache.Cache(
+        _SETTINGS["cache_db_directory"], disk=diskcache.JSONDisk, statistics=1
+    )
 
 
-_SETTINGS["cache_store"] = initialize_cache_store()
+_initialize_cache_store()
 
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
+EXTENSIONS = MappingProxyType(
+    {"application/x-netcdf": ".nc", "application/x-grib": ".grb"}
+)
 
 
 class set:
     # TODO: Add docstring
     def __init__(self, **kwargs: Any):
 
-        if "cache_store" in kwargs:
-            if len(kwargs) != 1:
-                raise ValueError(
-                    "'cache_store' is mutually exclusive with all other settings"
-                )
+        if "cache_store" in kwargs and "cache_db_directory" in kwargs:
+            raise ValueError(
+                "'cache_store' and 'cache_db_directory' are mutually exclusive"
+            )
 
-            # infer settings from cache_store properties
-            new_cache_store = kwargs["cache_store"]
-            for key in _SETTINGS.keys() - kwargs.keys():
-                if isinstance(getattr(type(new_cache_store), key, None), property):
-                    kwargs[key] = getattr(new_cache_store, key)
+        if "cache_files_directory" in kwargs and not isinstance(
+            kwargs["cache_files_directory"],
+            fsspec.implementations.local.LocalFileSystem,
+        ):
+            raise ValueError(
+                "'cache_files_directory' must be of type 'LocalFileSystem'"
+            )
 
         if (
             "xarray_cache_type" in kwargs
             and kwargs["xarray_cache_type"] not in EXTENSIONS
         ):
             raise ValueError(f"'xarray_cache_type' must be one of {list(EXTENSIONS)}")
+
+        if "cache_store" in kwargs:
+            kwargs["cache_db_directory"] = None
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
@@ -93,9 +85,9 @@ class set:
             ) from ex
 
         _SETTINGS.update(kwargs)
-        if "cache_store" not in kwargs:
+        if kwargs.get("cache_db_directory", None) is not None:
             self._old["cache_store"] = _SETTINGS["cache_store"]
-            _SETTINGS["cache_store"] = initialize_cache_store()
+            _initialize_cache_store()
 
     def __enter__(self) -> None:
         pass
@@ -107,3 +99,13 @@ class set:
         exc_tb: Optional[TracebackType],
     ) -> None:
         _SETTINGS.update(self._old)
+
+
+def get_cache_files_directory() -> str:
+
+    if _SETTINGS["cache_files_urlpath"] is _SETTINGS["cache_db_directory"] is None:
+        raise ValueError("Please set 'cache_files_directory'")
+
+    if _SETTINGS["cache_files_urlpath"] is None:
+        return str(_SETTINGS["cache_db_directory"])
+    return str(_SETTINGS["cache_files_urlpath"])

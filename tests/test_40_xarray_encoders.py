@@ -2,6 +2,7 @@ import glob
 import os
 from typing import TypeVar
 
+import fsspec
 import pytest
 
 from cacholote import cache, config, decode, encode, extra_encoders
@@ -21,21 +22,17 @@ def func(a: T) -> T:
 
 @pytest.fixture
 def ds() -> xr.Dataset:
-    import pooch
-
-    fname = pooch.retrieve(
-        url="https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib",
-        known_hash="c144fde61ca5d53702bf6f212775ef2cc783bdd66b6865160bf597c1b35ed898",
-    )
-    ds = xr.open_dataset(fname)
+    url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
+    with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
+        fname = of.name
+    ds = xr.open_dataset(fname, engine="cfgrib")
     del ds.attrs["history"]
-
     return ds.sel(number=0)
 
 
 xr_parametrize = (
     "xarray_cache_type,extension",
-    [("application/netcdf", ".nc"), ("application/wmo-GRIB2", ".grb2")],
+    [("application/x-netcdf", ".nc"), ("application/x-grib", ".grb")],
 )
 
 
@@ -49,7 +46,7 @@ def test_dictify_xr_dataset(
     )
     expected = {
         "type": xarray_cache_type,
-        "href": f"./285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        "href": local_path,
         "file:checksum": "285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4",
         "file:size": 470024,
         "file:local_path": local_path,
@@ -68,7 +65,7 @@ def test_xr_roundtrip(ds: xr.Dataset, xarray_cache_type: str, extension: str) ->
         ds_json = encode.dumps(ds)
         res = decode.loads(ds_json)
 
-    if xarray_cache_type == "application/wmo-GRIB2":
+    if xarray_cache_type == "application/x-grib":
         xr.testing.assert_equal(res, ds)
     else:
         xr.testing.assert_identical(res, ds)
@@ -89,7 +86,7 @@ def test_xr_cacheable(ds: xr.Dataset, xarray_cache_type: str, extension: str) ->
         assert config.SETTINGS["cache_store"].stats() == (0, 1)
         mtime = os.path.getmtime(local_path)
 
-        if xarray_cache_type == "application/wmo-GRIB2":
+        if xarray_cache_type == "application/x-grib":
             xr.testing.assert_equal(res, ds)
         else:
             xr.testing.assert_identical(res, ds)
@@ -102,7 +99,7 @@ def test_xr_cacheable(ds: xr.Dataset, xarray_cache_type: str, extension: str) ->
             os.path.join(config.SETTINGS["cache_store"].directory, f"*{extension}")
         ) == [local_path]
 
-        if xarray_cache_type == "application/wmo-GRIB2":
+        if xarray_cache_type == "application/x-grib":
             xr.testing.assert_equal(res, ds)
         else:
             xr.testing.assert_identical(res, ds)
