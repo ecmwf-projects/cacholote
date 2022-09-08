@@ -117,10 +117,10 @@ def dictify_xarray_asset(
     if filetype == "application/vnd+zarr":
         open_kwargs.update({"engine": "zarr", "consolidated": True})
     asset_dict = dictify_file(
-        filetype=config.SETTINGS["xarray_cache_type"],
+        filetype=filetype,
         checksum=checksum,
         size=size,
-        extension=config.EXTENSIONS[config.SETTINGS["xarray_cache_type"]],
+        extension=config.EXTENSIONS[filetype],
     )
     asset_dict.update(
         {

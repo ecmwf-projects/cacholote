@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy_buffer of the License at
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -52,7 +52,6 @@ def copy_buffer(
     f_out: fsspec.spec.AbstractBufferedFile,
     buffer_size: Optional[int] = None,
 ) -> None:
-
     buffer_size = io.DEFAULT_BUFFER_SIZE if buffer_size is None else buffer_size
     while True:
         data = f_in.read(buffer_size)
@@ -63,9 +62,9 @@ def copy_buffer(
 
 def fs_from_json(xr_or_io_json: Dict[str, Any]) -> fsspec.spec.AbstractFileSystem:
     protocol = fsspec.utils.get_protocol(xr_or_io_json["href"])
-    if "tmp:storage_options" in xr_or_io_json:
+    try:
         storage_options = xr_or_io_json["tmp:storage_options"]
-    else:
+    except KeyError:
         storage_options = xr_or_io_json["xarray:storage_options"]
     return fsspec.filesystem(protocol, **storage_options)
 
@@ -80,17 +79,13 @@ def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFi
         else:
             # Download local copy
             protocol = fsspec.utils.get_protocol(xr_json["href"])
-            if protocol == "file":
-                storage_options = xr_json["xarray:storage_options"]
-            else:
-                storage_options = {protocol: xr_json["xarray:storage_options"]}
+            storage_options = {protocol: xr_json["xarray:storage_options"]}
             with fsspec.open(
                 f"filecache::{xr_json['href']}",
                 filecache={"same_names": True},
                 **storage_options,
             ) as of:
                 filename_or_obj = of.name
-
     return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 
@@ -146,7 +141,6 @@ def dictify_xr_dataset(
                         xr_json["href"], "wb"
                     ) as f_out:
                         copy_buffer(f_in, f_out)
-
     return xr_json
 
 
@@ -154,7 +148,6 @@ def dictify_io_object(
     obj: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
     delete_original: bool = False,
 ) -> Dict[str, Any]:
-
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
@@ -175,11 +168,10 @@ def dictify_io_object(
 
     size = fs_in.size(path_in)
     checksum = fs_in.checksum(path_in)
-
     extension = f".{path_in.rsplit('.', 1)[-1]}" if "." in path_in else ""
-
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+
     io_json = encode.dictify_io_asset(
         filetype=filetype,
         checksum=checksum,
@@ -206,7 +198,6 @@ def dictify_io_object(
 
             if delete_original:
                 fs_in.rm(path_in)
-
     return io_json
 
 
