@@ -16,12 +16,12 @@
 import inspect
 import io
 import mimetypes
+import os
 import tempfile
 from typing import Any, Dict, Optional, Union
 
 import fsspec
 import fsspec.generic
-import fsspec.implementations.local
 
 from . import cache, encode
 
@@ -61,20 +61,33 @@ def copy_buffer(
         f_out.write(data)
 
 
+def fs_from_json(xr_or_io_json: Dict[str, Any]) -> fsspec.spec.AbstractFileSystem:
+    protocol = fsspec.utils.get_protocol(xr_or_io_json["href"])
+    if "tmp:storage_options" in xr_or_io_json:
+        storage_options = xr_or_io_json["tmp:storage_options"]
+    else:
+        storage_options = xr_or_io_json["xarray:storage_options"]
+    return fsspec.filesystem(protocol, **storage_options)
+
+
 def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
     if xr_json["type"] == "application/vnd+zarr":
-        filename_or_obj = fsspec.get_mapper(
-            xr_json["href"], **xr_json["xarray:storage_options"]
-        )
+        fs = fs_from_json(xr_json)
+        filename_or_obj = fs.get_mapper(xr_json["href"])
     else:
-        try:
+        if "file:local_path":
             filename_or_obj = xr_json["file:local_path"]
-        except KeyError:
+        else:
             # Download local copy
+            protocol = fsspec.utils.get_protocol(xr_json["href"])
+            if protocol == "file":
+                storage_options = xr_json["xarray:storage_options"]
+            else:
+                storage_options = {protocol: xr_json["xarray:storage_options"]}
             with fsspec.open(
-                f"simplecache::{xr_json['href']}",
-                simplecache={"same_names": True},
-                **xr_json["xarray:storage_options"],
+                f"filecache::{xr_json['href']}",
+                filecache={"same_names": True},
+                **storage_options,
             ) as of:
                 filename_or_obj = of.name
 
@@ -82,14 +95,14 @@ def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFi
 
 
 def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
-    return fsspec.open(
-        io_json["href"], **io_json["tmp:open_kwargs"], **io_json["tmp:storage_options"]
-    ).open()
+    fs = fs_from_json(io_json)
+    return fs.open(io_json["href"], **io_json["tmp:storage_options"])
 
 
 def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
-        return str(dask.base.tokenize(obj))  # type: ignore[no-untyped-call]
+        token: str = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
+    return token
 
 
 def dictify_xr_dataset(
@@ -109,27 +122,30 @@ def dictify_xr_dataset(
             obj.to_zarr(mapper, consolidated=True)
         else:
             # Need a tmp local copy to write on a different filesystem
-            with tempfile.NamedTemporaryFile() as f:
-                tmpfile = f.name
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                basename = os.path.basename(xr_json["href"])
+                tmpfilename = os.path.join(tmpdirname, basename)
 
-            if xr_json["type"] == "application/x-netcdf":
-                obj.to_netcdf(tmpfile)
-            elif xr_json["type"] == "application/x-grib":
-                import cfgrib.xarray_to_grib
+                if xr_json["type"] == "application/x-netcdf":
+                    obj.to_netcdf(tmpfilename)
+                elif xr_json["type"] == "application/x-grib":
+                    import cfgrib.xarray_to_grib
 
-                cfgrib.xarray_to_grib.to_grib(obj, tmpfile)
-            else:
-                # Should never get here! xarray_cache_type is checked in config.py
-                raise ValueError(f"type {xr_json['type']} is NOT supported.")
+                    cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
+                else:
+                    # Should never get here! xarray_cache_type is checked in config.py
+                    raise ValueError(f"type {xr_json['type']} is NOT supported.")
 
-            if "file:local_path" in xr_json:
-                fsspec.filesystem("file").mv(tmpfile, xr_json["file:local_path"])
-            else:
-                with fsspec.open(tmpfile, "rb") as f_in, fsspec.open(
-                    xr_json["href"], "wb", **xr_json["xarray:storage_options"]
-                ) as f_out:
-                    copy_buffer(f_in, f_out)
-                fsspec.filesystem("file").rm(tmpfile)
+                if "file:local_path" in xr_json:
+                    fsspec.filesystem("file").mv(
+                        tmpfilename, xr_json["file:local_path"]
+                    )
+                else:
+                    fs_out = fs_from_json(xr_json)
+                    with fsspec.open(tmpfilename, "rb") as f_in, fs_out.open(
+                        xr_json["href"], "wb"
+                    ) as f_out:
+                        copy_buffer(f_in, f_out)
 
     return xr_json
 
@@ -182,8 +198,9 @@ def dictify_io_object(
             else:
                 fs_in.cp(path_in, io_json["href"])
         else:
-            with fs_in.open(path_in, "rb") as f_in, fsspec.open(
-                io_json["href"], "wb", **io_json["tmp:storage_options"]
+            fs_out = fs_from_json(io_json)
+            with fs_in.open(path_in, "rb") as f_in, fs_out.open(
+                io_json["href"], "wb"
             ) as f_out:
                 copy_buffer(f_in, f_out)
 
