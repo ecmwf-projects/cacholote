@@ -168,7 +168,7 @@ def dictify_io_object(
 
     size = fs_in.size(path_in)
     checksum = fs_in.checksum(path_in)
-    extension = f".{path_in.rsplit('.', 1)[-1]}" if "." in path_in else ""
+    _, extension = os.path.splitext(path_in)
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
 
