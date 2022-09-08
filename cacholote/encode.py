@@ -72,9 +72,9 @@ def dictify_python_call(
 
 
 def dictify_file(
-    filetype: str, checksum: str, size: int, extension: str = ""
+    filetype: str, checksum: Union[int, str], size: int, extension: str = ""
 ) -> Dict[str, Any]:
-    href = posixpath.join(config.get_cache_files_directory(), checksum + extension)
+    href = posixpath.join(config.get_cache_files_directory(), f"{checksum}{extension}")
     file_json = {
         "type": filetype,
         "href": href,
@@ -89,7 +89,7 @@ def dictify_file(
 
 def dictify_io_asset(
     filetype: str,
-    checksum: str,
+    checksum: Union[int, str],
     size: int,
     extension: str = "",
     open_kwargs: Dict[str, Any] = {},
@@ -108,7 +108,7 @@ def dictify_io_asset(
 
 
 def dictify_xarray_asset(
-    checksum: str,
+    checksum: Union[int, str],
     size: int,
     open_kwargs: Dict[str, Any] = {},
 ) -> Dict[str, Any]:

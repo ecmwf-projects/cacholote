@@ -16,7 +16,7 @@ def test_dictify_io_object(tmpdir: str, delete_original: bool) -> None:
     tmpfile = os.path.join(tmpdir, "dummy.txt")
     with open(tmpfile, "w") as f:
         f.write("dummy")
-    checksum = str(fsspec.filesystem("file").checksum(tmpfile))
+    checksum = fsspec.filesystem("file").checksum(tmpfile)
 
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
@@ -41,7 +41,7 @@ def test_dictify_io_object(tmpdir: str, delete_original: bool) -> None:
 
 def test_copy_file_to_cache_directory(tmpdir: str) -> None:
     url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
-    checksum = "142252380851833733959491685103259827168"
+    checksum = 142252380851833733959491685103259827168
     cached_file = os.path.join(
         config.SETTINGS["cache_store"].directory, f"{checksum}.grib"
     )

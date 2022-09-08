@@ -100,7 +100,7 @@ def dictify_io_object(
     filetype = filetype or "unknown"
 
     size = fs_in.size(path_in)
-    checksum = str(fs_in.checksum(path_in))
+    checksum = fs_in.checksum(path_in)
 
     extension = f".{path_in.rsplit('.', 1)[-1]}" if "." in path_in else ""
 
