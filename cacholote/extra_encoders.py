@@ -116,16 +116,24 @@ def dictify_io_object(
     try:
         open_io_from_json(io_json)
     except:  # noqa: E722
-        with fs_in.open(path_in) as f_in, fsspec.open(
-            io_json["href"], "wb", **io_json["tmp:storage_options"]
-        ) as f_out:
-            while True:
-                data = f_in.read(io.DEFAULT_BUFFER_SIZE)
-                if not data:
-                    break
-                f_out.write(data)
-        if delete_original:
-            fs_in.rm(path_in)
+        protocol_out = fsspec.utils.get_protocol(io_json["href"])
+        fs_out = fsspec.filesystem(protocol_out, **io_json["tmp:storage_options"])
+        if fs_in == fs_out:
+            if delete_original:
+                fs_in.mv(path_in, io_json["href"])
+            else:
+                fs_in.cp(path_in, io_json["href"])
+        else:
+            with fs_in.open(path_in) as f_in, fsspec.open(
+                io_json["href"], "wb", **io_json["tmp:storage_options"]
+            ) as f_out:
+                while True:
+                    data = f_in.read(io.DEFAULT_BUFFER_SIZE)
+                    if not data:
+                        break
+                    f_out.write(data)
+            if delete_original:
+                fs_in.rm(path_in)
 
     return io_json
 
