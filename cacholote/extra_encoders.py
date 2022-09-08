@@ -70,6 +70,7 @@ def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFi
         try:
             filename_or_obj = xr_json["file:local_path"]
         except KeyError:
+            # Download local copy
             with fsspec.open(
                 f"simplecache::{xr_json['href']}",
                 simplecache={"same_names": True},
