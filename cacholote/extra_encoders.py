@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-import hashlib
 import inspect
 import io
 import mimetypes
@@ -77,19 +76,6 @@ def dictify_xr_dataset(
     return xr_json
 
 
-def hexdigestify_file(
-    f: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
-    buf_size: int = io.DEFAULT_BUFFER_SIZE,
-) -> str:
-    hash_req = hashlib.sha3_224()
-    while True:
-        data = f.read(buf_size)
-        if not data:
-            break
-        hash_req.update(data.encode() if isinstance(data, str) else data)
-    return hash_req.hexdigest()
-
-
 def dictify_io_object(
     obj: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
     delete_original: bool = False,
@@ -100,22 +86,21 @@ def dictify_io_object(
 
     if isinstance(obj, fsspec.spec.AbstractBufferedFile):
         path_in = obj.path
+        fs_in = obj.fs
     else:
         path_in = obj.name
+        fs_in = fsspec.filesystem("file")
 
     filetype = mimetypes.guess_type(path_in)[0]
     if filetype is None and HAS_MAGIC:
-        with fsspec.open(path_in, "rb") as f:
+        with fs_in.open(path_in, "rb") as f:
             filetype = magic.from_buffer(f.read(), mime=True)
             if filetype == "application/octet-stream":
                 filetype = None
     filetype = filetype or "unknown"
 
-    with fsspec.open(path_in, "rb") as f:
-        checksum = hexdigestify_file(f)
-
-    with fsspec.open(path_in, "rb") as f:
-        size = f.size
+    size = fs_in.size(path_in)
+    checksum = str(fs_in.checksum(path_in))
 
     extension = f".{path_in.rsplit('.', 1)[-1]}" if "." in path_in else ""
 
@@ -131,11 +116,16 @@ def dictify_io_object(
     try:
         open_io_from_json(io_json)
     except:  # noqa: E722
-        fs = fsspec.generic.GenericFileSystem(default_method="options")
+        with fs_in.open(path_in) as f_in, fsspec.open(
+            io_json["href"], "wb", **io_json["tmp:storage_options"]
+        ) as f_out:
+            while True:
+                data = f_in.read(io.DEFAULT_BUFFER_SIZE)
+                if not data:
+                    break
+                f_out.write(data)
         if delete_original:
-            fs.move(path_in, io_json["href"], **io_json["tmp:storage_options"])
-        else:
-            fs.copy(path_in, io_json["href"], **io_json["tmp:storage_options"])
+            fs_in.rm(path_in)
 
     return io_json
 
