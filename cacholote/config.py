@@ -47,7 +47,11 @@ _initialize_cache_store()
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
 EXTENSIONS = MappingProxyType(
-    {"application/x-netcdf": ".nc", "application/x-grib": ".grb"}
+    {
+        "application/x-netcdf": ".nc",
+        "application/x-grib": ".grib",
+        "application/vnd+zarr": ".zarr",
+    }
 )
 
 

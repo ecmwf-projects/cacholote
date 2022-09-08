@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# You may obtain a copy_buffer of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -16,7 +16,8 @@
 import inspect
 import io
 import mimetypes
-from typing import Any, Dict, Union
+import tempfile
+from typing import Any, Dict, Optional, Union
 
 import fsspec
 import fsspec.generic
@@ -42,6 +43,41 @@ except ImportError:
 for ext in (".grib", ".grb", ".grb1", ".grb2"):
     if ext not in mimetypes.types_map:
         mimetypes.add_type("application/x-grib", ext, strict=False)
+if ".zarr" not in mimetypes.types_map:
+    mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
+
+
+def copy_buffer(
+    f_in: fsspec.spec.AbstractBufferedFile,
+    f_out: fsspec.spec.AbstractBufferedFile,
+    buffer_size: Optional[int] = None,
+) -> None:
+
+    buffer_size = io.DEFAULT_BUFFER_SIZE if buffer_size is None else buffer_size
+    while True:
+        data = f_in.read(buffer_size)
+        if not data:
+            break
+        f_out.write(data)
+
+
+def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
+    if xr_json["type"] == "application/vnd+zarr":
+        filename_or_obj = fsspec.get_mapper(
+            xr_json["href"], **xr_json["xarray:storage_options"]
+        )
+    else:
+        try:
+            filename_or_obj = xr_json["file:local_path"]
+        except KeyError:
+            with fsspec.open(
+                f"simplecache::{xr_json['href']}",
+                simplecache={"same_names": True},
+                **xr_json["xarray:storage_options"],
+            ) as of:
+                filename_or_obj = of.name
+
+    return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 
 def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
@@ -62,17 +98,38 @@ def dictify_xr_dataset(
     checksum = cache.hexdigestify(token)
     xr_json = encode.dictify_xarray_asset(checksum=checksum, size=obj.nbytes)
     try:
-        xr.open_dataset(xr_json["file:local_path"], chunks="auto")
+        open_xr_from_json(xr_json)
     except:  # noqa: E722
-        if xr_json["type"] == "application/x-netcdf":
-            obj.to_netcdf(xr_json["file:local_path"])
-        elif xr_json["type"] == "application/x-grib":
-            import cfgrib.xarray_to_grib
-
-            cfgrib.xarray_to_grib.to_grib(obj, xr_json["file:local_path"])
+        if xr_json["type"] == "application/vnd+zarr":
+            # Write directly on any filesystem
+            mapper = fsspec.get_mapper(
+                xr_json["href"], **xr_json["xarray:storage_options"]
+            )
+            obj.to_zarr(mapper, consolidated=True)
         else:
-            # Should never get here! xarray_cache_type is checked in config.py
-            raise ValueError(f"type {xr_json['type']} is NOT supported.")
+            # Need a tmp local copy to write on a different filesystem
+            with tempfile.NamedTemporaryFile() as f:
+                tmpfile = f.name
+
+            if xr_json["type"] == "application/x-netcdf":
+                obj.to_netcdf(tmpfile)
+            elif xr_json["type"] == "application/x-grib":
+                import cfgrib.xarray_to_grib
+
+                cfgrib.xarray_to_grib.to_grib(obj, tmpfile)
+            else:
+                # Should never get here! xarray_cache_type is checked in config.py
+                raise ValueError(f"type {xr_json['type']} is NOT supported.")
+
+            if "file:local_path" in xr_json:
+                fsspec.filesystem("file").mv(tmpfile, xr_json["file:local_path"])
+            else:
+                with fsspec.open(tmpfile, "rb") as f_in, fsspec.open(
+                    xr_json["href"], "wb", **xr_json["xarray:storage_options"]
+                ) as f_out:
+                    copy_buffer(f_in, f_out)
+                fsspec.filesystem("file").rm(tmpfile)
+
     return xr_json
 
 
@@ -124,14 +181,11 @@ def dictify_io_object(
             else:
                 fs_in.cp(path_in, io_json["href"])
         else:
-            with fs_in.open(path_in) as f_in, fsspec.open(
+            with fs_in.open(path_in, "rb") as f_in, fsspec.open(
                 io_json["href"], "wb", **io_json["tmp:storage_options"]
             ) as f_out:
-                while True:
-                    data = f_in.read(io.DEFAULT_BUFFER_SIZE)
-                    if not data:
-                        break
-                    f_out.write(data)
+                copy_buffer(f_in, f_out)
+
             if delete_original:
                 fs_in.rm(path_in)
 

@@ -1,6 +1,6 @@
 import glob
 import os
-from typing import TypeVar
+from typing import Any, Dict, TypeVar
 
 import fsspec
 import pytest
@@ -10,8 +10,10 @@ from cacholote import cache, config, decode, encode, extra_encoders
 try:
     import xarray as xr
 finally:
-    pytest.importorskip("xarray")
+    pytest.importorskip("cfgrib")
     pytest.importorskip("dask")
+    pytest.importorskip("xarray")
+    pytest.importorskip("zarr")
 
 T = TypeVar("T")
 
@@ -30,15 +32,23 @@ def ds() -> xr.Dataset:
     return ds.sel(number=0)
 
 
-xr_parametrize = (
-    "xarray_cache_type,extension",
-    [("application/x-netcdf", ".nc"), ("application/x-grib", ".grb")],
+PARAMETRIZE = (
+    "xarray_cache_type,extension,open_kwargs",
+    [
+        ("application/x-netcdf", ".nc", {"chunks": "auto"}),
+        ("application/x-grib", ".grib", {"chunks": "auto"}),
+        (
+            "application/vnd+zarr",
+            ".zarr",
+            {"chunks": "auto", "engine": "zarr", "consolidated": True},
+        ),
+    ],
 )
 
 
-@pytest.mark.parametrize(*xr_parametrize)
+@pytest.mark.parametrize(*PARAMETRIZE)
 def test_dictify_xr_dataset(
-    ds: xr.Dataset, xarray_cache_type: str, extension: str
+    ds: xr.Dataset, xarray_cache_type: str, extension: str, open_kwargs: Dict[str, Any]
 ) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
@@ -50,7 +60,7 @@ def test_dictify_xr_dataset(
         "file:checksum": "285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4",
         "file:size": 470024,
         "file:local_path": local_path,
-        "xarray:open_kwargs": {},
+        "xarray:open_kwargs": open_kwargs,
         "xarray:storage_options": {},
     }
     with config.set(xarray_cache_type=xarray_cache_type):
@@ -59,8 +69,10 @@ def test_dictify_xr_dataset(
     assert os.path.exists(local_path)
 
 
-@pytest.mark.parametrize(*xr_parametrize)
-def test_xr_roundtrip(ds: xr.Dataset, xarray_cache_type: str, extension: str) -> None:
+@pytest.mark.parametrize(*PARAMETRIZE)
+def test_xr_roundtrip(
+    ds: xr.Dataset, xarray_cache_type: str, extension: str, open_kwargs: Dict[str, Any]
+) -> None:
     with config.set(xarray_cache_type=xarray_cache_type):
         ds_json = encode.dumps(ds)
         res = decode.loads(ds_json)
@@ -71,8 +83,10 @@ def test_xr_roundtrip(ds: xr.Dataset, xarray_cache_type: str, extension: str) ->
         xr.testing.assert_identical(res, ds)
 
 
-@pytest.mark.parametrize(*xr_parametrize)
-def test_xr_cacheable(ds: xr.Dataset, xarray_cache_type: str, extension: str) -> None:
+@pytest.mark.parametrize(*PARAMETRIZE)
+def test_xr_cacheable(
+    ds: xr.Dataset, xarray_cache_type: str, extension: str, open_kwargs: Dict[str, Any]
+) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
         f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
