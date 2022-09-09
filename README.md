@@ -28,7 +28,7 @@ import time
 import timeit
 import cacholote
 
-cacholote.config.set(directory="path/to/cache/dir")
+cacholote.config.set(cache_store_directory="path/to/cache/dir")
 
 @cacholote.cacheable
 def sleep(x):
