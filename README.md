@@ -31,18 +31,18 @@ import cacholote
 cacholote.config.set(cache_store_directory="path/to/cache/dir")
 
 @cacholote.cacheable
-def sleep(x):
+def cached_sleep(x):
     time.sleep(x)
     return x
 
-times = timeit.repeat(lambda: sleep(10), number=5, repeat=5)
+times = timeit.repeat(lambda: cached_sleep(10), number=5, repeat=5)
 print(times)  # First execution takes about 10s, then almost 0s
 
-assert sleep(10) == 10
+assert cached_sleep(10) == 10
 
 # Change settings using a context manager:
 with cacholote.config.set(cache_store_directory="new/path/to/cache/dir"):
-    sleep(10)
+    cached_sleep(10)
 
 # Show all available settings:
 print(cacholote.config.SETTINGS)
