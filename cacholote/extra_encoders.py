@@ -22,6 +22,8 @@ from typing import Any, Dict, Optional, Union
 
 import fsspec
 import fsspec.generic
+import fsspec.implementations.arrow
+import fsspec.implementations.local
 
 from . import cache, encode
 
@@ -46,6 +48,14 @@ for ext in (".grib", ".grb", ".grb1", ".grb2"):
 if ".zarr" not in mimetypes.types_map:
     mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
 
+UNION_IO_TYPES = Union[
+    io.BufferedReader,
+    io.TextIOWrapper,
+    fsspec.spec.AbstractBufferedFile,
+    fsspec.implementations.arrow.ArrowFile,
+    fsspec.implementations.local.LocalFileOpener,
+]
+
 
 def copy_buffer(
     f_in: fsspec.spec.AbstractBufferedFile,
@@ -69,7 +79,7 @@ def fs_from_json(xr_or_io_json: Dict[str, Any]) -> fsspec.spec.AbstractFileSyste
     return fsspec.filesystem(protocol, **storage_options)
 
 
-def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
+def open_xr_from_json(xr_json: Dict[str, Any]) -> xr.Dataset:
     if xr_json["type"] == "application/vnd+zarr":
         fs = fs_from_json(xr_json)
         filename_or_obj = fs.get_mapper(xr_json["href"])
@@ -89,7 +99,7 @@ def open_xr_from_json(xr_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFi
     return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 
-def open_io_from_json(io_json: Dict[str, Any]) -> fsspec.spec.AbstractBufferedFile:
+def open_io_from_json(io_json: Dict[str, Any]) -> UNION_IO_TYPES:
     fs = fs_from_json(io_json)
     return fs.open(io_json["href"], **io_json["tmp:storage_options"])
 
@@ -101,7 +111,7 @@ def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
 
 
 def dictify_xr_dataset(
-    obj: Union["xr.DataArray", "xr.Dataset"],
+    obj: "xr.Dataset",
 ) -> Dict[str, Any]:
     token = tokenize_xr_object(obj)
     checksum = cache.hexdigestify(token)
@@ -145,18 +155,18 @@ def dictify_xr_dataset(
 
 
 def dictify_io_object(
-    obj: Union[io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile],
+    obj: UNION_IO_TYPES,
     delete_original: bool = False,
 ) -> Dict[str, Any]:
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
-    if isinstance(obj, fsspec.spec.AbstractBufferedFile):
-        path_in = obj.path
-        fs_in = obj.fs
-    else:
+    if isinstance(obj, (io.BufferedReader, io.TextIOWrapper)):
         path_in = obj.name
         fs_in = fsspec.filesystem("file")
+    else:
+        path_in = obj.path
+        fs_in = obj.fs
 
     filetype = mimetypes.guess_type(path_in)[0]
     if filetype is None and HAS_MAGIC:
@@ -202,7 +212,13 @@ def dictify_io_object(
 
 
 def register_all() -> None:
-    for cls in (io.BufferedReader, io.TextIOWrapper, fsspec.spec.AbstractBufferedFile):
+    for cls in (
+        io.BufferedReader,
+        io.TextIOWrapper,
+        fsspec.spec.AbstractBufferedFile,
+        fsspec.implementations.arrow.ArrowFile,
+        fsspec.implementations.local.LocalFileOpener,
+    ):
         encode.FILECACHE_ENCODERS.append((cls, dictify_io_object))
     if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
