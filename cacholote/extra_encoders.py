@@ -21,7 +21,6 @@ import tempfile
 from typing import Any, Dict, Optional, Union
 
 import fsspec
-import fsspec.generic
 import fsspec.implementations.arrow
 import fsspec.implementations.local
 
