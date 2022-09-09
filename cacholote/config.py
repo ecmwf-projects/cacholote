@@ -26,7 +26,6 @@ from typing import Any, Dict, Optional, Type
 import diskcache
 import fsspec
 import fsspec.implementations.dirfs
-import fsspec.implementations.local
 
 _SETTINGS: Dict[str, Any] = {
     "cache_store_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
