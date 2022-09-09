@@ -48,7 +48,6 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         return extra_encoders.open_xr_from_json(obj)
 
     if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
-
         return extra_encoders.open_io_from_json(obj)
 
     return obj
