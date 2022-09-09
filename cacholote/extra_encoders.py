@@ -167,7 +167,7 @@ def dictify_io_object(
         path_in = obj.path
         fs_in = obj.fs
 
-    filetype = mimetypes.guess_type(path_in)[0]
+    filetype = mimetypes.guess_type(path_in, strict=False)[0]
     if filetype is None and HAS_MAGIC:
         with fs_in.open(path_in, "rb") as f:
             filetype = magic.from_buffer(f.read(), mime=True)
