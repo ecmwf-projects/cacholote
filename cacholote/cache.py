@@ -45,9 +45,17 @@ def cacheable(func: F) -> F:
         hexdigest = hexdigestify(call_json)
         cache_store = SETTINGS["cache_store"]
         try:
-            return decode.loads(cache_store[hexdigest])
-        except Exception as ex:
-            if hexdigest in cache_store:
+            cached = cache_store[hexdigest]
+        except KeyError:
+            # Miss
+            pass
+        else:
+            # Hit
+            try:
+                return decode.loads(cached)
+            except Exception as ex:
+                # Something wrong, e.g. cached files are corrupted
+                # Warn and recreate cache value
                 warnings.warn(str(ex), UserWarning)
 
         result = func(*args, **kwargs)
