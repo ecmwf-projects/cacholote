@@ -79,7 +79,7 @@ def fs_from_json(xr_or_io_json: Dict[str, Any]) -> fsspec.spec.AbstractFileSyste
     return fsspec.filesystem(protocol, **storage_options)
 
 
-def open_xr_from_json(xr_json: Dict[str, Any]) -> xr.Dataset:
+def open_xr_from_json(xr_json: Dict[str, Any]) -> "xr.Dataset":
     if xr_json["type"] == "application/vnd+zarr":
         fs = fs_from_json(xr_json)
         filename_or_obj = fs.get_mapper(xr_json["href"])
