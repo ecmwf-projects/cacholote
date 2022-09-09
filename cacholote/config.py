@@ -106,10 +106,13 @@ class set:
 
 
 def get_cache_files_directory() -> str:
-
-    if _SETTINGS["cache_files_urlpath"] is _SETTINGS["cache_store_directory"] is None:
+    if SETTINGS["cache_files_urlpath"] is SETTINGS["cache_store_directory"] is None:
         raise ValueError("Please set 'cache_files_directory'")
+    if SETTINGS["cache_files_urlpath"] is None:
+        return str(SETTINGS["cache_store_directory"])
+    return str(SETTINGS["cache_files_urlpath"])
 
-    if _SETTINGS["cache_files_urlpath"] is None:
-        return str(_SETTINGS["cache_store_directory"])
-    return str(_SETTINGS["cache_files_urlpath"])
+
+def get_cache_filesystem() -> fsspec.spec.AbstractFileSystem:
+    protocol = fsspec.utils.get_protocol(get_cache_files_directory())
+    return fsspec.filesystem(protocol, **SETTINGS["cache_files_storage_options"])

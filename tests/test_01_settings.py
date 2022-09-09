@@ -1,5 +1,6 @@
 import os
 
+import fsspec
 import pytest
 from diskcache import Cache
 
@@ -41,3 +42,8 @@ def test_change_settings(tmpdir: str) -> None:
 
     with pytest.raises(KeyError, match="Wrong settings. Available settings: "):
         config.set(dummy="dummy")
+
+
+def test_get_utils(tmpdir: str) -> None:
+    assert config.get_cache_files_directory() == tmpdir
+    assert config.get_cache_filesystem() == fsspec.filesystem("file")
