@@ -46,4 +46,6 @@ def test_change_settings(tmpdir: str) -> None:
 
 def test_get_utils(tmpdir: str) -> None:
     assert config.get_cache_files_directory() == tmpdir
-    assert config.get_cache_filesystem() == fsspec.filesystem("file")
+
+    assert config.get_cache_files_dirfs().path == tmpdir
+    assert config.get_cache_files_dirfs().fs == fsspec.filesystem("file")

@@ -59,27 +59,18 @@ class set:
     # TODO: Add docstring
     def __init__(self, **kwargs: Any):
 
-        if "cache_store" in kwargs and "cache_store_directory" in kwargs:
-            raise ValueError(
-                "'cache_store' and 'cache_store_directory' are mutually exclusive"
-            )
-
-        if "cache_files_directory" in kwargs and not isinstance(
-            kwargs["cache_files_directory"],
-            fsspec.implementations.local.LocalFileSystem,
-        ):
-            raise ValueError(
-                "'cache_files_directory' must be of type 'LocalFileSystem'"
-            )
+        if "cache_store" in kwargs:
+            if "cache_store_directory" in kwargs:
+                raise ValueError(
+                    "'cache_store' and 'cache_store_directory' are mutually exclusive"
+                )
+            kwargs["cache_store_directory"] = None
 
         if (
             "xarray_cache_type" in kwargs
             and kwargs["xarray_cache_type"] not in EXTENSIONS
         ):
             raise ValueError(f"'xarray_cache_type' must be one of {list(EXTENSIONS)}")
-
-        if "cache_store" in kwargs:
-            kwargs["cache_store_directory"] = None
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
@@ -113,6 +104,8 @@ def get_cache_files_directory() -> str:
     return str(SETTINGS["cache_files_urlpath"])
 
 
-def get_cache_filesystem() -> fsspec.spec.AbstractFileSystem:
-    protocol = fsspec.utils.get_protocol(get_cache_files_directory())
-    return fsspec.filesystem(protocol, **SETTINGS["cache_files_storage_options"])
+def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
+    cache_files_directory = get_cache_files_directory()
+    protocol = fsspec.utils.get_protocol(cache_files_directory)
+    fs = fsspec.filesystem(protocol, **SETTINGS["cache_files_storage_options"])
+    return fsspec.implementations.dirfs.DirFileSystem(cache_files_directory, fs)
