@@ -56,8 +56,8 @@ def cacheable(func: F) -> F:
         except encode.EncodeError:
             warnings.warn("bad output", UserWarning)
             return result
-        cache_store[hexdigest] = cached
 
+        cache_store[hexdigest] = cached
         return decode.loads(cached)
 
     return cast(F, wrapper)
