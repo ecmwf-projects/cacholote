@@ -210,13 +210,13 @@ def dictify_io_object(
 
 
 def register_all() -> None:
-    for cls in (
+    for type_ in (
         io.BufferedReader,
         io.TextIOWrapper,
         fsspec.spec.AbstractBufferedFile,
         fsspec.implementations.arrow.ArrowFile,
         fsspec.implementations.local.LocalFileOpener,
     ):
-        encode.FILECACHE_ENCODERS.append((cls, dictify_io_object))
+        encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))
     if HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
