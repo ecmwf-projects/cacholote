@@ -25,7 +25,7 @@ import fsspec.generic
 import fsspec.implementations.arrow
 import fsspec.implementations.local
 
-from . import cache, encode
+from . import cache, config, encode
 
 try:
     import dask
@@ -156,7 +156,6 @@ def dictify_xr_dataset(
 
 def dictify_io_object(
     obj: UNION_IO_TYPES,
-    delete_original: bool = False,
 ) -> Dict[str, Any]:
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
@@ -195,7 +194,7 @@ def dictify_io_object(
         protocol_out = fsspec.utils.get_protocol(io_json["href"])
         fs_out = fsspec.filesystem(protocol_out, **io_json["tmp:storage_options"])
         if fs_in == fs_out:
-            if delete_original:
+            if config.SETTINGS["io_delete_original"]:
                 fs_in.mv(path_in, io_json["href"])
             else:
                 fs_in.cp(path_in, io_json["href"])
@@ -206,7 +205,7 @@ def dictify_io_object(
             ) as f_out:
                 copy_buffer(f_in, f_out)
 
-            if delete_original:
+            if config.SETTINGS["io_delete_original"]:
                 fs_in.rm(path_in)
     return io_json
 

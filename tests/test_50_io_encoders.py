@@ -11,8 +11,8 @@ def func(url: str) -> fsspec.spec.AbstractBufferedFile:
         return f
 
 
-@pytest.mark.parametrize("delete_original", [True, False])
-def test_dictify_io_object(tmpdir: str, delete_original: bool) -> None:
+@pytest.mark.parametrize("io_delete_original", [True, False])
+def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
     tmpfile = os.path.join(tmpdir, "dummy.txt")
     with open(tmpfile, "w") as f:
         f.write("dummy")
@@ -31,12 +31,11 @@ def test_dictify_io_object(tmpdir: str, delete_original: bool) -> None:
         "tmp:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
         "tmp:storage_options": {},
     }
-    res = extra_encoders.dictify_io_object(
-        open(tmpfile), delete_original=delete_original
-    )
+    with config.set(io_delete_original=io_delete_original):
+        res = extra_encoders.dictify_io_object(open(tmpfile))
     assert res == expected
     assert os.path.exists(local_path)
-    assert os.path.exists(tmpfile) is not delete_original
+    assert os.path.exists(tmpfile) is not io_delete_original
 
 
 def test_copy_file_to_cache_directory(tmpdir: str) -> None:
