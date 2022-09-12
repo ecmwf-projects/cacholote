@@ -35,7 +35,7 @@ def cached_sleep(x):
     time.sleep(x)
     return x
 
-times = timeit.repeat(lambda: cached_sleep(10), number=5, repeat=5)
+times = timeit.repeat(lambda: cached_sleep(10), number=1, repeat=5)
 print(times)  # First execution takes about 10s, then almost 0s
 
 assert cached_sleep(10) == 10
