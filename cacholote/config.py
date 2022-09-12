@@ -98,7 +98,9 @@ class set:
 
 def get_cache_files_directory() -> str:
     if SETTINGS["cache_files_urlpath"] is SETTINGS["cache_store_directory"] is None:
-        raise ValueError("Please set 'cache_files_directory'")
+        raise ValueError(
+            "Please set 'cache_files_urlpath' and 'cache_files_storage_options'"
+        )
     if SETTINGS["cache_files_urlpath"] is None:
         return str(SETTINGS["cache_store_directory"])
     return str(SETTINGS["cache_files_urlpath"])

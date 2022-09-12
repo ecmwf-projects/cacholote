@@ -39,7 +39,7 @@ def cacheable(func: F) -> F:
                 **kwargs,
             )
         except encode.EncodeError:
-            warnings.warn("encoding issues - bad input", UserWarning)
+            warnings.warn("encoding issues: bad input", UserWarning)
             return func(*args, **kwargs)
         print(call_json)
 
@@ -64,7 +64,7 @@ def cacheable(func: F) -> F:
         try:
             cached = encode.dumps(result)
         except encode.EncodeError:
-            warnings.warn("encoding issues - bad output", UserWarning)
+            warnings.warn("encoding issues: bad output", UserWarning)
             return result
 
         cache_store[hexdigest] = cached

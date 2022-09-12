@@ -164,17 +164,14 @@ def dictify_io_object(
                 filetype = None
     filetype = filetype or "unknown"
 
-    size = fs_in.size(path_in)
-    root = fs_in.checksum(path_in)
-    _, extension = os.path.splitext(path_in)
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
 
     io_json = encode.dictify_io_asset(
         filetype=filetype,
-        root=root,
-        size=size,
-        extension=extension,
+        root=fs_in.checksum(path_in),
+        size=fs_in.size(path_in),
+        ext=os.path.splitext(path_in)[-1],
         open_kwargs=open_kwargs,
     )
 

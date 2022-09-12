@@ -72,9 +72,9 @@ def dictify_python_call(
 
 
 def dictify_file(
-    filetype: str, root: Union[int, str], size: int, extension: str = ""
+    filetype: str, root: Union[int, str], size: int, ext: str = ""
 ) -> Dict[str, Any]:
-    href = posixpath.join(config.get_cache_files_directory(), f"{root}{extension}")
+    href = posixpath.join(config.get_cache_files_directory(), f"{root}{ext}")
     file_json = {
         "type": filetype,
         "href": href,
@@ -90,13 +90,11 @@ def dictify_io_asset(
     filetype: str,
     root: Union[int, str],
     size: int,
-    extension: str = "",
+    ext: str = "",
     open_kwargs: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
-    asset_dict = dictify_file(
-        filetype=filetype, root=root, size=size, extension=extension
-    )
+    asset_dict = dictify_file(filetype=filetype, root=root, size=size, ext=ext)
     asset_dict.update(
         {
             "tmp:open_kwargs": open_kwargs,
@@ -119,7 +117,7 @@ def dictify_xarray_asset(
         filetype=filetype,
         root=root,
         size=size,
-        extension=config.EXTENSIONS[filetype],
+        ext=config.EXTENSIONS[filetype],
     )
     asset_dict.update(
         {
