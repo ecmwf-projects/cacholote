@@ -32,6 +32,10 @@ def import_object(fully_qualified_name: str) -> Any:
 
 
 def object_hook(obj: Dict[str, Any]) -> Any:
+    if "file:checksum" in obj:
+        fs = extra_encoders.fs_from_json(obj)
+        assert fs.checksum(obj["href"]) == obj["file:checksum"], "checksum mismatch"
+
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
 
@@ -44,11 +48,11 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
 
-    if {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
-        return extra_encoders.open_xr_from_json(obj)
-
     if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
-        return extra_encoders.open_io_from_json(obj)
+        return fs.open(obj["href"], **obj["tmp:storage_options"])
+
+    if {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
+        return extra_encoders.decode_xr_dataset(obj)
 
     return obj
 
