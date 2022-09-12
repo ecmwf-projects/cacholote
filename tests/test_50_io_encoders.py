@@ -22,19 +22,19 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
         config.SETTINGS["cache_store"].directory,
         f"{checksum}.txt",
     )
+
+    with config.set(io_delete_original=io_delete_original):
+        res = extra_encoders.dictify_io_object(open(tmpfile))
     expected = {
         "type": "text/plain",
         "href": local_path,
-        "file:checksum": checksum,
+        "file:checksum": fsspec.filesystem("file").checksum(local_path),
         "file:size": 5,
         "file:local_path": local_path,
         "tmp:open_kwargs": {"encoding": "UTF-8", "errors": "strict", "mode": "r"},
         "tmp:storage_options": {},
     }
-    with config.set(io_delete_original=io_delete_original):
-        res = extra_encoders.dictify_io_object(open(tmpfile))
     assert res == expected
-    assert os.path.exists(local_path)
     assert os.path.exists(tmpfile) is not io_delete_original
 
 

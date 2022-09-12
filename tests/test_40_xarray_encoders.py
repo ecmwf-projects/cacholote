@@ -1,4 +1,3 @@
-import glob
 import os
 from typing import Any, Dict, TypeVar
 
@@ -52,21 +51,21 @@ def test_dictify_xr_dataset(
 ) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
-        f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        f"06810be7ce1f5507be9180bfb9ff14fd{extension}",
     )
+    with config.set(xarray_cache_type=xarray_cache_type):
+        res = extra_encoders.dictify_xr_dataset(ds)
+
     expected = {
         "type": xarray_cache_type,
         "href": local_path,
-        "file:checksum": "285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4",
+        "file:checksum": fsspec.filesystem("file").checksum(local_path),
         "file:size": 470024,
         "file:local_path": local_path,
         "xarray:open_kwargs": open_kwargs,
         "xarray:storage_options": {},
     }
-    with config.set(xarray_cache_type=xarray_cache_type):
-        res = extra_encoders.dictify_xr_dataset(ds)
     assert res == expected
-    assert os.path.exists(local_path)
 
 
 @pytest.mark.parametrize(*PARAMETRIZE)
@@ -89,7 +88,7 @@ def test_xr_cacheable(
 ) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
-        f"285ee3a510a225620bb32d96ec20d19d9d91ae82be881e0b4c8320e4{extension}",
+        f"06810be7ce1f5507be9180bfb9ff14fd{extension}",
     )
 
     with config.set(xarray_cache_type=xarray_cache_type):
@@ -98,6 +97,7 @@ def test_xr_cacheable(
         # 1: create cached data
         res = cfunc(ds)
         assert config.SETTINGS["cache_store"].stats() == (0, 1)
+        assert len(config.SETTINGS["cache_store"]) == 1
         mtime = os.path.getmtime(local_path)
 
         if xarray_cache_type == "application/x-grib":
@@ -108,10 +108,8 @@ def test_xr_cacheable(
         # 2: use cached data
         res = cfunc(ds)
         assert config.SETTINGS["cache_store"].stats() == (1, 1)
+        assert len(config.SETTINGS["cache_store"]) == 1
         assert mtime == os.path.getmtime(local_path)
-        assert glob.glob(
-            os.path.join(config.SETTINGS["cache_store"].directory, f"*{extension}")
-        ) == [local_path]
 
         if xarray_cache_type == "application/x-grib":
             xr.testing.assert_equal(res, ds)

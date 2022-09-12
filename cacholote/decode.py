@@ -44,11 +44,15 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
 
-    if {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
-        return extra_encoders.open_xr_from_json(obj)
+    if "file:checksum" in obj:
+        fs = extra_encoders.fs_from_json(obj)
+        assert fs.checksum(obj["href"]) == obj["file:checksum"], "checksum missmatch"
 
-    if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
-        return extra_encoders.open_io_from_json(obj)
+        if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
+            return fs.open(obj["href"], **obj["tmp:storage_options"])
+
+        if {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
+            return extra_encoders.decode_xr_dataset(obj)
 
     return obj
 

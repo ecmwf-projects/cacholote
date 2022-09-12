@@ -24,7 +24,7 @@ import fsspec
 import fsspec.implementations.arrow
 import fsspec.implementations.local
 
-from . import cache, config, encode
+from . import config, encode
 
 try:
     import dask
@@ -78,7 +78,7 @@ def fs_from_json(xr_or_io_json: Dict[str, Any]) -> fsspec.spec.AbstractFileSyste
     return fsspec.filesystem(protocol, **storage_options)
 
 
-def open_xr_from_json(xr_json: Dict[str, Any]) -> "xr.Dataset":
+def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
     if xr_json["type"] == "application/vnd+zarr":
         fs = fs_from_json(xr_json)
         filename_or_obj = fs.get_mapper(xr_json["href"])
@@ -98,26 +98,15 @@ def open_xr_from_json(xr_json: Dict[str, Any]) -> "xr.Dataset":
     return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 
-def open_io_from_json(io_json: Dict[str, Any]) -> UNION_IO_TYPES:
-    fs = fs_from_json(io_json)
-    return fs.open(io_json["href"], **io_json["tmp:storage_options"])
-
-
-def tokenize_xr_object(obj: Union["xr.DataArray", "xr.Dataset"]) -> str:
-    with dask.config.set({"tokenize.ensure-deterministic": True}):
-        token: str = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
-    return token
-
-
 def dictify_xr_dataset(
     obj: "xr.Dataset",
 ) -> Dict[str, Any]:
-    token = tokenize_xr_object(obj)
-    checksum = cache.hexdigestify(token)
-    xr_json = encode.dictify_xarray_asset(checksum=checksum, size=obj.nbytes)
-    try:
-        open_xr_from_json(xr_json)
-    except:  # noqa: E722
+    with dask.config.set({"tokenize.ensure-deterministic": True}):
+        root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
+    xr_json = encode.dictify_xarray_asset(root=root, size=obj.nbytes)
+
+    fs_out = fs_from_json(xr_json)
+    if not fs_out.exists(xr_json["href"]):
         if xr_json["type"] == "application/vnd+zarr":
             # Write directly on any filesystem
             mapper = fsspec.get_mapper(
@@ -145,11 +134,12 @@ def dictify_xr_dataset(
                         tmpfilename, xr_json["file:local_path"]
                     )
                 else:
-                    fs_out = fs_from_json(xr_json)
                     with fsspec.open(tmpfilename, "rb") as f_in, fs_out.open(
                         xr_json["href"], "wb"
                     ) as f_out:
                         copy_buffer(f_in, f_out)
+
+    xr_json["file:checksum"] = fs_out.checksum(xr_json["href"])
     return xr_json
 
 
@@ -175,23 +165,21 @@ def dictify_io_object(
     filetype = filetype or "unknown"
 
     size = fs_in.size(path_in)
-    checksum = fs_in.checksum(path_in)
+    root = fs_in.checksum(path_in)
     _, extension = os.path.splitext(path_in)
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
 
     io_json = encode.dictify_io_asset(
         filetype=filetype,
-        checksum=checksum,
+        root=root,
         size=size,
         extension=extension,
         open_kwargs=open_kwargs,
     )
-    try:
-        open_io_from_json(io_json)
-    except:  # noqa: E722
-        protocol_out = fsspec.utils.get_protocol(io_json["href"])
-        fs_out = fsspec.filesystem(protocol_out, **io_json["tmp:storage_options"])
+
+    fs_out = fs_from_json(io_json)
+    if not fs_out.exists(io_json["href"]):
         if fs_in == fs_out:
             if config.SETTINGS["io_delete_original"]:
                 fs_in.mv(path_in, io_json["href"])
@@ -206,6 +194,8 @@ def dictify_io_object(
 
             if config.SETTINGS["io_delete_original"]:
                 fs_in.rm(path_in)
+
+    io_json["file:checksum"] = fs_out.checksum(io_json["href"])
     return io_json
 
 

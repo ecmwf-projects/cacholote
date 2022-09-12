@@ -72,13 +72,12 @@ def dictify_python_call(
 
 
 def dictify_file(
-    filetype: str, checksum: Union[int, str], size: int, extension: str = ""
+    filetype: str, root: Union[int, str], size: int, extension: str = ""
 ) -> Dict[str, Any]:
-    href = posixpath.join(config.get_cache_files_directory(), f"{checksum}{extension}")
+    href = posixpath.join(config.get_cache_files_directory(), f"{root}{extension}")
     file_json = {
         "type": filetype,
         "href": href,
-        "file:checksum": checksum,
         "file:size": size,
     }
     if fsspec.utils.get_protocol(href) == "file":
@@ -89,14 +88,14 @@ def dictify_file(
 
 def dictify_io_asset(
     filetype: str,
-    checksum: Union[int, str],
+    root: Union[int, str],
     size: int,
     extension: str = "",
     open_kwargs: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
 
     asset_dict = dictify_file(
-        filetype=filetype, checksum=checksum, size=size, extension=extension
+        filetype=filetype, root=root, size=size, extension=extension
     )
     asset_dict.update(
         {
@@ -108,7 +107,7 @@ def dictify_io_asset(
 
 
 def dictify_xarray_asset(
-    checksum: Union[int, str],
+    root: Union[int, str],
     size: int,
 ) -> Dict[str, Any]:
 
@@ -118,7 +117,7 @@ def dictify_xarray_asset(
         open_kwargs.update({"engine": "zarr", "consolidated": True})
     asset_dict = dictify_file(
         filetype=filetype,
-        checksum=checksum,
+        root=root,
         size=size,
         extension=config.EXTENSIONS[filetype],
     )
