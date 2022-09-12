@@ -41,7 +41,6 @@ def cacheable(func: F) -> F:
         except encode.EncodeError:
             warnings.warn("encoding issues: bad input", UserWarning)
             return func(*args, **kwargs)
-        print(call_json)
 
         hexdigest = hexdigestify(call_json)
         cache_store = SETTINGS["cache_store"]
