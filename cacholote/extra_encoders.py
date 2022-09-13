@@ -17,6 +17,7 @@ import inspect
 import io
 import mimetypes
 import os
+import posixpath
 import tempfile
 from typing import Any, Dict, Optional, Union
 
@@ -41,11 +42,6 @@ try:
 except ImportError:
     HAS_MAGIC = False
 
-for ext in (".grib", ".grb", ".grb1", ".grb2"):
-    if ext not in mimetypes.types_map:
-        mimetypes.add_type("application/x-grib", ext, strict=False)
-if ".zarr" not in mimetypes.types_map:
-    mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
 
 UNION_IO_TYPES = Union[
     io.BufferedReader,
@@ -69,18 +65,48 @@ def copy_buffer(
         f_out.write(data)
 
 
-def fs_from_json(xr_or_io_json: Dict[str, Any]) -> fsspec.spec.AbstractFileSystem:
-    protocol = fsspec.utils.get_protocol(xr_or_io_json["href"])
-    try:
-        storage_options = xr_or_io_json["tmp:storage_options"]
-    except KeyError:
-        storage_options = xr_or_io_json["xarray:storage_options"]
+def get_filesystem(
+    urlpath: str, storage_options: Optional[Dict[str, Any]] = None
+) -> fsspec.AbstractFileSystem:
+    if storage_options is None:
+        storage_options = config.SETTINGS["cache_files_storage_options"]
+    protocol = fsspec.utils.get_protocol(urlpath)
     return fsspec.filesystem(protocol, **storage_options)
+
+
+def dictify_file(urlpath: str) -> Dict[str, Any]:
+    for ext in (".grib", ".grb", ".grb1", ".grb2"):
+        if ext not in mimetypes.types_map:
+            mimetypes.add_type("application/x-grib", ext, strict=False)
+    if ".zarr" not in mimetypes.types_map:
+        mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
+
+    fs = get_filesystem(urlpath)
+
+    filetype = mimetypes.guess_type(urlpath, strict=False)[0]
+    if filetype is None and HAS_MAGIC:
+        with fs.open(urlpath, "rb") as f:
+            filetype = magic.from_buffer(f.read(), mime=True)
+            if filetype == "application/octet-stream":
+                filetype = None
+    filetype = filetype or "unknown"
+
+    file_dict = {
+        "type": filetype,
+        "href": urlpath,
+        "file:checksum": fs.checksum(urlpath),
+        "file:size": fs.size(urlpath),
+    }
+
+    if fs == fsspec.filesystem("file"):
+        file_dict["file:local_path"] = urlpath
+
+    return file_dict
 
 
 def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
     if xr_json["type"] == "application/vnd+zarr":
-        fs = fs_from_json(xr_json)
+        fs = get_filesystem(xr_json["href"], xr_json["xarray:storage_options"])
         filename_or_obj = fs.get_mapper(xr_json["href"])
     else:
         if "file:local_path":
@@ -103,44 +129,54 @@ def dictify_xr_dataset(
 ) -> Dict[str, Any]:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
-    xr_json = encode.dictify_xarray_asset(root=root)
 
-    fs_out = fs_from_json(xr_json)
-    if not fs_out.exists(xr_json["href"]):
-        if xr_json["type"] == "application/vnd+zarr":
+    filetype = config.SETTINGS["xarray_cache_type"]
+    ext = config.EXTENSIONS[filetype]
+    urlpath_out = posixpath.join(config.get_cache_files_directory(), f"{root}{ext}")
+
+    fs_out = get_filesystem(urlpath_out)
+    if not fs_out.exists(urlpath_out):
+        if filetype == "application/vnd+zarr":
             # Write directly on any filesystem
             mapper = fsspec.get_mapper(
-                xr_json["href"], **xr_json["xarray:storage_options"]
+                urlpath_out, **config.SETTINGS["cache_files_storage_options"]
             )
             obj.to_zarr(mapper, consolidated=True)
         else:
             # Need a tmp local copy to write on a different filesystem
             with tempfile.TemporaryDirectory() as tmpdirname:
-                basename = os.path.basename(xr_json["href"])
+                basename = os.path.basename(urlpath_out)
                 tmpfilename = os.path.join(tmpdirname, basename)
 
-                if xr_json["type"] == "application/x-netcdf":
+                if filetype == "application/x-netcdf":
                     obj.to_netcdf(tmpfilename)
-                elif xr_json["type"] == "application/x-grib":
+                elif filetype == "application/x-grib":
                     import cfgrib.xarray_to_grib
 
                     cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
                 else:
                     # Should never get here! xarray_cache_type is checked in config.py
-                    raise ValueError(f"type {xr_json['type']} is NOT supported.")
+                    raise ValueError(f"type {filetype!r} is NOT supported.")
 
-                if "file:local_path" in xr_json:
-                    fsspec.filesystem("file").mv(
-                        tmpfilename, xr_json["file:local_path"]
-                    )
+                if fs_out == fsspec.filesystem("file"):
+                    fsspec.filesystem("file").mv(tmpfilename, urlpath_out)
                 else:
                     with fsspec.open(tmpfilename, "rb") as f_in, fs_out.open(
-                        xr_json["href"], "wb"
+                        urlpath_out, "wb"
                     ) as f_out:
                         copy_buffer(f_in, f_out)
 
-    xr_json["file:checksum"] = fs_out.checksum(xr_json["href"])
-    xr_json["file:size"] = fs_out.size(xr_json["href"])
+    xr_json = dictify_file(urlpath_out)
+    xr_json["xarray:storage_options"] = config.SETTINGS["cache_files_storage_options"]
+    if filetype == "application/vnd+zarr":
+        xr_json["xarray:open_kwargs"] = {
+            "engine": "zarr",
+            "consolidated": True,
+            "chunks": "auto",
+        }
+    else:
+        xr_json["xarray:open_kwargs"] = {"chunks": "auto"}
+
     return xr_json
 
 
@@ -151,49 +187,45 @@ def dictify_io_object(
         raise ValueError("write-mode objects can NOT be cached.")
 
     if isinstance(obj, (io.BufferedReader, io.TextIOWrapper)):
-        path_in = obj.name
+        urlpath_in = obj.name
         fs_in = fsspec.filesystem("file")
     else:
-        path_in = obj.path
+        urlpath_in = obj.path
         fs_in = obj.fs
 
-    filetype = mimetypes.guess_type(path_in, strict=False)[0]
-    if filetype is None and HAS_MAGIC:
-        with fs_in.open(path_in, "rb") as f:
-            filetype = magic.from_buffer(f.read(), mime=True)
-            if filetype == "application/octet-stream":
-                filetype = None
-    filetype = filetype or "unknown"
+    root = fs_in.checksum(urlpath_in)
+    _, ext = os.path.splitext(urlpath_in)
+    urlpath_out = posixpath.join(config.get_cache_files_directory(), f"{root}{ext}")
 
-    params = inspect.signature(open).parameters
-    open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
-
-    io_json = encode.dictify_io_asset(
-        filetype=filetype,
-        root=fs_in.checksum(path_in),
-        size=fs_in.size(path_in),
-        ext=os.path.splitext(path_in)[-1],
-        open_kwargs=open_kwargs,
+    protocol = fsspec.utils.get_protocol(urlpath_out)
+    fs_out = fsspec.filesystem(
+        protocol, **config.SETTINGS["cache_files_storage_options"]
     )
-
-    fs_out = fs_from_json(io_json)
-    if not fs_out.exists(io_json["href"]):
+    if not fs_out.exists(urlpath_out):
         if fs_in == fs_out:
             if config.SETTINGS["io_delete_original"]:
-                fs_in.mv(path_in, io_json["href"])
+                fs_in.mv(urlpath_in, urlpath_out)
             else:
-                fs_in.cp(path_in, io_json["href"])
+                fs_in.cp(urlpath_in, urlpath_out)
         else:
-            fs_out = fs_from_json(io_json)
-            with fs_in.open(path_in, "rb") as f_in, fs_out.open(
-                io_json["href"], "wb"
+            with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
+                urlpath_out, "wb"
             ) as f_out:
                 copy_buffer(f_in, f_out)
 
             if config.SETTINGS["io_delete_original"]:
-                fs_in.rm(path_in)
+                fs_in.rm(urlpath_in)
 
-    io_json["file:checksum"] = fs_out.checksum(io_json["href"])
+    io_json = dictify_file(urlpath_out)
+    params = inspect.signature(open).parameters
+    open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+    io_json.update(
+        {
+            "tmp:storage_options": config.SETTINGS["cache_files_storage_options"],
+            "tmp:open_kwargs": open_kwargs,
+        }
+    )
+
     return io_json
 
 
