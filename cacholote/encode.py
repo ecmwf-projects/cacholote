@@ -72,7 +72,7 @@ def dictify_python_call(
 
 
 def dictify_file(
-    filetype: str, root: Union[int, str], size: int, ext: str = ""
+    filetype: str, root: Union[int, str], size: Optional[int] = None, ext: str = ""
 ) -> Dict[str, Any]:
     href = posixpath.join(config.get_cache_files_directory(), f"{root}{ext}")
     file_json = {
@@ -80,6 +80,8 @@ def dictify_file(
         "href": href,
         "file:size": size,
     }
+    if size is not None:
+        file_json["file:size"] = size
     if fsspec.utils.get_protocol(href) == "file":
         file_json["file:local_path"] = os.path.abspath(href)
 
@@ -106,7 +108,6 @@ def dictify_io_asset(
 
 def dictify_xarray_asset(
     root: Union[int, str],
-    size: int,
 ) -> Dict[str, Any]:
 
     filetype = config.SETTINGS["xarray_cache_type"]
@@ -116,7 +117,6 @@ def dictify_xarray_asset(
     asset_dict = dictify_file(
         filetype=filetype,
         root=root,
-        size=size,
         ext=config.EXTENSIONS[filetype],
     )
     asset_dict.update(

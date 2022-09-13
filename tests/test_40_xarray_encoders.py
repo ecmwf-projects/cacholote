@@ -32,13 +32,14 @@ def ds() -> xr.Dataset:
 
 
 PARAMETRIZE = (
-    "xarray_cache_type,extension,open_kwargs",
+    "xarray_cache_type,extension,size,open_kwargs",
     [
-        ("application/x-netcdf", ".nc", {"chunks": "auto"}),
-        ("application/x-grib", ".grib", {"chunks": "auto"}),
+        ("application/x-netcdf", ".nc", 501607, {"chunks": "auto"}),
+        ("application/x-grib", ".grib", 353088, {"chunks": "auto"}),
         (
             "application/vnd+zarr",
             ".zarr",
+            448,
             {"chunks": "auto", "engine": "zarr", "consolidated": True},
         ),
     ],
@@ -47,7 +48,11 @@ PARAMETRIZE = (
 
 @pytest.mark.parametrize(*PARAMETRIZE)
 def test_dictify_xr_dataset(
-    ds: xr.Dataset, xarray_cache_type: str, extension: str, open_kwargs: Dict[str, Any]
+    ds: xr.Dataset,
+    xarray_cache_type: str,
+    extension: str,
+    size: int,
+    open_kwargs: Dict[str, Any],
 ) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,
@@ -60,7 +65,7 @@ def test_dictify_xr_dataset(
         "type": xarray_cache_type,
         "href": local_path,
         "file:checksum": fsspec.filesystem("file").checksum(local_path),
-        "file:size": 470024,
+        "file:size": size,
         "file:local_path": local_path,
         "xarray:open_kwargs": open_kwargs,
         "xarray:storage_options": {},
@@ -70,7 +75,11 @@ def test_dictify_xr_dataset(
 
 @pytest.mark.parametrize(*PARAMETRIZE)
 def test_xr_roundtrip(
-    ds: xr.Dataset, xarray_cache_type: str, extension: str, open_kwargs: Dict[str, Any]
+    ds: xr.Dataset,
+    xarray_cache_type: str,
+    extension: str,
+    size: int,
+    open_kwargs: Dict[str, Any],
 ) -> None:
     with config.set(xarray_cache_type=xarray_cache_type):
         ds_json = encode.dumps(ds)
@@ -84,7 +93,11 @@ def test_xr_roundtrip(
 
 @pytest.mark.parametrize(*PARAMETRIZE)
 def test_xr_cacheable(
-    ds: xr.Dataset, xarray_cache_type: str, extension: str, open_kwargs: Dict[str, Any]
+    ds: xr.Dataset,
+    xarray_cache_type: str,
+    extension: str,
+    size: int,
+    open_kwargs: Dict[str, Any],
 ) -> None:
     local_path = os.path.join(
         config.SETTINGS["cache_store"].directory,

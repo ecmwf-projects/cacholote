@@ -103,7 +103,7 @@ def dictify_xr_dataset(
 ) -> Dict[str, Any]:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
-    xr_json = encode.dictify_xarray_asset(root=root, size=obj.nbytes)
+    xr_json = encode.dictify_xarray_asset(root=root)
 
     fs_out = fs_from_json(xr_json)
     if not fs_out.exists(xr_json["href"]):
@@ -140,6 +140,7 @@ def dictify_xr_dataset(
                         copy_buffer(f_in, f_out)
 
     xr_json["file:checksum"] = fs_out.checksum(xr_json["href"])
+    xr_json["file:size"] = fs_out.size(xr_json["href"])
     return xr_json
 
 
