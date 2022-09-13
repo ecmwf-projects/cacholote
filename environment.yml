@@ -21,6 +21,7 @@ dependencies:
 - pip
 - python-magic
 - requests
+- s3fs
 - xarray>=2022.6.0
 - zarr
 - pip:
