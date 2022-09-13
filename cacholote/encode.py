@@ -19,15 +19,9 @@ import datetime
 import inspect
 import json
 import operator
-import os
 import pickle
-import posixpath
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
-import fsspec
-
-from . import config
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
@@ -69,64 +63,6 @@ def dictify_python_call(
     if kwargs:
         python_call_simple["kwargs"] = kwargs
     return python_call_simple
-
-
-def dictify_file(
-    filetype: str, root: Union[int, str], size: Optional[int] = None, ext: str = ""
-) -> Dict[str, Any]:
-    href = posixpath.join(config.get_cache_files_directory(), f"{root}{ext}")
-    file_json = {
-        "type": filetype,
-        "href": href,
-        "file:size": size,
-    }
-    if size is not None:
-        file_json["file:size"] = size
-    if fsspec.utils.get_protocol(href) == "file":
-        file_json["file:local_path"] = os.path.abspath(href)
-
-    return file_json
-
-
-def dictify_io_asset(
-    filetype: str,
-    root: Union[int, str],
-    size: int,
-    ext: str = "",
-    open_kwargs: Dict[str, Any] = {},
-) -> Dict[str, Any]:
-
-    asset_dict = dictify_file(filetype=filetype, root=root, size=size, ext=ext)
-    asset_dict.update(
-        {
-            "tmp:open_kwargs": open_kwargs,
-            "tmp:storage_options": config._SETTINGS["cache_files_storage_options"],
-        }
-    )
-    return asset_dict
-
-
-def dictify_xarray_asset(
-    root: Union[int, str],
-) -> Dict[str, Any]:
-
-    filetype = config.SETTINGS["xarray_cache_type"]
-    open_kwargs: Dict[str, Any] = {"chunks": "auto"}
-    if filetype == "application/vnd+zarr":
-        open_kwargs.update({"engine": "zarr", "consolidated": True})
-    asset_dict = dictify_file(
-        filetype=filetype,
-        root=root,
-        ext=config.EXTENSIONS[filetype],
-    )
-    asset_dict.update(
-        {
-            "xarray:open_kwargs": open_kwargs,
-            "xarray:storage_options": config._SETTINGS["cache_files_storage_options"],
-        }
-    )
-
-    return asset_dict
 
 
 def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:

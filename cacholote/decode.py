@@ -33,7 +33,12 @@ def import_object(fully_qualified_name: str) -> Any:
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     if "file:checksum" in obj:
-        fs = extra_encoders.fs_from_json(obj)
+        storage_options = {}
+        for k, v in obj.items():
+            if k.rsplit(":", 1)[-1] == "storage_options":
+                storage_options = v
+                break
+        fs = extra_encoders.get_filesystem(obj["href"], storage_options)
         assert fs.checksum(obj["href"]) == obj["file:checksum"], "checksum mismatch"
 
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
