@@ -17,6 +17,7 @@ except ImportError:
     pass
 
 requests = pytest.importorskip("requests")
+pytest.importorskip("moto")
 pytest.importorskip("s3fs")
 
 

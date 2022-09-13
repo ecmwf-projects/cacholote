@@ -17,6 +17,7 @@ dependencies:
 - dask
 - diskcache
 - fsspec
+- moto
 - netCDF4
 - pip
 - python-magic
