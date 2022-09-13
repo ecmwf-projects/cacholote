@@ -113,7 +113,7 @@ def xr_cached_func(data_vars: Dict[str, Any]) -> "xr.Dataset":
 def test_io_to_s3(
     tmpdir: str, s3_config: fsspec.AbstractFileSystem, io_delete_original: bool
 ) -> None:
-    tmpfile = os.path.join(tmpdir, "test.txt")
+    tmpfile = os.path.join(tmpdir, "test")
     with open(tmpfile, "wb") as f:
         f.write(b"test")
     checksum = fsspec.filesystem("file").checksum(tmpfile)
@@ -122,7 +122,7 @@ def test_io_to_s3(
     with config.set(**s3_config, io_delete_original=io_delete_original):
         res = io_cached_func(tmpfile)
     assert res.read() == b"test"
-    assert res.path == f"test-bucket/{checksum}.txt"
+    assert res.path == f"test-bucket/{checksum}"
     assert config.SETTINGS["cache_store"].stats() == (0, 1)
     assert os.path.exists(tmpfile) is not io_delete_original
 
@@ -130,7 +130,7 @@ def test_io_to_s3(
     with config.set(**s3_config, io_delete_original=io_delete_original):
         res = io_cached_func(tmpfile)
     assert res.read() == b"test"
-    assert res.path == f"test-bucket/{checksum}.txt"
+    assert res.path == f"test-bucket/{checksum}"
     assert config.SETTINGS["cache_store"].stats() == (1, 1)
 
 
