@@ -111,7 +111,7 @@ def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
         fs = get_filesystem(xr_json["href"], xr_json["xarray:storage_options"])
         filename_or_obj = fs.get_mapper(xr_json["href"])
     else:
-        if "file:local_path":
+        if "file:local_path" in xr_json:
             filename_or_obj = xr_json["file:local_path"]
         else:
             # Download local copy
