@@ -57,7 +57,8 @@ def copy_buffer(
     f_out: fsspec.spec.AbstractBufferedFile,
     buffer_size: Optional[int] = None,
 ) -> None:
-    buffer_size = io.DEFAULT_BUFFER_SIZE if buffer_size is None else buffer_size
+    if buffer_size is None:
+        buffer_size = io.DEFAULT_BUFFER_SIZE
     while True:
         data = f_in.read(buffer_size)
         if not data:
@@ -196,10 +197,7 @@ def dictify_io_object(
     _, ext = os.path.splitext(urlpath_in)
     urlpath_out = posixpath.join(config.get_cache_files_directory(), f"{root}{ext}")
 
-    protocol = fsspec.utils.get_protocol(urlpath_out)
-    fs_out = fsspec.filesystem(
-        protocol, **config.SETTINGS["cache_files_storage_options"]
-    )
+    fs_out = get_filesystem(urlpath_out)
     if not fs_out.exists(urlpath_out):
         if fs_in == fs_out:
             if config.SETTINGS["io_delete_original"]:
