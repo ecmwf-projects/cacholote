@@ -39,7 +39,7 @@ PARAMETRIZE = (
         (
             "application/vnd+zarr",
             ".zarr",
-            448,
+            None,
             {"chunks": "auto", "engine": "zarr", "consolidated": True},
         ),
     ],
@@ -61,6 +61,9 @@ def test_dictify_xr_dataset(
     with config.set(xarray_cache_type=xarray_cache_type):
         res = extra_encoders.dictify_xr_dataset(ds)
 
+    if size is None:
+        # zarr size can change depending on the filesystem
+        size = os.path.getsize(local_path)
     expected = {
         "type": xarray_cache_type,
         "href": local_path,
