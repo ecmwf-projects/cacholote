@@ -75,13 +75,14 @@ def get_filesystem(
 
 
 def dictify_file(urlpath: str) -> Dict[str, Any]:
+    fs = get_filesystem(urlpath)
+
+    # Add grib and zarr to mimetypes
     for ext in (".grib", ".grb", ".grb1", ".grb2"):
         if ext not in mimetypes.types_map:
             mimetypes.add_type("application/x-grib", ext, strict=False)
     if ".zarr" not in mimetypes.types_map:
         mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
-
-    fs = get_filesystem(urlpath)
 
     filetype = mimetypes.guess_type(urlpath, strict=False)[0]
     if filetype is None and HAS_MAGIC:
@@ -138,9 +139,7 @@ def dictify_xr_dataset(
     if not fs_out.exists(urlpath_out):
         if filetype == "application/vnd+zarr":
             # Write directly on any filesystem
-            mapper = fsspec.get_mapper(
-                urlpath_out, **config.SETTINGS["cache_files_storage_options"]
-            )
+            mapper = fs_out.get_mapper(urlpath_out)
             obj.to_zarr(mapper, consolidated=True)
         else:
             # Need a tmp local copy to write on a different filesystem
