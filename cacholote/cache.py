@@ -58,6 +58,7 @@ def cacheable(func: F) -> F:
                 # Something wrong, e.g. cached files are corrupted
                 # Warn and recreate cache value
                 warnings.warn(str(ex), UserWarning)
+                del cache_store[hexdigest]
 
         result = func(*args, **kwargs)
         try:

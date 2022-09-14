@@ -51,12 +51,13 @@ def test_copy_from_http_to_cache(
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
         with config.set(**ftp_config_settings):
+            dirfs = config.get_cache_files_dirfs()
             result = cfunc(url)
 
             # Check hit & miss
             assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-            infos.append(config.get_cache_files_dirfs().info(f"{url_checksum}"))
+            infos.append(dirfs.info(f"{url_checksum}"))
 
         # Check result
         assert result.read() == b"test"
@@ -66,3 +67,19 @@ def test_copy_from_http_to_cache(
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
+
+    if not ftp_config_settings:
+        # Warn but don't fail if file is corrupted
+        dirfs.touch(f"{url_checksum}", truncate=False)
+        touched_checksum = dirfs.checksum(f"{url_checksum}")
+        with pytest.warns(UserWarning, match="checksum mismatch"):
+            result = cfunc(url)
+            assert result.read() == b"test"
+            assert dirfs.checksum(f"{url_checksum}") != touched_checksum
+
+        # Warn but don't fail if file is deleted
+        dirfs.rm(f"{url_checksum}", recursive=True)
+        with pytest.warns(UserWarning, match="No such file or directory"):
+            result = cfunc(url)
+            assert result.read() == b"test"
+            assert dirfs.exists(f"{url_checksum}")

@@ -121,6 +121,7 @@ def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
                 **storage_options,
             ) as of:
                 filename_or_obj = of.name
+    print(filename_or_obj)
     return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 

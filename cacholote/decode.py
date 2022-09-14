@@ -39,7 +39,9 @@ def object_hook(obj: Dict[str, Any]) -> Any:
                 storage_options = v
                 break
         fs = extra_encoders.get_filesystem(obj["href"], storage_options)
-        assert fs.checksum(obj["href"]) == obj["file:checksum"], "checksum mismatch"
+        if fs.checksum(obj["href"]) != obj["file:checksum"]:
+            fs.rm(obj["href"], recursive=True)
+            raise ValueError("checksum mismatch")
 
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
