@@ -23,6 +23,7 @@ def ftp_config_settings(request) -> Generator[Dict[str, Any], None, None]:
     if request.param is False:
         yield {}
     else:
+        pytest.importorskip("pyftpdlib")
         with tempfile.TemporaryDirectory() as ftp_dir:
             popen = subprocess.Popen(
                 [

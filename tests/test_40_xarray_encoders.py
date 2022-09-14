@@ -1,3 +1,6 @@
+import tempfile
+from typing import Any, Dict
+
 import fsspec
 import pytest
 
@@ -40,20 +43,20 @@ def test_dictify_xr_dataset(tmpdir: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "xarray_cache_type,ext,identical,check_source,importorskip",
+    "xarray_cache_type,ext,importorskip",
     [
-        ("application/x-netcdf", ".nc", True, True, "netCDF4"),
-        ("application/x-grib", ".grib", False, True, "cfgrib"),
-        ("application/vnd+zarr", ".zarr", True, False, "zarr"),
+        ("application/x-netcdf", ".nc", "netCDF4"),
+        ("application/x-grib", ".grib", "cfgrib"),
+        ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
+@pytest.mark.parametrize("ftp_config_settings", [False, True], indirect=True)
 def test_xr_cacheable(
     tmpdir: str,
     xarray_cache_type: str,
     ext: str,
-    identical: bool,
-    check_source: bool,
     importorskip: str,
+    ftp_config_settings: Dict[str, Any],
 ) -> None:
     pytest.importorskip(importorskip)
 
@@ -62,24 +65,35 @@ def test_xr_cacheable(
 
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
-        with config.set(xarray_cache_type=xarray_cache_type):
+        with config.set(xarray_cache_type=xarray_cache_type, **ftp_config_settings):
             actual = cfunc()
 
-        # Check hit & miss
-        assert config.SETTINGS["cache_store"].stats() == expected_stats
+            # Check hit & miss
+            assert config.SETTINGS["cache_store"].stats() == expected_stats
+
+            infos.append(
+                config.get_cache_files_dirfs().info(
+                    f"06810be7ce1f5507be9180bfb9ff14fd{ext}"
+                )
+            )
 
         # Check result
-        if identical:
-            xr.testing.assert_identical(actual, expected)
-        else:
+        if xarray_cache_type == "application/x-grib":
             xr.testing.assert_equal(actual, expected)
+        else:
+            xr.testing.assert_identical(actual, expected)
 
         # Check source file
-        if check_source:
-            assert (
-                actual.encoding["source"]
-                == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
-            )
+        if xarray_cache_type != "application/vnd+zarr":
+            # zarr mapper is not added to encoding
+            if ftp_config_settings:
+                # we use tmp local file
+                assert actual.encoding["source"].startswith(tempfile.gettempdir())
+            else:
+                assert (
+                    actual.encoding["source"]
+                    == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
+                )
 
         # Check opened with dask
         assert dict(actual.chunks) == {
@@ -88,12 +102,6 @@ def test_xr_cacheable(
             "latitude": (61,),
             "longitude": (120,),
         }
-
-        infos.append(
-            fsspec.filesystem("file").info(
-                f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
-            )
-        )
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
