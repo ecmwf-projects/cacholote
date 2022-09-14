@@ -12,7 +12,6 @@ dependencies:
 - sphinx
 - sphinx-autoapi
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
-- aiohttp
 - cfgrib
 - dask
 - diskcache
@@ -20,8 +19,8 @@ dependencies:
 - moto
 - netCDF4
 - pip
+- pytest-httpserver
 - python-magic
-- requests
 - s3fs
 - xarray>=2022.6.0
 - zarr
