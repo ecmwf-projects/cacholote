@@ -27,7 +27,7 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
         res = extra_encoders.dictify_io_object(open(tmpfile))
     expected = {
         "type": "text/plain",
-        "href": local_path,
+        "href": f"file://{local_path}",
         "file:checksum": fsspec.filesystem("file").checksum(local_path),
         "file:size": 5,
         "file:local_path": local_path,

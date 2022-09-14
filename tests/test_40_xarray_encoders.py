@@ -1,28 +1,16 @@
-import os
-from typing import Any, Dict, TypeVar
-
 import fsspec
 import pytest
 
-from cacholote import cache, config, decode, encode, extra_encoders
+from cacholote import cache, config, extra_encoders
 
 try:
     import xarray as xr
-finally:
-    pytest.importorskip("cfgrib")
-    pytest.importorskip("dask")
+except ImportError:
     pytest.importorskip("xarray")
-    pytest.importorskip("zarr")
-
-T = TypeVar("T")
+pytest.importorskip("dask")
 
 
-def func(a: T) -> T:
-    return a
-
-
-@pytest.fixture
-def ds() -> xr.Dataset:
+def get_grib_ds() -> "xr.Dataset":
     url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
     with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
         fname = of.name
@@ -31,103 +19,81 @@ def ds() -> xr.Dataset:
     return ds.sel(number=0)
 
 
-PARAMETRIZE = (
-    "xarray_cache_type,extension,size,open_kwargs",
+def test_dictify_xr_dataset(tmpdir: str) -> None:
+    pytest.importorskip("netCDF4")
+
+    ds = xr.Dataset({"foo": [0]}, attrs={})
+    actual = extra_encoders.dictify_xr_dataset(ds)
+    checksum = fsspec.filesystem("file").checksum(
+        f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
+    )
+    expected = {
+        "type": "application/x-netcdf",
+        "href": f"file://{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
+        "file:checksum": checksum,
+        "file:size": 669,
+        "file:local_path": f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
+        "xarray:storage_options": {},
+        "xarray:open_kwargs": {"chunks": "auto"},
+    }
+    assert actual == expected
+
+
+@pytest.mark.parametrize(
+    "xarray_cache_type,ext,identical,check_source,importorskip",
     [
-        ("application/x-netcdf", ".nc", 501607, {"chunks": "auto"}),
-        ("application/x-grib", ".grib", 353088, {"chunks": "auto"}),
-        (
-            "application/vnd+zarr",
-            ".zarr",
-            None,
-            {"chunks": "auto", "engine": "zarr", "consolidated": True},
-        ),
+        ("application/x-netcdf", ".nc", True, True, "netCDF4"),
+        ("application/x-grib", ".grib", False, True, "cfgrib"),
+        ("application/vnd+zarr", ".zarr", True, False, "zarr"),
     ],
 )
-
-
-@pytest.mark.parametrize(*PARAMETRIZE)
-def test_dictify_xr_dataset(
-    ds: xr.Dataset,
-    xarray_cache_type: str,
-    extension: str,
-    size: int,
-    open_kwargs: Dict[str, Any],
-) -> None:
-    local_path = os.path.join(
-        config.SETTINGS["cache_store"].directory,
-        f"06810be7ce1f5507be9180bfb9ff14fd{extension}",
-    )
-    with config.set(xarray_cache_type=xarray_cache_type):
-        res = extra_encoders.dictify_xr_dataset(ds)
-
-    if size is None:
-        # zarr size can change depending on the filesystem
-        size = os.path.getsize(local_path)
-    expected = {
-        "type": xarray_cache_type,
-        "href": local_path,
-        "file:checksum": fsspec.filesystem("file").checksum(local_path),
-        "file:size": size,
-        "file:local_path": local_path,
-        "xarray:open_kwargs": open_kwargs,
-        "xarray:storage_options": {},
-    }
-    assert res == expected
-
-
-@pytest.mark.parametrize(*PARAMETRIZE)
-def test_xr_roundtrip(
-    ds: xr.Dataset,
-    xarray_cache_type: str,
-    extension: str,
-    size: int,
-    open_kwargs: Dict[str, Any],
-) -> None:
-    with config.set(xarray_cache_type=xarray_cache_type):
-        ds_json = encode.dumps(ds)
-        res = decode.loads(ds_json)
-
-    if xarray_cache_type == "application/x-grib":
-        xr.testing.assert_equal(res, ds)
-    else:
-        xr.testing.assert_identical(res, ds)
-
-
-@pytest.mark.parametrize(*PARAMETRIZE)
 def test_xr_cacheable(
-    ds: xr.Dataset,
+    tmpdir: str,
     xarray_cache_type: str,
-    extension: str,
-    size: int,
-    open_kwargs: Dict[str, Any],
+    ext: str,
+    identical: bool,
+    check_source: bool,
+    importorskip: str,
 ) -> None:
-    local_path = os.path.join(
-        config.SETTINGS["cache_store"].directory,
-        f"06810be7ce1f5507be9180bfb9ff14fd{extension}",
-    )
+    pytest.importorskip(importorskip)
 
-    with config.set(xarray_cache_type=xarray_cache_type):
-        cfunc = cache.cacheable(func)
+    expected = get_grib_ds()
+    cfunc = cache.cacheable(get_grib_ds)
 
-        # 1: create cached data
-        res = cfunc(ds)
-        assert config.SETTINGS["cache_store"].stats() == (0, 1)
-        assert len(config.SETTINGS["cache_store"]) == 1
-        mtime = os.path.getmtime(local_path)
+    infos = []
+    for expected_stats in ((0, 1), (1, 1)):
+        with config.set(xarray_cache_type=xarray_cache_type):
+            actual = cfunc()
 
-        if xarray_cache_type == "application/x-grib":
-            xr.testing.assert_equal(res, ds)
+        # Check hit & miss
+        assert config.SETTINGS["cache_store"].stats() == expected_stats
+
+        # Check result
+        if identical:
+            xr.testing.assert_identical(actual, expected)
         else:
-            xr.testing.assert_identical(res, ds)
+            xr.testing.assert_equal(actual, expected)
 
-        # 2: use cached data
-        res = cfunc(ds)
-        assert config.SETTINGS["cache_store"].stats() == (1, 1)
-        assert len(config.SETTINGS["cache_store"]) == 1
-        assert mtime == os.path.getmtime(local_path)
+        # Check source file
+        if check_source:
+            assert (
+                actual.encoding["source"]
+                == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
+            )
 
-        if xarray_cache_type == "application/x-grib":
-            xr.testing.assert_equal(res, ds)
-        else:
-            xr.testing.assert_identical(res, ds)
+        # Check opened with dask
+        assert dict(actual.chunks) == {
+            "time": (4,),
+            "isobaricInhPa": (2,),
+            "latitude": (61,),
+            "longitude": (120,),
+        }
+
+        infos.append(
+            fsspec.filesystem("file").info(
+                f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
+            )
+        )
+
+    # Check cached file is not modified
+    assert infos[0] == infos[1]
