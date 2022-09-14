@@ -17,12 +17,12 @@ dependencies:
 - dask
 - diskcache
 - fsspec
-- moto
 - netCDF4
 - pip
+- pyftpdlib
+- pytest-httpserver
 - python-magic
 - requests
-- s3fs
 - xarray>=2022.6.0
 - zarr
 - pip:

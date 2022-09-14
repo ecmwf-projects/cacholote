@@ -9,4 +9,6 @@ dependencies:
 - aiohttp
 - diskcache
 - fsspec
+- pyftpdlib
+- pytest-httpserver
 - requests

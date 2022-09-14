@@ -95,13 +95,11 @@ def dictify_file(urlpath: str) -> Dict[str, Any]:
 
     file_dict = {
         "type": filetype,
-        "href": urlpath,
+        "href": fs.unstrip_protocol(urlpath),
         "file:checksum": fs.checksum(urlpath),
         "file:size": fs.size(urlpath),
+        "file:local_path": fs._strip_protocol(urlpath),
     }
-
-    if fs == fsspec.filesystem("file"):
-        file_dict["file:local_path"] = urlpath
 
     return file_dict
 
@@ -111,7 +109,7 @@ def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
         fs = get_filesystem(xr_json["href"], xr_json["xarray:storage_options"])
         filename_or_obj = fs.get_mapper(xr_json["href"])
     else:
-        if "file:local_path" in xr_json:
+        if fsspec.utils.get_protocol(xr_json["href"]) == "file":
             filename_or_obj = xr_json["file:local_path"]
         else:
             # Download local copy
