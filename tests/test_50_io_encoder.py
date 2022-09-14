@@ -56,15 +56,13 @@ def test_copy_from_http_to_cache(
             # Check hit & miss
             assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-            # Check result
-            assert result.read() == b"test"
-
-            # Check file in cache
-            assert (
-                result.path == f"{'' if ftp_config_settings else tmpdir}/{url_checksum}"
-            )
-
             infos.append(config.get_cache_files_dirfs().info(f"{url_checksum}"))
+
+        # Check result
+        assert result.read() == b"test"
+
+        # Check file in cache
+        assert result.path == f"{'' if ftp_config_settings else tmpdir}/{url_checksum}"
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
