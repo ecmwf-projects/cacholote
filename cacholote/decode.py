@@ -33,14 +33,16 @@ def import_object(fully_qualified_name: str) -> Any:
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     if "file:checksum" in obj:
-        storage_options = {}
         for k, v in obj.items():
             if k.rsplit(":", 1)[-1] == "storage_options":
                 storage_options = v
                 break
+        else:
+            storage_options = {}
         fs = extra_encoders.get_filesystem(obj["href"], storage_options)
         if fs.checksum(obj["href"]) != obj["file:checksum"]:
-            fs.rm(obj["href"], recursive=True)
+            recursive = obj.get("type") == "application/vnd+zarr"
+            fs.rm(obj["href"], recursive=recursive)
             raise ValueError("checksum mismatch")
 
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:

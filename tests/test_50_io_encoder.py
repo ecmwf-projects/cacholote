@@ -45,7 +45,7 @@ def test_copy_from_http_to_cache(
 ) -> None:
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
-    url_checksum = fsspec.filesystem("http").checksum(url)
+    cached_basename = str(fsspec.filesystem("http").checksum(url))
 
     cfunc = cache.cacheable(open_url)
     infos = []
@@ -57,29 +57,40 @@ def test_copy_from_http_to_cache(
             # Check hit & miss
             assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-            infos.append(dirfs.info(f"{url_checksum}"))
+            infos.append(dirfs.info(cached_basename))
 
         # Check result
         assert result.read() == b"test"
 
         # Check file in cache
-        assert result.path == f"{'' if ftp_config_settings else tmpdir}/{url_checksum}"
+        assert (
+            result.path == f"{'' if ftp_config_settings else tmpdir}/{cached_basename}"
+        )
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
 
-    if not ftp_config_settings:
-        # Warn but don't fail if file is corrupted
-        dirfs.touch(f"{url_checksum}", truncate=False)
-        touched_checksum = dirfs.checksum(f"{url_checksum}")
-        with pytest.warns(UserWarning, match="checksum mismatch"):
-            result = cfunc(url)
-        assert result.read() == b"test"
-        assert dirfs.checksum(f"{url_checksum}") != touched_checksum
 
-        # Warn but don't fail if file is deleted
-        dirfs.rm(f"{url_checksum}", recursive=True)
-        with pytest.warns(UserWarning, match="No such file or directory"):
-            result = cfunc(url)
-        assert result.read() == b"test"
-        assert dirfs.exists(f"{url_checksum}")
+def test_io_corrupted_files(httpserver: pytest_httpserver.HTTPServer) -> None:
+    httpserver.expect_request("/test").respond_with_data(b"test")
+    url = httpserver.url_for("/test")
+    cached_basename = str(fsspec.filesystem("http").checksum(url))
+
+    cfunc = cache.cacheable(open_url)
+    dirfs = config.get_cache_files_dirfs()
+    cfunc(url)
+
+    # Warn if file is corrupted
+    dirfs.touch(cached_basename)
+    touched_info = dirfs.info(cached_basename)
+    with pytest.warns(UserWarning, match="checksum mismatch"):
+        result = cfunc(url)
+    assert result.read() == b"test"
+    assert dirfs.info(cached_basename) != touched_info
+
+    # Warn if file is deleted
+    dirfs.rm(cached_basename)
+    with pytest.warns(UserWarning, match="No such file or directory"):
+        result = cfunc(url)
+    assert result.read() == b"test"
+    assert dirfs.exists(cached_basename)
