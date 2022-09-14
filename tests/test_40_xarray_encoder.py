@@ -92,8 +92,11 @@ def test_xr_cacheable(
         if xarray_cache_type != "application/vnd+zarr":
             # zarr mapper is not added to encoding
             if ftp_config_settings:
-                # we use tmp local file
+                # read from tmp local file
                 assert actual.encoding["source"].startswith(tempfile.gettempdir())
+                assert actual.encoding["source"].endswith(
+                    f"/06810be7ce1f5507be9180bfb9ff14fd{ext}"
+                )
             else:
                 assert (
                     actual.encoding["source"]
