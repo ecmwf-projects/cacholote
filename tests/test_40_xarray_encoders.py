@@ -60,6 +60,11 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
+    if xarray_cache_type == "application/vnd+zarr" and ftp_config_settings:
+        pytest.xfail(
+            "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory."
+        )
+
     expected = get_grib_ds()
     cfunc = cache.cacheable(get_grib_ds)
 

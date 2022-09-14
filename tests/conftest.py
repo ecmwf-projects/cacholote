@@ -16,7 +16,9 @@ def set_tmpdir(tmpdir: str) -> Generator[None, None, None]:
 
 
 @pytest.fixture
-def ftp_config_settings(request) -> Generator[Dict[str, Any], None, None]:
+def ftp_config_settings(
+    request: pytest.FixtureRequest,
+) -> Generator[Dict[str, Any], None, None]:
     """
     Fixture providing a writable FTP filesystem.
     """
@@ -37,6 +39,7 @@ def ftp_config_settings(request) -> Generator[Dict[str, Any], None, None]:
                     "-P",
                     "pass",
                     "-w",
+                    "-V",
                 ]
             )
             try:
