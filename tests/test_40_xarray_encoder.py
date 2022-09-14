@@ -118,24 +118,23 @@ def test_xr_cacheable(
         with config.set(xarray_cache_type=xarray_cache_type):
             with pytest.warns(UserWarning, match="checksum mismatch"):
                 actual = cfunc()
-                if xarray_cache_type == "application/x-grib":
-                    xr.testing.assert_equal(actual, expected)
-                else:
-                    xr.testing.assert_identical(actual, expected)
+        if xarray_cache_type == "application/x-grib":
+            xr.testing.assert_equal(actual, expected)
+        else:
+            xr.testing.assert_identical(actual, expected)
 
-                assert (
-                    dirfs.checksum(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")
-                    != touched_checksum
-                )
+        assert (
+            dirfs.checksum(f"06810be7ce1f5507be9180bfb9ff14fd{ext}") != touched_checksum
+        )
 
         # Warn but don't fail if file is deleted
         dirfs.rm(f"06810be7ce1f5507be9180bfb9ff14fd{ext}", recursive=True)
         with config.set(xarray_cache_type=xarray_cache_type):
             with pytest.warns(UserWarning, match="No such file or directory"):
                 actual = cfunc()
-                if xarray_cache_type == "application/x-grib":
-                    xr.testing.assert_equal(actual, expected)
-                else:
-                    xr.testing.assert_identical(actual, expected)
+        if xarray_cache_type == "application/x-grib":
+            xr.testing.assert_equal(actual, expected)
+        else:
+            xr.testing.assert_identical(actual, expected)
 
-                assert dirfs.exists(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")
+        assert dirfs.exists(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")

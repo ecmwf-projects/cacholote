@@ -74,12 +74,12 @@ def test_copy_from_http_to_cache(
         touched_checksum = dirfs.checksum(f"{url_checksum}")
         with pytest.warns(UserWarning, match="checksum mismatch"):
             result = cfunc(url)
-            assert result.read() == b"test"
-            assert dirfs.checksum(f"{url_checksum}") != touched_checksum
+        assert result.read() == b"test"
+        assert dirfs.checksum(f"{url_checksum}") != touched_checksum
 
         # Warn but don't fail if file is deleted
         dirfs.rm(f"{url_checksum}", recursive=True)
         with pytest.warns(UserWarning, match="No such file or directory"):
             result = cfunc(url)
-            assert result.read() == b"test"
-            assert dirfs.exists(f"{url_checksum}")
+        assert result.read() == b"test"
+        assert dirfs.exists(f"{url_checksum}")
