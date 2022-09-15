@@ -105,8 +105,10 @@ class EncodeError(Exception):
 
 def filecache_default(
     obj: Any,
-    encoders: List[Tuple[Any, Callable[..., Any]]] = FILECACHE_ENCODERS,
+    encoders: Optional[List[Tuple[Any, Callable[..., Any]]]] = None,
 ) -> Any:
+    if encoders is None:
+        encoders = FILECACHE_ENCODERS
     for type_, encoder in reversed(encoders):
         if isinstance(obj, type_):
             try:

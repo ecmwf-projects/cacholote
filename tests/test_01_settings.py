@@ -40,7 +40,7 @@ def test_change_settings(tmpdir: str) -> None:
     config.set(cache_store_directory=newdir)
     assert config.SETTINGS["cache_store"].directory == newdir
 
-    with pytest.raises(KeyError, match="Wrong settings. Available settings: "):
+    with pytest.raises(ValueError, match="Wrong settings. Available settings: "):
         config.set(dummy="dummy")
 
 

@@ -13,13 +13,14 @@
 # limitations under the License.
 
 
+import functools
 import inspect
 import io
 import mimetypes
 import os
 import posixpath
 import tempfile
-from typing import Any, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.arrow
@@ -42,6 +43,7 @@ try:
 except ImportError:
     HAS_MAGIC = False
 
+F = TypeVar("F", bound=Callable[..., Any])
 
 UNION_IO_TYPES = Union[
     io.BufferedReader,
@@ -50,6 +52,16 @@ UNION_IO_TYPES = Union[
     fsspec.implementations.arrow.ArrowFile,
     fsspec.implementations.local.LocalFileOpener,
 ]
+
+
+def _requires_xarray_and_dask(func: F) -> F:
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not HAS_XARRAY_AND_DASK:
+            raise ValueError("please install 'xarray' and 'dask'")
+        return func(*args, **kwargs)
+
+    return cast(F, wrapper)
 
 
 def copy_buffer(
@@ -98,12 +110,13 @@ def dictify_file(urlpath: str) -> Dict[str, Any]:
         "href": fs.unstrip_protocol(urlpath),
         "file:checksum": fs.checksum(urlpath),
         "file:size": fs.size(urlpath),
-        "file:local_path": fs._strip_protocol(urlpath),
+        "file:local_path": fsspec.core.strip_protocol(urlpath),
     }
 
     return file_dict
 
 
+@_requires_xarray_and_dask
 def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
     if xr_json["type"] == "application/vnd+zarr":
         fs = get_filesystem(xr_json["href"], xr_json["xarray:storage_options"])
@@ -124,6 +137,7 @@ def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
     return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 
+@_requires_xarray_and_dask
 def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]

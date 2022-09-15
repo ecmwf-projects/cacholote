@@ -75,12 +75,12 @@ class set:
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
         except KeyError as ex:
-            raise KeyError(
+            raise ValueError(
                 f"Wrong settings. Available settings: {list(_SETTINGS)}"
             ) from ex
 
         _SETTINGS.update(kwargs)
-        if kwargs.get("cache_store_directory", None) is not None:
+        if kwargs.get("cache_store_directory") is not None:
             self._old["cache_store"] = _SETTINGS["cache_store"]
             _initialize_cache_store()
 

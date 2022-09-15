@@ -35,7 +35,6 @@ __all__ = [
     "config",
     "dumps",
     "extra_encoders",
-    "extra_stores",
     "filecache_default",
     "loads",
     "object_hook",
