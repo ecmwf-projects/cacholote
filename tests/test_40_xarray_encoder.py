@@ -10,7 +10,6 @@ try:
     import xarray as xr
 except ImportError:
     pytest.importorskip("xarray")
-pytest.importorskip("dask")
 
 
 def get_grib_ds() -> "xr.Dataset":
@@ -62,7 +61,7 @@ def test_xr_cacheable(
 
     if xarray_cache_type == "application/vnd+zarr" and ftp_config_settings:
         pytest.xfail(
-            "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory."
+            "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory"
         )
 
     expected = get_grib_ds()
@@ -71,16 +70,13 @@ def test_xr_cacheable(
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
         with config.set(xarray_cache_type=xarray_cache_type, **ftp_config_settings):
+            dirfs = config.get_cache_files_dirfs()
             actual = cfunc()
 
             # Check hit & miss
             assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-            infos.append(
-                config.get_cache_files_dirfs().info(
-                    f"06810be7ce1f5507be9180bfb9ff14fd{ext}"
-                )
-            )
+            infos.append(dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}"))
 
         # Check result
         if xarray_cache_type == "application/x-grib":
@@ -113,3 +109,45 @@ def test_xr_cacheable(
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
+
+
+@pytest.mark.parametrize(
+    "xarray_cache_type,ext,importorskip",
+    [
+        ("application/x-netcdf", ".nc", "netCDF4"),
+        ("application/vnd+zarr", ".zarr", "zarr"),
+    ],
+)
+def test_xr_corrupted_files(
+    tmpdir: str,
+    xarray_cache_type: str,
+    ext: str,
+    importorskip: str,
+) -> None:
+    pytest.importorskip(importorskip)
+
+    expected = get_grib_ds()
+    cfunc = cache.cacheable(get_grib_ds)
+
+    with config.set(xarray_cache_type=xarray_cache_type):
+        dirfs = config.get_cache_files_dirfs()
+        cfunc()
+
+    # Warn if file is corrupted
+    dirfs.touch(f"06810be7ce1f5507be9180bfb9ff14fd{ext}", truncate=False)
+    touched_info = dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")
+    with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
+        UserWarning, match="checksum mismatch"
+    ):
+        actual = cfunc()
+    xr.testing.assert_identical(actual, expected)
+    assert dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}") != touched_info
+
+    # Warn if file is deleted
+    dirfs.rm(f"06810be7ce1f5507be9180bfb9ff14fd{ext}", recursive=True)
+    with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
+        UserWarning, match="No such file or directory"
+    ):
+        actual = cfunc()
+    xr.testing.assert_identical(actual, expected)
+    assert dirfs.exists(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")

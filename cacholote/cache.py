@@ -39,7 +39,7 @@ def cacheable(func: F) -> F:
                 **kwargs,
             )
         except encode.EncodeError:
-            warnings.warn("encoding issues: bad input", UserWarning)
+            warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
         hexdigest = hexdigestify(call_json)
@@ -58,12 +58,13 @@ def cacheable(func: F) -> F:
                 # Something wrong, e.g. cached files are corrupted
                 # Warn and recreate cache value
                 warnings.warn(str(ex), UserWarning)
+                del cache_store[hexdigest]
 
         result = func(*args, **kwargs)
         try:
             cached = encode.dumps(result)
         except encode.EncodeError:
-            warnings.warn("encoding issues: bad output", UserWarning)
+            warnings.warn("can NOT encode output", UserWarning)
             return result
 
         cache_store[hexdigest] = cached

@@ -207,7 +207,6 @@ def dictify_io_object(
                 urlpath_out, "wb"
             ) as f_out:
                 copy_buffer(f_in, f_out)
-
             if config.SETTINGS["io_delete_original"]:
                 fs_in.rm(urlpath_in)
 

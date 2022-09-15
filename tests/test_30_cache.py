@@ -62,10 +62,10 @@ def test_cacheable(settings: Dict[str, Any]) -> None:
             pass
 
         inst = Dummy()
-        with pytest.warns(UserWarning, match="bad input"):
+        with pytest.warns(UserWarning, match="can NOT encode python call"):
             res = cfunc(inst)
         assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
 
-        with pytest.warns(UserWarning, match="bad output"):
+        with pytest.warns(UserWarning, match="can NOT encode output"):
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
