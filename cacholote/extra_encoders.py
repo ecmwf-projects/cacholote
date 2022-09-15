@@ -124,9 +124,7 @@ def decode_xr_dataset(xr_json: Dict[str, Any]) -> "xr.Dataset":
     return xr.open_dataset(filename_or_obj, **xr_json["xarray:open_kwargs"])
 
 
-def dictify_xr_dataset(
-    obj: "xr.Dataset",
-) -> Dict[str, Any]:
+def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
 
@@ -178,9 +176,7 @@ def dictify_xr_dataset(
     return xr_json
 
 
-def dictify_io_object(
-    obj: UNION_IO_TYPES,
-) -> Dict[str, Any]:
+def dictify_io_object(obj: UNION_IO_TYPES) -> Dict[str, Any]:
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
