@@ -4,7 +4,7 @@ from typing import Any, Dict
 import fsspec
 import pytest
 
-from cacholote import cache, config, extra_encoders
+from cacholote import cache, config, extra_encoders, utils
 
 try:
     import xarray as xr
@@ -70,7 +70,7 @@ def test_xr_cacheable(
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
         with config.set(xarray_cache_type=xarray_cache_type, **ftp_config_settings):
-            dirfs = config.get_cache_files_dirfs()
+            dirfs = utils.get_cache_files_dirfs()
             actual = cfunc()
 
             # Check hit & miss
@@ -130,7 +130,7 @@ def test_xr_corrupted_files(
     cfunc = cache.cacheable(get_grib_ds)
 
     with config.set(xarray_cache_type=xarray_cache_type):
-        dirfs = config.get_cache_files_dirfs()
+        dirfs = utils.get_cache_files_dirfs()
         cfunc()
 
     # Warn if file is corrupted

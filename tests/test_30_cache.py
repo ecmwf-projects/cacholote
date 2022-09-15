@@ -25,13 +25,6 @@ def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
         return LocalClass()
 
 
-def test_hexdigestify() -> None:
-    text = "some random Unicode text \U0001f4a9"
-    expected = "278a2cefeef9a3269f4ba1c41ad733a4c07101ae6859f607c8a42cf2"
-    res = cache.hexdigestify(text)
-    assert res == expected
-
-
 @pytest.mark.parametrize("settings", SETTINGS_LIST)
 def test_cacheable(settings: Dict[str, Any]) -> None:
 

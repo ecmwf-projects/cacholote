@@ -1,3 +1,4 @@
+"""Public decorator."""
 # Copyright 2019, B-Open Solutions srl.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +15,18 @@
 
 
 import functools
-import hashlib
 import warnings
 from typing import Any, Callable, TypeVar, cast
 
-from . import decode, encode
+from . import decode, encode, utils
 from .config import SETTINGS
 
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def hexdigestify(text: str) -> str:
-    hash_req = hashlib.sha3_224(text.encode())
-    return hash_req.hexdigest()
-
-
 def cacheable(func: F) -> F:
+    """Make a function cacheable."""
+
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
@@ -42,7 +39,7 @@ def cacheable(func: F) -> F:
             warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
-        hexdigest = hexdigestify(call_json)
+        hexdigest = utils.hexdigestify(call_json)
         cache_store = SETTINGS["cache_store"]
         try:
             # Use try/except to update stats correctly

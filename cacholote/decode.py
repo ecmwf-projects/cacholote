@@ -1,3 +1,4 @@
+"""Decode JSON data."""
 # Copyright 2019, B-Open Solutions srl.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,10 +18,11 @@ import importlib
 import json
 from typing import Any, Dict, Union
 
-from . import extra_encoders
+from . import extra_encoders, utils
 
 
 def import_object(fully_qualified_name: str) -> Any:
+    """Import python objects defined by fully qualified names ('module:qualname')."""
     # FIXME: apply exclude/include-rules to `fully_qualified_name`
     if ":" not in fully_qualified_name:
         raise ValueError(f"{fully_qualified_name!r} not in the form 'module:qualname'")
@@ -32,6 +34,7 @@ def import_object(fully_qualified_name: str) -> Any:
 
 
 def object_hook(obj: Dict[str, Any]) -> Any:
+    """Decode deserialized JSON data (dict)."""
     if "file:checksum" in obj:
         for k, v in obj.items():
             if k.rsplit(":", 1)[-1] == "storage_options":
@@ -39,7 +42,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
                 break
         else:
             storage_options = {}
-        fs = extra_encoders.get_filesystem(obj["href"], storage_options)
+        fs = utils.get_filesystem_from_urlpath(obj["href"], storage_options)
         if fs.checksum(obj["href"]) != obj["file:checksum"]:
             recursive = obj.get("type") == "application/vnd+zarr"
             fs.rm(obj["href"], recursive=recursive)
@@ -66,5 +69,18 @@ def object_hook(obj: Dict[str, Any]) -> Any:
     return obj
 
 
-def loads(obj: Union[str, bytes], **kwargs: Any) -> Any:
+def loads(obj: Union[str, bytes, bytearray], **kwargs: Any) -> Any:
+    """Decode JSON data to a python object.
+
+    Parameters
+    ----------
+    obj: str, bytes, bytearray
+        Opened JSON.
+    **kwargs: Any
+        Keyword arguments for `json.loads`
+
+    Returns
+    -------
+    Any
+    """
     return json.loads(obj, object_hook=object_hook, **kwargs)

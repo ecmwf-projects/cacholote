@@ -1,8 +1,4 @@
-"""
-Handle global settings.
-
-SETTINGS can be imported elsewhere to use global settings.
-"""
+"""Global settings."""
 
 # Copyright 2019, B-Open Solutions srl.
 #
@@ -24,10 +20,8 @@ from types import MappingProxyType, TracebackType
 from typing import Any, Dict, Optional, Type
 
 import diskcache
-import fsspec
-import fsspec.implementations.dirfs
 
-EXTENSIONS = MappingProxyType(
+_EXTENSIONS = MappingProxyType(
     {
         "application/x-netcdf": ".nc",
         "application/x-grib": ".grib",
@@ -38,7 +32,7 @@ _SETTINGS: Dict[str, Any] = {
     "cache_store_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
     "cache_files_urlpath": None,
     "cache_files_storage_options": {},
-    "xarray_cache_type": list(EXTENSIONS)[0],
+    "xarray_cache_type": list(_EXTENSIONS)[0],
     "io_delete_original": False,
 }
 
@@ -56,7 +50,28 @@ SETTINGS = MappingProxyType(_SETTINGS)
 
 
 class set:
-    # TODO: Add docstring
+    """Customize cacholote settings.
+
+    It is possible to use it either as a context manager, or to configure global settings.
+
+    Parameters
+    ----------
+    cache_store_directory : str, default: system-specific-tmpdir/cacholote
+        Directory for the cache store.
+    cache_files_urlpath : str, optional, default: None
+        URL for cache files.
+        * None: store cache files in `cache_store_directory`
+    cache_files_storage_options : dict, default: {}
+        `fsspec` storage options for storing cache files.
+    xarray_cache_type : {"application/x-netcdf", "application/x-grib", "application/vnd+zarr"}, \
+        default: "application/x-netcdf"
+        Type for `xarray` cache files.
+    io_delete_original: bool, default: False
+        Whether to delete the original copy of cached files.
+    cache_store:
+        Key-value store object for the cache. Mutually exclusive with `cache_store_directory`.
+    """
+
     def __init__(self, **kwargs: Any):
 
         if "cache_store" in kwargs:
@@ -68,9 +83,9 @@ class set:
 
         if (
             "xarray_cache_type" in kwargs
-            and kwargs["xarray_cache_type"] not in EXTENSIONS
+            and kwargs["xarray_cache_type"] not in _EXTENSIONS
         ):
-            raise ValueError(f"'xarray_cache_type' must be one of {list(EXTENSIONS)}")
+            raise ValueError(f"'xarray_cache_type' must be one of {list(_EXTENSIONS)}")
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
@@ -94,20 +109,3 @@ class set:
         exc_tb: Optional[TracebackType],
     ) -> None:
         _SETTINGS.update(self._old)
-
-
-def get_cache_files_directory() -> str:
-    if SETTINGS["cache_files_urlpath"] is SETTINGS["cache_store_directory"] is None:
-        raise ValueError(
-            "please set 'cache_files_urlpath' and 'cache_files_storage_options'"
-        )
-    if SETTINGS["cache_files_urlpath"] is None:
-        return str(SETTINGS["cache_store_directory"])
-    return str(SETTINGS["cache_files_urlpath"])
-
-
-def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
-    cache_files_directory = get_cache_files_directory()
-    protocol = fsspec.utils.get_protocol(cache_files_directory)
-    fs = fsspec.filesystem(protocol, **SETTINGS["cache_files_storage_options"])
-    return fsspec.implementations.dirfs.DirFileSystem(cache_files_directory, fs)

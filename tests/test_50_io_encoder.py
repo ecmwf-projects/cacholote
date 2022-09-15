@@ -4,7 +4,7 @@ import fsspec
 import pytest
 import pytest_httpserver
 
-from cacholote import cache, config, extra_encoders
+from cacholote import cache, config, extra_encoders, utils
 
 
 def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
@@ -51,7 +51,7 @@ def test_copy_from_http_to_cache(
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
         with config.set(**ftp_config_settings):
-            dirfs = config.get_cache_files_dirfs()
+            dirfs = utils.get_cache_files_dirfs()
             result = cfunc(url)
 
             # Check hit & miss
@@ -77,7 +77,7 @@ def test_io_corrupted_files(httpserver: pytest_httpserver.HTTPServer) -> None:
     cached_basename = str(fsspec.filesystem("http").checksum(url))
 
     cfunc = cache.cacheable(open_url)
-    dirfs = config.get_cache_files_dirfs()
+    dirfs = utils.get_cache_files_dirfs()
     cfunc(url)
 
     # Warn if file is corrupted

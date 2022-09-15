@@ -1,3 +1,4 @@
+"""Encode to JSON data."""
 # Copyright 2019, B-Open Solutions srl.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,11 +41,10 @@ def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]
         fully_qualified_name = obj
     else:
         fully_qualified_name = inspect_fully_qualified_name(obj)
-    object_simple = {
+    return {
         "type": "python_object",
         "fully_qualified_name": fully_qualified_name,
     }
-    return object_simple
 
 
 def dictify_python_call(
@@ -89,7 +89,7 @@ def dictify_pickable(obj: Any) -> Dict[str, Any]:
     return dictify_python_call(pickle.loads, pickle.dumps(obj))
 
 
-FILECACHE_ENCODERS: List[Tuple[Any, Callable[..., Any]]] = [
+FILECACHE_ENCODERS: List[Tuple[Any, Callable[[Any], Dict[str, Any]]]] = [
     (object, dictify_pickable),
     (collections.abc.Callable, dictify_python_object),
     (bytes, dictify_bytes),
@@ -105,8 +105,22 @@ class EncodeError(Exception):
 
 def filecache_default(
     obj: Any,
-    encoders: Optional[List[Tuple[Any, Callable[..., Any]]]] = None,
-) -> Any:
+    encoders: Optional[List[Tuple[Any, Callable[[Any], Dict[str, Any]]]]] = None,
+) -> Dict[str, Any]:
+    """Serialize objects that are not JSON-serializable.
+
+    Parameters
+    ----------
+    obj: Any
+        Object to encode
+    encoders: list, optional
+        List of tuples of the form (type, function_to_dictify_type).
+        * None: Use default cacholote.encode.FILECACHE_ENCODERS
+
+    Returns
+    -------
+    dict
+    """
     if encoders is None:
         encoders = FILECACHE_ENCODERS
     for type_, encoder in reversed(encoders):
@@ -120,11 +134,24 @@ def filecache_default(
 
 def dumps(
     obj: Any,
-    separators: Optional[Tuple[str, str]] = (",", ":"),
     **kwargs: Any,
 ) -> str:
-    default = filecache_default
-    return json.dumps(obj, separators=separators, default=default, **kwargs)
+    """Serialize object to JSON formatted string.
+
+    Parameters
+    ----------
+    obj: Any
+        Object to serialize
+    **kwargs:
+        Keyword argument for json.dumps
+
+    Returns
+    -------
+    str
+    """
+    kwargs.setdefault("separators", (",", ":"))
+    kwargs.setdefault("default", filecache_default)
+    return json.dumps(obj, **kwargs)
 
 
 def dumps_python_call(
@@ -132,5 +159,20 @@ def dumps_python_call(
     *args: Any,
     **kwargs: Any,
 ) -> str:
+    """Serialize python call to JSON formatted string.
+
+    Parameters
+    ----------
+    func: str, callable
+        Function to serialize
+    *args: Any
+        Arguments to serialize
+    **kwargs: Any
+        Keyword argument to serialize
+
+    Returns
+    -------
+    str
+    """
     python_call = dictify_python_call(func, *args, **kwargs)
     return dumps(python_call)

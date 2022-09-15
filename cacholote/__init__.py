@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import config, extra_encoders
+from . import config, extra_encoders, utils
 from .cache import cacheable
-from .decode import loads, object_hook
-from .encode import dumps, filecache_default
+from .decode import loads
+from .encode import dumps
 
 try:
     # NOTE: the `version.py` file must not be present in the git repository
@@ -35,7 +35,6 @@ __all__ = [
     "config",
     "dumps",
     "extra_encoders",
-    "filecache_default",
     "loads",
-    "object_hook",
+    "utils",
 ]
