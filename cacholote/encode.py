@@ -107,7 +107,7 @@ def filecache_default(
     obj: Any,
     encoders: Optional[List[Tuple[Any, Callable[[Any], Dict[str, Any]]]]] = None,
 ) -> Dict[str, Any]:
-    """Serialize objects that are not JSON-serializable.
+    """Dictify objects that are not JSON-serializable.
 
     Parameters
     ----------
