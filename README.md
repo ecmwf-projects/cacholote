@@ -31,18 +31,19 @@ Before pushing to GitHub, run the following commands:
 >>> from timeit import repeat
 
 >>> @cacholote.cacheable
-... def cached_sleep(x):
+... def cached_func(x):
 ...     sleep(x)
 ...     return x
 
 >>> with TemporaryDirectory() as tmpdir, cacholote.config.set(cache_store_directory=tmpdir):
-...    nocache_time, *cache_times = repeat(lambda: cached_sleep(1), number=1, repeat=5)
-...    cache_result = cached_sleep(1)
+...    timings = repeat(lambda: cached_func(1), number=1, repeat=5)
+...    cached_result = cached_func(1)
 
->>> cache_result
+>>> cached_result
 1
 
->>> assert nocache_time > 1 and all(t < 1 for t in cache_times)
+>>> [int(t) for t in timings]
+[1, 0, 0, 0, 0]
 
 ```
 
