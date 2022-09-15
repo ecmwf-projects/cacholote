@@ -24,32 +24,25 @@ Before pushing to GitHub, run the following commands:
 ## Quick-start
 
 ```python
-import time
-import timeit
-import cacholote
+>>> import cacholote
 
-cacholote.config.set(cache_store_directory="path/to/cache/dir")
+>>> from tempfile import TemporaryDirectory
+>>> from time import sleep
+>>> from timeit import repeat
 
-@cacholote.cacheable
-def cached_sleep(x):
-    time.sleep(x)
-    return x
+>>> @cacholote.cacheable
+... def cached_sleep(x):
+...     sleep(x)
+...     return x
 
-times = timeit.repeat(lambda: cached_sleep(10), number=1, repeat=5)
-print(times)  # First execution takes about 10s, then almost 0s
+>>> with TemporaryDirectory() as tmpdir, cacholote.config.set(cache_store_directory=tmpdir):
+...    nocache_time, *cache_times = repeat(lambda: cached_sleep(1), number=1, repeat=5)
+...    cache_result = cached_sleep(1)
 
-assert cached_sleep(10) == 10
+>>> cache_result
+1
 
-# Change settings using a context manager:
-with cacholote.config.set(cache_store_directory="new/path/to/cache/dir"):
-    cached_sleep(10)
-
-# Show all available settings:
-print(cacholote.config.SETTINGS)
-
-# To use a custom key/value store other than diskcache (e.g., Redis/Pymemcache):
-import redis
-cacholote.config.set(cache_store=redis.Redis())
+>>> assert nocache_time > 1 and all(t < 1 for t in cache_times)
 
 ```
 
