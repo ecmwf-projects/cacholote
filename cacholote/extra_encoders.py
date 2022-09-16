@@ -81,16 +81,14 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
                 filetype = None
     filetype = filetype or "unknown"
 
-    if hasattr(fs, "url"):
-        # Use HTTP pre-signed url
-        href = fs.url(urlpath)
-        storage_options: Dict[str, Any] = {}
-        fs = utils.get_filesystem_from_urlpath(href, storage_options)
-    else:
-        href = fs.unstrip_protocol(urlpath)
-        storage_options = fs.storage_options
+    # When available, use presigned URL to access path by HTTP
+    # TODO: specify kwargs such as expires
+    use_http = hasattr(fs, "url")
+    href = fs.url(urlpath) if use_http else fs.unstrip_protocol(urlpath)
+    storage_options: Dict[str, Any] = {} if use_http else fs.storage_options
+    fs = utils.get_filesystem_from_urlpath(href, storage_options)
 
-    file_dict = {
+    return {
         "type": filetype,
         "href": href,
         "file:checksum": fs.checksum(href),
@@ -98,8 +96,6 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
         "file:local_path": fsspec.core.strip_protocol(urlpath),
         "storage_options": storage_options,
     }
-
-    return file_dict
 
 
 @_requires_xarray_and_dask
