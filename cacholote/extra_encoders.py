@@ -24,7 +24,6 @@ import tempfile
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
 import fsspec
-import fsspec.implementations.arrow
 import fsspec.implementations.local
 
 from . import config, encode, utils
@@ -50,13 +49,12 @@ _UNION_IO_TYPES = Union[
     io.BufferedReader,
     io.TextIOWrapper,
     fsspec.spec.AbstractBufferedFile,
-    fsspec.implementations.arrow.ArrowFile,
     fsspec.implementations.local.LocalFileOpener,
 ]
 
 
 def _requires_xarray_and_dask(func: F) -> F:
-    """Raise an error if xarray or dask are not installed."""
+    """Raise an error if `xarray` or `dask` are not installed."""
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -100,7 +98,7 @@ def _dictify_file(urlpath: str) -> Dict[str, Any]:
 
 @_requires_xarray_and_dask
 def decode_xr_dataset(xr_dict: Dict[str, Any]) -> "xr.Dataset":
-    """Decode xarray Dataset from JSON deserialized data (dict)."""
+    """Decode ``xr.Dataset`` from JSON deserialized data (``dict``)."""
     if xr_dict["type"] == "application/vnd+zarr":
         fs = utils.get_filesystem_from_urlpath(
             xr_dict["href"], xr_dict["xarray:storage_options"]
@@ -157,7 +155,7 @@ def _store_xr_dataset(
 
 @_requires_xarray_and_dask
 def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
-    """Encode xarray Dataset to JSON deserialized data (dict)."""
+    """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
 
@@ -206,7 +204,7 @@ def _store_io_object(
 
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
-    """Encode file objects to JSON deserialized data (dict)."""
+    """Encode a file object to JSON deserialized data (``dict``)."""
     if "w" in obj.mode:
         raise ValueError("write-mode objects can NOT be cached.")
 
@@ -246,7 +244,6 @@ def register_all() -> None:
         io.BufferedReader,
         io.TextIOWrapper,
         fsspec.spec.AbstractBufferedFile,
-        fsspec.implementations.arrow.ArrowFile,
         fsspec.implementations.local.LocalFileOpener,
     ):
         encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))

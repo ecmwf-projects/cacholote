@@ -22,8 +22,8 @@ from . import extra_encoders, utils
 
 
 def import_object(fully_qualified_name: str) -> Any:
-    """Import python objects defined by fully qualified names ('module:qualname')."""
-    # FIXME: apply exclude/include-rules to `fully_qualified_name`
+    """Import python objects defined by fully qualified names (``'module:qualname'``)."""
+    # FIXME: apply exclude/include-rules to ``fully_qualified_name``
     if ":" not in fully_qualified_name:
         raise ValueError(f"{fully_qualified_name!r} not in the form 'module:qualname'")
     module_name, _, object_name = fully_qualified_name.partition(":")
@@ -34,7 +34,7 @@ def import_object(fully_qualified_name: str) -> Any:
 
 
 def object_hook(obj: Dict[str, Any]) -> Any:
-    """Decode deserialized JSON data (dict)."""
+    """Decode deserialized JSON data (``dict``)."""
     if "file:checksum" in obj:
         for k, v in obj.items():
             if k.rsplit(":", 1)[-1] == "storage_options":
@@ -70,14 +70,14 @@ def object_hook(obj: Dict[str, Any]) -> Any:
 
 
 def loads(obj: Union[str, bytes, bytearray], **kwargs: Any) -> Any:
-    """Decode JSON data to a python object.
+    """Decode serialized JSON data to a python object.
 
     Parameters
     ----------
     obj: str, bytes, bytearray
-        Opened JSON.
+        Serialized JSON data.
     **kwargs: Any
-        Keyword arguments for `json.loads`
+        Keyword arguments for ``json.loads``
 
     Returns
     -------

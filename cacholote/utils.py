@@ -45,7 +45,7 @@ def get_cache_files_directory() -> str:
 
 
 def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
-    """Return the fsspec directory filesystem where cache files are stored."""
+    """Return the ``fsspec`` directory filesystem where cache files are stored."""
     cache_files_directory = get_cache_files_directory()
     protocol = fsspec.utils.get_protocol(cache_files_directory)
     fs = fsspec.filesystem(protocol, **config.SETTINGS["cache_files_storage_options"])
@@ -55,7 +55,7 @@ def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
 def get_filesystem_from_urlpath(
     urlpath: str, storage_options: Dict[str, Any]
 ) -> fsspec.AbstractFileSystem:
-    """Return the fsspec filesystem inferred from the URL protocol.
+    """Return the ``fsspec`` filesystem inferred from the URL protocol.
 
     Parameters
     ----------
@@ -85,7 +85,7 @@ def copy_buffered_file(
         Source and destination buffered files.
     buffer_size: int, optional, default=None
         Maximum size for chunks in bytes.
-        * None: use io.DEFAULT_BUFFER_SIZE
+        None: use ``io.DEFAULT_BUFFER_SIZE``
     """
     if buffer_size is None:
         buffer_size = io.DEFAULT_BUFFER_SIZE

@@ -56,20 +56,20 @@ class set:
 
     Parameters
     ----------
-    cache_store_directory : str, default: system-specific-tmpdir/cacholote
-        Directory for the cache store.
-    cache_files_urlpath : str, optional, default: None
+    cache_store_directory : str, default: "system-specific-tmpdir/cacholote"
+        Directory for the cache store. Mutually exclusive with ``cache_store``.
+    cache_files_urlpath : str, None, default: None
         URL for cache files.
-        * None: store cache files in `cache_store_directory`
+        None: same as ``cache_store_directory``
     cache_files_storage_options : dict, default: {}
-        `fsspec` storage options for storing cache files.
+        ``fsspec`` storage options for storing cache files.
     xarray_cache_type : {"application/x-netcdf", "application/x-grib", "application/vnd+zarr"}, \
         default: "application/x-netcdf"
-        Type for `xarray` cache files.
+        Type for ``xarray`` cache files.
     io_delete_original: bool, default: False
         Whether to delete the original copy of cached files.
     cache_store:
-        Key-value store object for the cache. Mutually exclusive with `cache_store_directory`.
+        Key-value store object for the cache. Mutually exclusive with ``cache_store_directory``.
     """
 
     def __init__(self, **kwargs: Any):

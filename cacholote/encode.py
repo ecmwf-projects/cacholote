@@ -114,8 +114,8 @@ def filecache_default(
     obj: Any
         Object to encode
     encoders: list, optional
-        List of tuples of the form (type, function_to_dictify_type).
-        * None: Use default cacholote.encode.FILECACHE_ENCODERS
+        List of tuples of the form ``(type, encoder)``.
+        None: Use default ``cacholote.encode.FILECACHE_ENCODERS``
 
     Returns
     -------
@@ -143,7 +143,7 @@ def dumps(
     obj: Any
         Object to serialize
     **kwargs:
-        Keyword argument for json.dumps
+        Keyword arguments of ``json.dumps``
 
     Returns
     -------
@@ -166,9 +166,9 @@ def dumps_python_call(
     func: str, callable
         Function to serialize
     *args: Any
-        Arguments to serialize
+        Arguments of ``func``
     **kwargs: Any
-        Keyword argument to serialize
+        Keyword arguments of ``func``
 
     Returns
     -------
