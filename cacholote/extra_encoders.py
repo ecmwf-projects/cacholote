@@ -71,10 +71,7 @@ def _requires_xarray_and_dask(func: F) -> F:
     return cast(F, wrapper)
 
 
-def _dictify_file(urlpath: str) -> Dict[str, Any]:
-    fs = utils.get_filesystem_from_urlpath(
-        urlpath, config.SETTINGS["cache_files_storage_options"]
-    )
+def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]:
 
     filetype = mimetypes.guess_type(urlpath, strict=False)[0]
     if filetype is None and _HAS_MAGIC:
@@ -84,12 +81,22 @@ def _dictify_file(urlpath: str) -> Dict[str, Any]:
                 filetype = None
     filetype = filetype or "unknown"
 
+    if hasattr(fs, "url"):
+        # Use HTTP pre-signed url
+        href = fs.url(urlpath)
+        storage_options: Dict[str, Any] = {}
+        fs = utils.get_filesystem_from_urlpath(href, storage_options)
+    else:
+        href = fs.unstrip_protocol(urlpath)
+        storage_options = fs.storage_options
+
     file_dict = {
         "type": filetype,
-        "href": fs.unstrip_protocol(urlpath),
-        "file:checksum": fs.checksum(urlpath),
-        "file:size": fs.size(urlpath),
+        "href": href,
+        "file:checksum": fs.checksum(href),
+        "file:size": fs.size(href),
         "file:local_path": fsspec.core.strip_protocol(urlpath),
+        "storage_options": storage_options,
     }
 
     return file_dict
@@ -168,8 +175,8 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     if not fs_out.exists(urlpath_out):
         _store_xr_dataset(obj, fs_out, urlpath_out, filetype)
 
-    xr_dict = _dictify_file(urlpath_out)
-    xr_dict["xarray:storage_options"] = config.SETTINGS["cache_files_storage_options"]
+    xr_dict = _dictify_file(fs_out, urlpath_out)
+    xr_dict["xarray:storage_options"] = xr_dict.pop("storage_options")
     if filetype == "application/vnd+zarr":
         xr_dict["xarray:open_kwargs"] = {
             "engine": "zarr",
@@ -224,17 +231,17 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     if not fs_out.exists(urlpath_out):
         _store_io_object(fs_in, urlpath_in, fs_out, urlpath_out)
 
-    io_json = _dictify_file(urlpath_out)
+    io_dict = _dictify_file(fs_out, urlpath_out)
     params = inspect.signature(open).parameters
     open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
-    io_json.update(
+    io_dict.update(
         {
-            "tmp:storage_options": config.SETTINGS["cache_files_storage_options"],
+            "tmp:storage_options": io_dict.pop("storage_options"),
             "tmp:open_kwargs": open_kwargs,
         }
     )
 
-    return io_json
+    return io_dict
 
 
 def register_all() -> None:
