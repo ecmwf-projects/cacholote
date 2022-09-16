@@ -52,6 +52,12 @@ _UNION_IO_TYPES = Union[
     fsspec.implementations.local.LocalFileOpener,
 ]
 
+# Add netcdf, grib, and zarr to mimetypes
+mimetypes.add_type("application/netcdf", ".nc", strict=True)
+for ext in (".grib", ".grb", ".grb1", ".grb2"):
+    mimetypes.add_type("application/x-grib", ext, strict=False)
+mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
+
 
 def _requires_xarray_and_dask(func: F) -> F:
     """Raise an error if `xarray` or `dask` are not installed."""
@@ -69,13 +75,6 @@ def _dictify_file(urlpath: str) -> Dict[str, Any]:
     fs = utils.get_filesystem_from_urlpath(
         urlpath, config.SETTINGS["cache_files_storage_options"]
     )
-
-    # Add grib and zarr to mimetypes
-    for ext in (".grib", ".grb", ".grb1", ".grb2"):
-        if ext not in mimetypes.types_map:
-            mimetypes.add_type("application/x-grib", ext, strict=False)
-    if ".zarr" not in mimetypes.types_map:
-        mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
 
     filetype = mimetypes.guess_type(urlpath, strict=False)[0]
     if filetype is None and _HAS_MAGIC:
@@ -134,7 +133,7 @@ def _store_xr_dataset(
             basename = os.path.basename(urlpath)
             tmpfilename = os.path.join(tmpdirname, basename)
 
-            if filetype == "application/x-netcdf":
+            if filetype == "application/netcdf":
                 obj.to_netcdf(tmpfilename)
             elif filetype == "application/x-grib":
                 import cfgrib.xarray_to_grib
@@ -160,7 +159,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
 
     filetype = config.SETTINGS["xarray_cache_type"]
-    ext = config._EXTENSIONS[filetype]
+    ext = mimetypes.guess_extension(filetype, strict=False)
     urlpath_out = posixpath.join(utils.get_cache_files_directory(), f"{root}{ext}")
 
     fs_out = utils.get_filesystem_from_urlpath(

@@ -30,7 +30,7 @@ def test_dictify_xr_dataset(tmpdir: str) -> None:
         f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
     )
     expected = {
-        "type": "application/x-netcdf",
+        "type": "application/netcdf",
         "href": f"file://{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
         "file:checksum": checksum,
         "file:size": 669,
@@ -44,7 +44,7 @@ def test_dictify_xr_dataset(tmpdir: str) -> None:
 @pytest.mark.parametrize(
     "xarray_cache_type,ext,importorskip",
     [
-        ("application/x-netcdf", ".nc", "netCDF4"),
+        ("application/netcdf", ".nc", "netCDF4"),
         ("application/x-grib", ".grib", "cfgrib"),
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
@@ -114,7 +114,7 @@ def test_xr_cacheable(
 @pytest.mark.parametrize(
     "xarray_cache_type,ext,importorskip",
     [
-        ("application/x-netcdf", ".nc", "netCDF4"),
+        ("application/netcdf", ".nc", "netCDF4"),
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )

@@ -17,22 +17,23 @@
 import os
 import tempfile
 from types import MappingProxyType, TracebackType
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, List, Optional, Type
 
 import diskcache
 
-_EXTENSIONS = MappingProxyType(
-    {
-        "application/x-netcdf": ".nc",
-        "application/x-grib": ".grib",
-        "application/vnd+zarr": ".zarr",
-    }
-)
+_ALLOWED_SETTINGS: Dict[str, List[Any]] = {
+    "xarray_cache_type": [
+        "application/netcdf",
+        "application/x-grib",
+        "application/vnd+zarr",
+    ]
+}
+
 _SETTINGS: Dict[str, Any] = {
     "cache_store_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
     "cache_files_urlpath": None,
     "cache_files_storage_options": {},
-    "xarray_cache_type": list(_EXTENSIONS)[0],
+    "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
 }
 
@@ -63,8 +64,8 @@ class set:
         None: same as ``cache_store_directory``
     cache_files_storage_options : dict, default: {}
         ``fsspec`` storage options for storing cache files.
-    xarray_cache_type : {"application/x-netcdf", "application/x-grib", "application/vnd+zarr"}, \
-        default: "application/x-netcdf"
+    xarray_cache_type : {"application/netcdf", "application/x-grib", "application/vnd+zarr"}, \
+        default: "application/netcdf"
         Type for ``xarray`` cache files.
     io_delete_original: bool, default: False
         Whether to delete the original copy of cached files.
@@ -74,18 +75,16 @@ class set:
 
     def __init__(self, **kwargs: Any):
 
+        for k, v in kwargs.items():
+            if k in _ALLOWED_SETTINGS and v not in _ALLOWED_SETTINGS[k]:
+                raise ValueError(f"{k!r} must be one of {_ALLOWED_SETTINGS[k]!r}")
+
         if "cache_store" in kwargs:
             if "cache_store_directory" in kwargs:
                 raise ValueError(
                     "'cache_store' and 'cache_store_directory' are mutually exclusive"
                 )
             kwargs["cache_store_directory"] = None
-
-        if (
-            "xarray_cache_type" in kwargs
-            and kwargs["xarray_cache_type"] not in _EXTENSIONS
-        ):
-            raise ValueError(f"'xarray_cache_type' must be one of {list(_EXTENSIONS)}")
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
