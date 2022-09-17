@@ -102,10 +102,10 @@ def set_cache(
                 popen.terminate()
                 popen.wait()
     elif request.param == "s3":
+        botocore_session = pytest.importorskip("botocore.session")
+        s3fs = pytest.importorskip("s3fs")
         """Yields properly configured S3FileSystem instance + test bucket name"""
         with s3_base():
-            botocore_session = pytest.importorskip("botocore.session")
-            s3fs = pytest.importorskip("s3fs")
             test_bucket_name = "test-bucket"
             session = botocore_session.Session()
             client = session.create_client("s3", endpoint_url=ENDPOINT_URI)
