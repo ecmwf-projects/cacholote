@@ -21,20 +21,29 @@ def get_grib_ds() -> "xr.Dataset":
     return ds.sel(number=0)
 
 
-def test_dictify_xr_dataset(tmpdir: str) -> None:
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+def test_dictify_xr_dataset(tmpdir: str, set_cache: str) -> None:
     pytest.importorskip("netCDF4")
 
     ds = xr.Dataset({"foo": [0]}, attrs={})
     actual = extra_encoders.dictify_xr_dataset(ds)
-    checksum = fsspec.filesystem("file").checksum(
-        f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
-    )
+    if set_cache == "s3":
+        href = actual["href"]
+        assert href.startswith(
+            "http://127.0.0.1:5555/test-bucket/247fd17e087ae491996519c097e70e48.nc"
+        )
+        checksum = fsspec.filesystem("http").checksum(href)
+        local_dir = "test-bucket"
+    else:
+        href = f"{set_cache}://{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
+        checksum = fsspec.filesystem(set_cache).checksum(href)
+        local_dir = tmpdir
     expected = {
         "type": "application/netcdf",
-        "href": f"file://{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
+        "href": href,
         "file:checksum": checksum,
         "file:size": 669,
-        "file:local_path": f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
+        "file:local_path": f"{local_dir}/247fd17e087ae491996519c097e70e48.nc",
         "xarray:storage_options": {},
         "xarray:open_kwargs": {"chunks": "auto"},
     }
@@ -49,7 +58,7 @@ def test_dictify_xr_dataset(tmpdir: str) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("set_cache", ["s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "ftp"], indirect=True)
 def test_xr_cacheable(
     tmpdir: str,
     xarray_cache_type: str,

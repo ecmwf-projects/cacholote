@@ -37,7 +37,7 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
 
 
-@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "ftp"], indirect=True)
 def test_copy_from_http_to_cache(
     tmpdir: str,
     httpserver: pytest_httpserver.HTTPServer,
