@@ -24,6 +24,7 @@ def s3_base() -> Generator[None, None, None]:
     This and some other fixtures are taken from
     https://github.com/fsspec/s3fs/blob/main/s3fs/tests/test_s3fs.py
     """
+    pytest.importorskip("boto3")
     requests = pytest.importorskip("requests")
     try:
         # should fail since we didn't start server yet
