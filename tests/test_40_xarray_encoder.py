@@ -49,17 +49,18 @@ def test_dictify_xr_dataset(tmpdir: str) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("ftp_config_settings", [False, True], indirect=True)
+@pytest.mark.parametrize("set_cache", ["s3"], indirect=True)
 def test_xr_cacheable(
     tmpdir: str,
     xarray_cache_type: str,
     ext: str,
     importorskip: str,
-    ftp_config_settings: Dict[str, Any],
+    set_cache: Dict[str, Any],
 ) -> None:
     pytest.importorskip(importorskip)
 
-    if xarray_cache_type == "application/vnd+zarr" and ftp_config_settings:
+    cache_is_local = config.SETTINGS["cache_files_urlpath"] is None
+    if xarray_cache_type == "application/vnd+zarr" and not cache_is_local:
         pytest.xfail(
             "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory"
         )
@@ -69,14 +70,14 @@ def test_xr_cacheable(
 
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
-        with config.set(xarray_cache_type=xarray_cache_type, **ftp_config_settings):
+        with config.set(xarray_cache_type=xarray_cache_type):
             dirfs = utils.get_cache_files_dirfs()
             actual = cfunc()
 
-            # Check hit & miss
-            assert config.SETTINGS["cache_store"].stats() == expected_stats
+        # Check hit & miss
+        assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-            infos.append(dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}"))
+        infos.append(dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}"))
 
         # Check result
         if xarray_cache_type == "application/x-grib":
@@ -87,16 +88,16 @@ def test_xr_cacheable(
         # Check source file
         if xarray_cache_type != "application/vnd+zarr":
             # zarr mapper is not added to encoding
-            if ftp_config_settings:
+            if cache_is_local:
+                assert (
+                    actual.encoding["source"]
+                    == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
+                )
+            else:
                 # read from tmp local file
                 assert actual.encoding["source"].startswith(tempfile.gettempdir())
                 assert actual.encoding["source"].endswith(
                     f"/06810be7ce1f5507be9180bfb9ff14fd{ext}"
-                )
-            else:
-                assert (
-                    actual.encoding["source"]
-                    == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
                 )
 
         # Check opened with dask
