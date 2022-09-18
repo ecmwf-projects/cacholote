@@ -37,26 +37,23 @@ def test_dictify_python_object() -> None:
 
 
 def test_dictify_python_call() -> None:
+
     expected0 = {"type": "python_call", "callable": "builtins:int"}
     res0 = encode.dictify_python_call(int)
     assert res0 == expected0
 
-    expected1 = {"type": "python_call", "callable": "builtins:int"}
-    res1 = encode.dictify_python_call(int)
+    expected1 = {"type": "python_call", "callable": "builtins:len", "args": ("test",)}
+    res1 = encode.dictify_python_call(len, "test")
     assert res1 == expected1
 
-    expected2 = {"type": "python_call", "callable": "builtins:len", "args": ("test",)}
-    res2 = encode.dictify_python_call(len, "test")
-    assert res2 == expected2
-
-    expected3 = {
+    expected2 = {
         "type": "python_call",
         "callable": "builtins:int",
         "args": ("2",),
         "kwargs": {"base": 3},
     }
-    res3 = encode.dictify_python_call(int, "2", base=3)
-    assert res3 == expected3
+    res2 = encode.dictify_python_call(int, "2", base=3)
+    assert res2 == expected2
 
 
 def test_filecache_default() -> None:

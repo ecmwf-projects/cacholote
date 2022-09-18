@@ -1,5 +1,3 @@
-import tempfile
-
 import fsspec
 import pytest
 
@@ -32,9 +30,9 @@ def test_dictify_xr_dataset(tmpdir: str, set_cache: str) -> None:
         assert href.startswith(
             "http://127.0.0.1:5555/test-bucket/247fd17e087ae491996519c097e70e48.nc"
         )
+        storage_options = {}
         fs = fsspec.filesystem("http")
         local_prefix = "s3://test-bucket"
-        storage_options = {}
     elif set_cache == "ftp":
         href = "ftp:///247fd17e087ae491996519c097e70e48.nc"
         storage_options = {
@@ -47,9 +45,9 @@ def test_dictify_xr_dataset(tmpdir: str, set_cache: str) -> None:
         local_prefix = "ftp://"
     else:
         href = f"{set_cache}://{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
+        storage_options = {}
         fs = fsspec.filesystem(set_cache)
         local_prefix = tmpdir
-        storage_options = {}
 
     expected = {
         "type": "application/netcdf",
@@ -106,23 +104,7 @@ def test_xr_cacheable(
         else:
             xr.testing.assert_identical(actual, expected)
 
-        # Check source file
-        if xarray_cache_type != "application/vnd+zarr":
-            # zarr mapper is not added to encoding
-            if set_cache == "file":
-                assert (
-                    actual.encoding["source"]
-                    == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
-                )
-            else:
-                # read from tmp local file
-                assert actual.encoding["source"].startswith(tempfile.gettempdir())
-                assert (
-                    f"/06810be7ce1f5507be9180bfb9ff14fd{ext}"
-                    in actual.encoding["source"]
-                )
-
-        # Check opened with dask
+        # Check opened with dask (i.e., read from file)
         assert dict(actual.chunks) == {
             "time": (4,),
             "isobaricInhPa": (2,),
