@@ -82,9 +82,8 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
     filetype = filetype or "unknown"
 
     # When available, use presigned URL to access path by HTTP
-    # TODO: specify kwargs such as expires
-    use_http = hasattr(fs, "url")
-    href = fs.url(urlpath) if use_http else fs.unstrip_protocol(urlpath)
+    use_http = hasattr(fs, "url") and filetype != "application/vnd+zarr"
+    href = fs.url(urlpath, expires=None) if use_http else fs.unstrip_protocol(urlpath)
     storage_options: Dict[str, Any] = {} if use_http else fs.storage_options
     fs = utils.get_filesystem_from_urlpath(href, storage_options)
 
@@ -93,7 +92,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
         "href": href,
         "file:checksum": fs.checksum(href),
         "file:size": fs.size(href),
-        "file:local_path": fsspec.core.strip_protocol(urlpath),
+        "file:local_path": urlpath,
         "storage_options": storage_options,
     }
 
@@ -108,7 +107,7 @@ def decode_xr_dataset(xr_dict: Dict[str, Any]) -> "xr.Dataset":
         filename_or_obj = fs.get_mapper(xr_dict["href"])
     else:
         if fsspec.utils.get_protocol(xr_dict["href"]) == "file":
-            filename_or_obj = xr_dict["file:local_path"]
+            filename_or_obj = fsspec.core.strip_protocol(xr_dict["href"])
         else:
             # Download local copy
             protocol = fsspec.utils.get_protocol(xr_dict["href"])
@@ -144,7 +143,7 @@ def _store_xr_dataset(
                 cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
             else:
                 # Should never get here! xarray_cache_type is checked in config.py
-                raise ValueError(f"type {filetype!r} is NOT supported.")
+                raise NotImplementedError
 
             if fs == fsspec.filesystem("file"):
                 fsspec.filesystem("file").mv(tmpfilename, urlpath)
@@ -179,8 +178,13 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
             "consolidated": True,
             "chunks": "auto",
         }
+    elif filetype == "application/netcdf":
+        xr_dict["xarray:open_kwargs"] = {"engine": "netcdf4"}
+    elif filetype == "application/x-grib":
+        xr_dict["xarray:open_kwargs"] = {"engine": "cfgrib"}
     else:
-        xr_dict["xarray:open_kwargs"] = {"chunks": "auto"}
+        raise NotImplementedError
+    xr_dict["xarray:open_kwargs"].update({"chunks": "auto"})
 
     return xr_dict
 

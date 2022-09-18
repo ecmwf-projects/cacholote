@@ -1,5 +1,3 @@
-from typing import Any, Dict
-
 import fsspec
 import pytest
 import pytest_httpserver
@@ -37,13 +35,12 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
 
 
-@pytest.mark.parametrize("set_cache", ["file", "ftp"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "ftp", "s3"], indirect=True)
 def test_copy_from_http_to_cache(
     tmpdir: str,
     httpserver: pytest_httpserver.HTTPServer,
-    set_cache: Dict[str, Any],
+    set_cache: str,
 ) -> None:
-    cache_is_local = config.SETTINGS["cache_files_urlpath"] is None
 
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
@@ -64,7 +61,14 @@ def test_copy_from_http_to_cache(
         assert result.read() == b"test"
 
         # Check file in cache
-        assert result.path == f"{tmpdir if cache_is_local else ''}/{cached_basename}"
+        if set_cache == "ftp":
+            assert result.path == f"/{cached_basename}"
+        elif set_cache == "s3":
+            assert result.path.startswith(
+                f"http://127.0.0.1:5555/test-bucket/{cached_basename}"
+            )
+        else:
+            assert result.path == f"{tmpdir}/{cached_basename}"
 
     # Check cached file is not modified
     assert infos[0] == infos[1]

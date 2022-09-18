@@ -1,5 +1,4 @@
 import tempfile
-from typing import Any, Dict
 
 import fsspec
 import pytest
@@ -21,31 +20,45 @@ def get_grib_ds() -> "xr.Dataset":
     return ds.sel(number=0)
 
 
-@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "ftp", "s3"], indirect=True)
 def test_dictify_xr_dataset(tmpdir: str, set_cache: str) -> None:
     pytest.importorskip("netCDF4")
 
     ds = xr.Dataset({"foo": [0]}, attrs={})
     actual = extra_encoders.dictify_xr_dataset(ds)
+
     if set_cache == "s3":
         href = actual["href"]
         assert href.startswith(
             "http://127.0.0.1:5555/test-bucket/247fd17e087ae491996519c097e70e48.nc"
         )
-        checksum = fsspec.filesystem("http").checksum(href)
-        local_dir = "test-bucket"
+        fs = fsspec.filesystem("http")
+        local_prefix = "s3://test-bucket"
+        storage_options = {}
+    elif set_cache == "ftp":
+        href = "ftp:///247fd17e087ae491996519c097e70e48.nc"
+        storage_options = {
+            "host": "localhost",
+            "port": 2121,
+            "username": "user",
+            "password": "pass",
+        }
+        fs = fsspec.filesystem(set_cache, **storage_options)
+        local_prefix = "ftp://"
     else:
         href = f"{set_cache}://{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
-        checksum = fsspec.filesystem(set_cache).checksum(href)
-        local_dir = tmpdir
+        fs = fsspec.filesystem(set_cache)
+        local_prefix = tmpdir
+        storage_options = {}
+
     expected = {
         "type": "application/netcdf",
         "href": href,
-        "file:checksum": checksum,
+        "file:checksum": fs.checksum(href),
         "file:size": 669,
-        "file:local_path": f"{local_dir}/247fd17e087ae491996519c097e70e48.nc",
-        "xarray:storage_options": {},
-        "xarray:open_kwargs": {"chunks": "auto"},
+        "file:local_path": f"{local_prefix}/247fd17e087ae491996519c097e70e48.nc",
+        "xarray:storage_options": storage_options,
+        "xarray:open_kwargs": {"engine": "netcdf4", "chunks": "auto"},
     }
     assert actual == expected
 
@@ -58,18 +71,17 @@ def test_dictify_xr_dataset(tmpdir: str, set_cache: str) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("set_cache", ["file", "ftp"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "ftp", "s3"], indirect=True)
 def test_xr_cacheable(
     tmpdir: str,
     xarray_cache_type: str,
     ext: str,
     importorskip: str,
-    set_cache: Dict[str, Any],
+    set_cache: str,
 ) -> None:
     pytest.importorskip(importorskip)
 
-    cache_is_local = config.SETTINGS["cache_files_urlpath"] is None
-    if xarray_cache_type == "application/vnd+zarr" and not cache_is_local:
+    if xarray_cache_type == "application/vnd+zarr" and set_cache == "ftp":
         pytest.xfail(
             "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory"
         )
@@ -97,7 +109,7 @@ def test_xr_cacheable(
         # Check source file
         if xarray_cache_type != "application/vnd+zarr":
             # zarr mapper is not added to encoding
-            if cache_is_local:
+            if set_cache == "file":
                 assert (
                     actual.encoding["source"]
                     == f"{tmpdir}/06810be7ce1f5507be9180bfb9ff14fd{ext}"
@@ -105,8 +117,9 @@ def test_xr_cacheable(
             else:
                 # read from tmp local file
                 assert actual.encoding["source"].startswith(tempfile.gettempdir())
-                assert actual.encoding["source"].endswith(
+                assert (
                     f"/06810be7ce1f5507be9180bfb9ff14fd{ext}"
+                    in actual.encoding["source"]
                 )
 
         # Check opened with dask
