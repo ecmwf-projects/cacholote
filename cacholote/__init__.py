@@ -15,9 +15,9 @@
 # limitations under the License.
 
 from . import config, extra_encoders, utils
-from .cache import cacheable
+from .cache import cacheable, hexdigestify_python_call
 from .decode import loads
-from .encode import dumps, dumps_python_call
+from .encode import dumps
 
 try:
     # NOTE: the `version.py` file must not be present in the git repository
@@ -36,6 +36,7 @@ __all__ = [
     "dumps",
     "dumps_python_call",
     "extra_encoders",
+    "hexdigestify_python_call",
     "loads",
     "utils",
 ]

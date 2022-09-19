@@ -16,12 +16,35 @@
 
 import functools
 import warnings
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, TypeVar, Union, cast
 
 from . import decode, encode, utils
 from .config import SETTINGS
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def hexdigestify_python_call(
+    func: Union[str, Callable[..., Any]],
+    *args: Any,
+    **kwargs: Any,
+) -> str:
+    """Convert function to its hash made of hexadecimal digits.
+
+    Parameters
+    ----------
+    func: str, callable
+        Function to hexdigestify
+    *args: Any
+        Arguments of ``func``
+    **kwargs: Any
+        Keyword arguments of ``func``
+
+    Returns
+    -------
+    str
+    """
+    return utils.hexdigestify(encode.dumps_python_call(func, *args, **kwargs))
 
 
 def cacheable(func: F) -> F:
@@ -30,7 +53,7 @@ def cacheable(func: F) -> F:
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
-            call_json = encode.dumps_python_call(
+            hexdigest = hexdigestify_python_call(
                 func,
                 *args,
                 **kwargs,
@@ -39,7 +62,6 @@ def cacheable(func: F) -> F:
             warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
-        hexdigest = utils.hexdigestify(call_json)
         cache_store = SETTINGS["cache_store"]
         try:
             # Use try/except to update stats correctly
