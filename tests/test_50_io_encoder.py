@@ -1,5 +1,3 @@
-from typing import Any, Dict
-
 import fsspec
 import pytest
 import pytest_httpserver
@@ -37,12 +35,20 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
 
 
-@pytest.mark.parametrize("ftp_config_settings", [False, True], indirect=True)
+@pytest.mark.parametrize(
+    "set_cache, cache_dir",
+    [("file", None), ("ftp", ""), ("s3", "test-bucket")],
+    indirect=["set_cache"],
+)
 def test_copy_from_http_to_cache(
     tmpdir: str,
     httpserver: pytest_httpserver.HTTPServer,
-    ftp_config_settings: Dict[str, Any],
+    set_cache: str,
+    cache_dir: str,
 ) -> None:
+    if cache_dir is None:
+        cache_dir = tmpdir
+
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
     cached_basename = str(fsspec.filesystem("http").checksum(url))
@@ -50,22 +56,19 @@ def test_copy_from_http_to_cache(
     cfunc = cache.cacheable(open_url)
     infos = []
     for expected_stats in ((0, 1), (1, 1)):
-        with config.set(**ftp_config_settings):
-            dirfs = utils.get_cache_files_dirfs()
-            result = cfunc(url)
+        dirfs = utils.get_cache_files_dirfs()
+        result = cfunc(url)
 
-            # Check hit & miss
-            assert config.SETTINGS["cache_store"].stats() == expected_stats
+        # Check hit & miss
+        assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-            infos.append(dirfs.info(cached_basename))
+        infos.append(dirfs.info(cached_basename))
 
         # Check result
         assert result.read() == b"test"
 
         # Check file in cache
-        assert (
-            result.path == f"{'' if ftp_config_settings else tmpdir}/{cached_basename}"
-        )
+        assert result.path == f"{cache_dir}/{cached_basename}"
 
     # Check cached file is not modified
     assert infos[0] == infos[1]

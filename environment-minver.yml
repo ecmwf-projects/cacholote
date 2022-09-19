@@ -9,6 +9,8 @@ dependencies:
 - aiohttp
 - diskcache
 - fsspec
+- moto
 - pyftpdlib
 - pytest-httpserver
 - requests
+- s3fs
