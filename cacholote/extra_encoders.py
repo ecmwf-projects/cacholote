@@ -92,10 +92,12 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
             http_path = urllib.parse.urljoin(
                 endpoint_url, fsspec.core.strip_protocol(urlpath)
             )
-            if fsspec.filesystem("http").exists(http_path):
+            if http_fs.exists(http_path):
+                # Public http
                 href = http_path
                 fs = http_fs
             elif hasattr(fs, "url"):
+                # Pre-signed http
                 href = fs.url(urlpath, expires=None)
                 fs = http_fs
 
