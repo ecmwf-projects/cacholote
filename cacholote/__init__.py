@@ -17,7 +17,7 @@
 from . import config, extra_encoders, utils
 from .cache import cacheable
 from .decode import loads
-from .encode import dumps
+from .encode import dumps, dumps_python_call
 
 try:
     # NOTE: the `version.py` file must not be present in the git repository
@@ -34,6 +34,7 @@ __all__ = [
     "cacheable",
     "config",
     "dumps",
+    "dumps_python_call",
     "extra_encoders",
     "loads",
     "utils",
