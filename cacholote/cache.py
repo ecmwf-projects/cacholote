@@ -35,8 +35,8 @@ def cacheable(func: F) -> F:
                 *args,
                 **kwargs,
             )
-        except encode.EncodeError:
-            warnings.warn("can NOT encode python call", UserWarning)
+        except encode.EncodeError as ex:
+            warnings.warn(f"can NOT encode python call: {ex!s}", UserWarning)
             return func(*args, **kwargs)
 
         hexdigest = utils.hexdigestify(call_json)
@@ -60,8 +60,8 @@ def cacheable(func: F) -> F:
         result = func(*args, **kwargs)
         try:
             cached = encode.dumps(result)
-        except encode.EncodeError:
-            warnings.warn("can NOT encode output", UserWarning)
+        except encode.EncodeError as ex:
+            warnings.warn(f"can NOT encode output: {ex!s}", UserWarning)
             return result
 
         cache_store[hexdigest] = cached
