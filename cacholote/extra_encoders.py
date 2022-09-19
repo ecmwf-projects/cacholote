@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import functools
 import inspect
 import io
@@ -21,6 +20,7 @@ import mimetypes
 import os
 import posixpath
 import tempfile
+import urllib
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
 import fsspec
@@ -81,19 +81,31 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
                 filetype = None
     filetype = filetype or "unknown"
 
-    # When available, use presigned URL to access path by HTTP
-    use_http = hasattr(fs, "url") and filetype != "application/vnd+zarr"
-    href = fs.url(urlpath, expires=None) if use_http else fs.unstrip_protocol(urlpath)
-    storage_options: Dict[str, Any] = {} if use_http else fs.storage_options
-    fs = utils.get_filesystem_from_urlpath(href, storage_options)
+    try:
+        endpoint_url = fs.storage_options["client_kwargs"]["endpoint_url"]
+    except KeyError:
+        href = urlpath
+    else:
+        href = urlpath
+        if not fs.isdir(urlpath):
+            http_fs = fsspec.filesystem("http")
+            http_path = urllib.parse.urljoin(
+                endpoint_url, fsspec.core.strip_protocol(urlpath)
+            )
+            if fsspec.filesystem("http").exists(http_path):
+                href = http_path
+                fs = http_fs
+            elif hasattr(fs, "url"):
+                href = fs.url(urlpath, expires=None)
+                fs = http_fs
 
     return {
         "type": filetype,
-        "href": href,
+        "href": fs.unstrip_protocol(href),
         "file:checksum": fs.checksum(href),
         "file:size": fs.size(href),
         "file:local_path": urlpath,
-        "storage_options": storage_options,
+        "storage_options": fs.storage_options,
     }
 
 
