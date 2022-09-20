@@ -65,6 +65,9 @@ class set:
         None: same as ``cache_store_directory``
     cache_files_storage_options : dict, default: {}
         ``fsspec`` storage options for storing cache files.
+    cache_files_urlpath_readonly : str, None, default: None
+        URL for cache files accessible in read-only mode.
+        None: same as ``cache_files_urlpath``
     xarray_cache_type : {"application/netcdf", "application/x-grib", "application/vnd+zarr"}, \
         default: "application/netcdf"
         Type for ``xarray`` cache files.
