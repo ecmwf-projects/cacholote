@@ -1,3 +1,5 @@
+import pathlib
+
 import fsspec
 import pytest
 
@@ -18,13 +20,13 @@ def get_grib_ds() -> "xr.Dataset":
     return ds.sel(number=0)
 
 
-def test_dictify_xr_dataset(tmpdir: str) -> None:
+def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
     ds = xr.Dataset({"foo": [0]}, attrs={})
     actual = extra_encoders.dictify_xr_dataset(ds)
     checksum = fsspec.filesystem("file").checksum(
-        f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
+        tmpdir / "247fd17e087ae491996519c097e70e48.nc"
     )
     expected = {
         "type": "application/netcdf",

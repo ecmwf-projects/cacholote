@@ -1,5 +1,6 @@
 import contextlib
 import os
+import pathlib
 import shlex
 import subprocess
 import sys
@@ -95,7 +96,7 @@ def initialize_ftp() -> Generator[Dict[str, Any], None, None]:
 
 @pytest.fixture(autouse=True)
 def set_cache(
-    tmpdir: str,
+    tmpdir: pathlib.Path,
     request: pytest.FixtureRequest,
 ) -> Generator[str, None, None]:
     """

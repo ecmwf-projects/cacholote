@@ -1,3 +1,5 @@
+import pathlib
+
 import fsspec
 import pytest
 import pytest_httpserver
@@ -11,8 +13,8 @@ def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
 
 
 @pytest.mark.parametrize("io_delete_original", [True, False])
-def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
-    tmpfile = f"{tmpdir}/test.txt"
+def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> None:
+    tmpfile = tmpdir / "test.txt"
     with open(tmpfile, "wb") as f:
         f.write(b"test")
     tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
@@ -20,7 +22,7 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
     with config.set(io_delete_original=io_delete_original):
         actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
 
-    local_path = f"{tmpdir}/{tmp_checksum}.txt"
+    local_path = tmpdir / f"{tmp_checksum}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
         "type": "text/plain",
@@ -41,13 +43,13 @@ def test_dictify_io_object(tmpdir: str, io_delete_original: bool) -> None:
     indirect=["set_cache"],
 )
 def test_copy_from_http_to_cache(
-    tmpdir: str,
+    tmpdir: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
     cache_dir: str,
 ) -> None:
     if cache_dir is None:
-        cache_dir = tmpdir
+        cache_dir = str(tmpdir)
 
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")

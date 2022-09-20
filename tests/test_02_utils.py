@@ -1,3 +1,5 @@
+import pathlib
+
 import fsspec
 
 from cacholote import utils
@@ -10,8 +12,24 @@ def test_hexdigestify() -> None:
     assert res == expected
 
 
-def test_get_cache_files(tmpdir: str) -> None:
+def test_get_cache_files(tmpdir: pathlib.Path) -> None:
     assert utils.get_cache_files_directory() == tmpdir
 
     assert utils.get_cache_files_dirfs().path == tmpdir
     assert utils.get_cache_files_dirfs().fs == fsspec.filesystem("file")
+
+
+def test_get_filesystem_from_urlpath(tmpdir: pathlib.Path) -> None:
+    assert utils.get_filesystem_from_urlpath(str(tmpdir), {}) == fsspec.filesystem(
+        "file"
+    )
+
+
+def test_copy_buffered_file(tmpdir: pathlib.Path) -> None:
+    src = tmpdir / "test0"
+    dst = tmpdir / "test1"
+    with open(src, "wb") as f:
+        f.write(b"test")
+    with open(src, "rb") as f_src, open(dst, "wb") as f_dst:
+        utils.copy_buffered_file(f_src, f_dst)
+    assert open(src, "rb").read() == open(dst, "rb").read() == b"test"

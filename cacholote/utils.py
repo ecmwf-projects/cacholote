@@ -15,7 +15,8 @@
 
 import hashlib
 import io
-from typing import Any, Dict, Optional
+import os
+from typing import Any, Dict, Optional, Union
 
 import fsspec
 import fsspec.implementations.dirfs
@@ -29,7 +30,7 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()
 
 
-def get_cache_files_directory() -> str:
+def get_cache_files_directory() -> Union[str, os.PathLike[Any]]:
     """Return the directory where cache files are stored."""
     if (
         config.SETTINGS["cache_files_urlpath"]
