@@ -33,6 +33,7 @@ _SETTINGS: Dict[str, Any] = {
     "cache_store_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
     "cache_files_urlpath": None,
     "cache_files_storage_options": {},
+    "cache_files_urlpath_readonly": None,
     "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
 }

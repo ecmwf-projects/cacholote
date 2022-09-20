@@ -3,7 +3,7 @@ import pathlib
 import fsspec
 import pytest
 
-from cacholote import cache, config, extra_encoders, utils
+from cacholote import cache, config, decode, encode, extra_encoders, utils
 
 try:
     import xarray as xr
@@ -20,24 +20,36 @@ def get_grib_ds() -> "xr.Dataset":
     return ds.sel(number=0)
 
 
+@pytest.mark.filterwarnings(
+    "ignore:distutils Version classes are deprecated. Use packaging.version instead."
+)
 def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
+    readonly_dir = tmpdir / "readonly"
+    fsspec.filesystem("file").mkdir(readonly_dir)
+
     ds = xr.Dataset({"foo": [0]}, attrs={})
-    actual = extra_encoders.dictify_xr_dataset(ds)
-    checksum = fsspec.filesystem("file").checksum(
-        tmpdir / "247fd17e087ae491996519c097e70e48.nc"
-    )
+    with config.set(cache_files_urlpath_readonly=readonly_dir):
+        actual = extra_encoders.dictify_xr_dataset(ds)
     expected = {
         "type": "application/netcdf",
-        "href": f"file://{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
-        "file:checksum": checksum,
+        "href": f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc",
+        "file:checksum": fsspec.filesystem("file").checksum(
+            tmpdir / "247fd17e087ae491996519c097e70e48.nc"
+        ),
         "file:size": 669,
         "file:local_path": f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
         "xarray:storage_options": {},
         "xarray:open_kwargs": {"chunks": "auto"},
     }
     assert actual == expected
+
+    fsspec.filesystem("file").mv(
+        f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
+        f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc",
+    )
+    xr.testing.assert_identical(ds, decode.loads(encode.dumps(actual)))
 
 
 @pytest.mark.parametrize(

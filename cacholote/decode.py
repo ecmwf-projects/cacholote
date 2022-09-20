@@ -18,7 +18,7 @@ import importlib
 import json
 from typing import Any, Dict, Union
 
-from . import extra_encoders, utils
+from . import extra_encoders
 
 
 def import_object(fully_qualified_name: str) -> Any:
@@ -35,19 +35,6 @@ def import_object(fully_qualified_name: str) -> Any:
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     """Decode deserialized JSON data (``dict``)."""
-    if "file:checksum" in obj:
-        for k, v in obj.items():
-            if k.rsplit(":", 1)[-1] == "storage_options":
-                storage_options = v
-                break
-        else:
-            storage_options = {}
-        fs = utils.get_filesystem_from_urlpath(obj["href"], storage_options)
-        if fs.checksum(obj["href"]) != obj["file:checksum"]:
-            recursive = obj.get("type") == "application/vnd+zarr"
-            fs.rm(obj["href"], recursive=recursive)
-            raise ValueError("checksum mismatch")
-
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
 
@@ -61,7 +48,8 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         return func(*args, **kwargs)
 
     if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
-        return fs.open(obj["href"], **obj["tmp:storage_options"])
+        fs, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(obj)
+        return fs.open(urlpath)
 
     if {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
         return extra_encoders.decode_xr_dataset(obj)
