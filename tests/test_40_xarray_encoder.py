@@ -32,23 +32,21 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     ds = xr.Dataset({"foo": [0]}, attrs={})
     with config.set(cache_files_urlpath_readonly=readonly_dir):
         actual = extra_encoders.dictify_xr_dataset(ds)
+
+    href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
+    local_path = f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
     expected = {
         "type": "application/netcdf",
-        "href": f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc",
-        "file:checksum": fsspec.filesystem("file").checksum(
-            tmpdir / "247fd17e087ae491996519c097e70e48.nc"
-        ),
+        "href": href,
+        "file:checksum": fsspec.filesystem("file").checksum(local_path),
         "file:size": 669,
-        "file:local_path": f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
+        "file:local_path": local_path,
         "xarray:storage_options": {},
         "xarray:open_kwargs": {"chunks": "auto"},
     }
     assert actual == expected
 
-    fsspec.filesystem("file").mv(
-        f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc",
-        f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc",
-    )
+    fsspec.filesystem("file").mv(local_path, href)
     xr.testing.assert_identical(ds, decode.loads(encode.dumps(actual)))
 
 
