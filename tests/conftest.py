@@ -127,5 +127,9 @@ def set_cache(
                 cache_files_storage_options=dict(client_kwargs=client_kwargs),
             ):
                 yield request.param
+    elif request.param == "redis":
+        redislite = pytest.importorskip("redislite")
+        with config.set(cache_store=redislite.Redis()):
+            yield request.param
     else:
         raise ValueError

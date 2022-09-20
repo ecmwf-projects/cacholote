@@ -47,6 +47,12 @@ def test_dictify_xr_dataset(tmpdir: str) -> None:
     ],
 )
 @pytest.mark.parametrize("set_cache", ["file", "ftp", "s3"], indirect=True)
+@pytest.mark.filterwarnings(
+    "ignore:GRIB write support is experimental, DO NOT RELY ON IT!"
+)
+@pytest.mark.filterwarnings(
+    "ignore:distutils Version classes are deprecated. Use packaging.version instead."
+)
 def test_xr_cacheable(
     xarray_cache_type: str,
     ext: str,
