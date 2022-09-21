@@ -4,7 +4,7 @@ import fsspec
 import pytest
 import pytest_httpserver
 
-from cacholote import cache, config, extra_encoders, utils
+from cacholote import cache, config, decode, encode, extra_encoders, utils
 
 
 def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
@@ -14,19 +14,25 @@ def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
 
 @pytest.mark.parametrize("io_delete_original", [True, False])
 def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> None:
+    readonly_dir = tmpdir / "readonly"
+    fsspec.filesystem("file").mkdir(readonly_dir)
+
     tmpfile = tmpdir / "test.txt"
     with open(tmpfile, "wb") as f:
         f.write(b"test")
     tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
 
-    with config.set(io_delete_original=io_delete_original):
+    with config.set(
+        io_delete_original=io_delete_original, cache_files_urlpath_readonly=readonly_dir
+    ):
         actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
 
-    local_path = tmpdir / f"{tmp_checksum}.txt"
+    href = f"{readonly_dir}/{tmp_checksum}.txt"
+    local_path = f"{tmpdir}/{tmp_checksum}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
         "type": "text/plain",
-        "href": f"file://{local_path}",
+        "href": href,
         "file:checksum": checksum,
         "file:size": 4,
         "file:local_path": local_path,
@@ -35,6 +41,9 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     }
     assert actual == expected
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
+
+    fsspec.filesystem("file").mv(local_path, href)
+    assert decode.loads(encode.dumps(actual)).read() == b"test"
 
 
 @pytest.mark.parametrize(

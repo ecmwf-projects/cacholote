@@ -21,7 +21,7 @@ import mimetypes
 import os
 import posixpath
 import tempfile
-from typing import Any, Callable, Dict, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
@@ -71,11 +71,11 @@ def _requires_xarray_and_dask(func: F) -> F:
     return cast(F, wrapper)
 
 
-def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]:
+def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
 
-    filetype = mimetypes.guess_type(urlpath, strict=False)[0]
+    filetype = mimetypes.guess_type(local_path, strict=False)[0]
     if filetype is None and _HAS_MAGIC:
-        with fs.open(urlpath, "rb") as f:
+        with fs.open(local_path, "rb") as f:
             filetype = magic.from_buffer(f.read(), mime=True)
             if filetype == "application/octet-stream":
                 filetype = None
@@ -83,34 +83,71 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> Dict[str, Any]
 
     file_dict = {
         "type": filetype,
-        "href": fs.unstrip_protocol(urlpath),
-        "file:checksum": fs.checksum(urlpath),
-        "file:size": fs.size(urlpath),
-        "file:local_path": fsspec.core.strip_protocol(urlpath),
+        "href": posixpath.join(
+            utils.get_cache_files_directory_readonly(), posixpath.basename(local_path)
+        ),
+        "file:checksum": fs.checksum(local_path),
+        "file:size": fs.size(local_path),
+        "file:local_path": local_path,
     }
 
     return file_dict
 
 
+def _get_fs_and_urlpath_to_decode(
+    cache_dict: Dict[str, Any]
+) -> Tuple[fsspec.AbstractFileSystem, str]:
+    urlpath = cache_dict["file:local_path"]
+    for k, v in cache_dict.items():
+        if k.endswith(":storage_options"):
+            storage_options = v
+            break
+    else:
+        storage_options = {}
+
+    # Attempt to read from local_path
+    try:
+        fs = utils.get_filesystem_from_urlpath(urlpath, storage_options)
+    except:  # noqa: E722
+        pass
+    else:
+        if fs.exists(urlpath):
+            if fs.checksum(urlpath) == cache_dict["file:checksum"]:
+                return (fs, urlpath)
+            # Delete corrupted files
+            recursive = cache_dict.get("type") == "application/vnd+zarr"
+            fs.rm(cache_dict["file:local_path"], recursive=recursive)
+            raise ValueError("checksum mismatch")
+
+    # Attempt to read from href
+    urlpath = cache_dict["href"]
+    fs = utils.get_filesystem_from_urlpath(urlpath, {})
+    if fs.exists(urlpath):
+        return (fs, urlpath)
+
+    # Nothing worked
+    raise ValueError(
+        f"No such file or directory: {cache_dict['file:local_path']!r} nor {cache_dict['href']!r}"
+    )
+
+
 @_requires_xarray_and_dask
 def decode_xr_dataset(xr_dict: Dict[str, Any]) -> "xr.Dataset":
     """Decode ``xr.Dataset`` from JSON deserialized data (``dict``)."""
+    fs, urlpath = _get_fs_and_urlpath_to_decode(xr_dict)
+
     if xr_dict["type"] == "application/vnd+zarr":
-        fs = utils.get_filesystem_from_urlpath(
-            xr_dict["href"], xr_dict["xarray:storage_options"]
-        )
-        filename_or_obj = fs.get_mapper(xr_dict["href"])
+        filename_or_obj = fs.get_mapper(urlpath)
     else:
-        if fsspec.utils.get_protocol(xr_dict["href"]) == "file":
-            filename_or_obj = xr_dict["file:local_path"]
+        if fsspec.utils.get_protocol(urlpath) == "file":
+            filename_or_obj = urlpath
         else:
             # Download local copy
-            protocol = fsspec.utils.get_protocol(xr_dict["href"])
-            storage_options = {protocol: xr_dict["xarray:storage_options"]}
+            protocol = fsspec.utils.get_protocol(urlpath)
             with fsspec.open(
-                f"filecache::{xr_dict['href']}",
+                f"filecache::{urlpath}",
                 filecache={"same_names": True},
-                **storage_options,
+                **{protocol: fs.storage_options},
             ) as of:
                 filename_or_obj = of.name
     return xr.open_dataset(filename_or_obj, **xr_dict["xarray:open_kwargs"])
