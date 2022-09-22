@@ -80,7 +80,7 @@ def dictify_python_call(
             # E.g., builtins
             pass
         else:
-            python_call_simple["bytecode"] = utils.hexdigestify(bytecode)
+            python_call_simple["checksum"] = utils.hexdigestify(bytecode)
 
     if args:
         python_call_simple["args"] = args
