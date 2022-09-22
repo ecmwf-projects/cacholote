@@ -20,12 +20,11 @@ import datetime
 import dis
 import inspect
 import json
-import operator
 import pickle
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from . import utils
+from . import decode, utils
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
@@ -56,32 +55,30 @@ def dictify_python_call(
     **kwargs: Any,
 ) -> Dict[str, Any]:
 
-    kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
     python_call_simple: Dict[str, Any] = {
         "type": "python_call",
         "callable": callable_fqn,
     }
 
-    if not isinstance(func, str):
-        try:
-            sig = inspect.signature(func)
-        except ValueError:
-            # No signature available
-            pass
-        else:
-            bound = sig.bind(*args, **kwargs)
-            args = bound.args
-            kwargs = bound.kwargs
+    call = decode.import_object(callable_fqn) if isinstance(func, str) else func
+    try:
+        bytecode = dis.Bytecode(call).dis()
+    except TypeError:
+        # E.g., builtins
+        pass
+    else:
+        python_call_simple["checksum"] = utils.hexdigestify(bytecode)
 
-        try:
-            bytecode = dis.Bytecode(func).dis()
-        except TypeError:
-            # E.g., builtins
-            pass
-        else:
-            python_call_simple["checksum"] = utils.hexdigestify(bytecode)
-
+    try:
+        sig = inspect.signature(call)
+    except ValueError:
+        # No signature available
+        pass
+    else:
+        bound = sig.bind(*args, **kwargs)
+        args = bound.args
+        kwargs = bound.kwargs
     if args:
         python_call_simple["args"] = args
     if kwargs:
