@@ -82,7 +82,7 @@ def dictify_python_call(
     if args:
         python_call_simple["args"] = args
     if kwargs:
-        python_call_simple["kwargs"] = kwargs
+        python_call_simple["kwargs"] = {k: kwargs[k] for k in sorted(kwargs)}
 
     return python_call_simple
 
