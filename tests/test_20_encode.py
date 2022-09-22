@@ -63,6 +63,7 @@ def test_filecache_default() -> None:
         "args": (date.isoformat(),),
     }
     res0 = encode.filecache_default(date)
+
     assert res0 == expected0
 
     data1 = bytes(list(range(20)) + list(range(225, 256)))

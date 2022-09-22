@@ -17,12 +17,15 @@
 import binascii
 import collections.abc
 import datetime
+import dis
 import inspect
 import json
 import operator
 import pickle
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
+from . import utils
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
@@ -52,16 +55,38 @@ def dictify_python_call(
     *args: Any,
     **kwargs: Any,
 ) -> Dict[str, Any]:
+
     kwargs = dict(sorted(kwargs.items(), key=operator.itemgetter(0)))
     callable_fqn = dictify_python_object(func)["fully_qualified_name"]
     python_call_simple: Dict[str, Any] = {
         "type": "python_call",
         "callable": callable_fqn,
     }
+
+    if not isinstance(func, str):
+        try:
+            sig = inspect.signature(func)
+        except ValueError:
+            # No signature available
+            pass
+        else:
+            bound = sig.bind(*args, **kwargs)
+            args = bound.args
+            kwargs = bound.kwargs
+
+        try:
+            bytecode = dis.Bytecode(func).dis()
+        except TypeError:
+            # E.g., builtins
+            pass
+        else:
+            python_call_simple["bytecode"] = utils.hexdigestify(bytecode)
+
     if args:
         python_call_simple["args"] = args
     if kwargs:
         python_call_simple["kwargs"] = kwargs
+
     return python_call_simple
 
 

@@ -56,3 +56,32 @@ def test_cacheable(set_cache: str) -> None:
 def test_hexdigestify_python_call() -> None:
     res = cache.hexdigestify_python_call(sorted, "foo", reverse=True)
     assert res == "29a102cc6e599572ddadf8fdc05bc09e8bf793257b18ae2440b5fc42"
+
+
+def test_same_name_differen_hash() -> None:
+    def func():
+        return 0
+
+    assert (
+        cache.hexdigestify_python_call(func)
+        == "9fe6f81099fccf65388ec5e7cbac7919ed12ccace6f439ece0b3d345"
+    )
+
+    def func():
+        return 1
+
+    assert (
+        cache.hexdigestify_python_call(func)
+        == "816ac7ce78f6029aedff83841d65aa89925b7f5c5cda0ec92f62542a"
+    )
+
+
+def test_same_hash_usings_args_or_kwargs() -> None:
+    def func(x):
+        return x
+
+    assert (
+        cache.hexdigestify_python_call(func, 1)
+        == cache.hexdigestify_python_call(func, x=1)
+        == "f44fd64232b026c015d4f31d020dd829a1c04c04e760123e9c860119"
+    )
