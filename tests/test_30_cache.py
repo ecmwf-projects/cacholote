@@ -59,7 +59,7 @@ def test_hexdigestify_python_call() -> None:
 
 
 def test_same_name_differen_hash() -> None:
-    def func():
+    def func() -> int:
         return 0
 
     assert (
@@ -67,7 +67,7 @@ def test_same_name_differen_hash() -> None:
         == "9fe6f81099fccf65388ec5e7cbac7919ed12ccace6f439ece0b3d345"
     )
 
-    def func():
+    def func() -> int:  # type: ignore[no-redef]
         return 1
 
     assert (
@@ -77,7 +77,7 @@ def test_same_name_differen_hash() -> None:
 
 
 def test_same_hash_usings_args_or_kwargs() -> None:
-    def func(x):
+    def func(x: Any) -> Any:
         return x
 
     assert (
