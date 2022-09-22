@@ -61,9 +61,9 @@ def dictify_python_call(
         "callable": callable_fqn,
     }
 
-    call = decode.import_object(callable_fqn) if isinstance(func, str) else func
+    callable = decode.import_object(callable_fqn) if isinstance(func, str) else func
     try:
-        bytecode = dis.Bytecode(call).dis()
+        bytecode = dis.Bytecode(callable).dis()
     except TypeError:
         # E.g., builtins
         pass
@@ -71,7 +71,7 @@ def dictify_python_call(
         python_call_simple["checksum"] = utils.hexdigestify(bytecode)
 
     try:
-        sig = inspect.signature(call)
+        sig = inspect.signature(callable)
     except ValueError:
         # No signature available
         pass
