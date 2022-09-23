@@ -58,13 +58,13 @@ def test_hexdigestify_python_call() -> None:
     assert res == "29a102cc6e599572ddadf8fdc05bc09e8bf793257b18ae2440b5fc42"
 
 
-def test_same_name_differen_checksum() -> None:
+def test_same_name_different_checksum() -> None:
     def func() -> int:
         return 0
 
     assert (
         cache.hexdigestify_python_call(func)
-        == "63a7e09b221209162fffe521d5021732af13e8d5dc634e3fc8332c1e"
+        == "4f6501c8d23ac56958f4d123edee9f77e14b8cd3fbf1f96af8d1a51b"
     )
 
     def func() -> int:  # type: ignore[no-redef]
@@ -72,16 +72,16 @@ def test_same_name_differen_checksum() -> None:
 
     assert (
         cache.hexdigestify_python_call(func)
-        == "10e1cbdc13cd7736068ec5c529448d39198243199c9be4a9fc1e38a7"
+        == "990dd6a221d930bdfad1b0a9bb6de5ff3046c21e845974ca7b9ae94d"
     )
 
 
-def test_same_key_usings_args_or_kwargs() -> None:
+def test_same_key_using_args_or_kwargs() -> None:
     def func(x: Any) -> Any:
         return x
 
     assert (
         cache.hexdigestify_python_call(func, 1)
         == cache.hexdigestify_python_call(func, x=1)
-        == "9390663ca921ede05bf474348b924f9d3c2d43f20bb9b5f35d15d20b"
+        == "b62f186e782e4082598e0b062fc1925af84c08c2cb166cf6b3a113c3"
     )
