@@ -116,11 +116,12 @@ def test_roundtrip(data: Any) -> None:
 
 def test_dumps_python_call() -> None:
     expected = (
-        r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],'
-        r'"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads",'
-        r'"args":[{"type":"python_call","callable":"binascii:a2b_base64",'
-        r'"args":["gASVOAAAAAAAAACMCGRhdGV0aW1llIwIdGltZXpvbmWUk5RoAIwJdGltZWRlbHRhlJO'
-        r'USwBNEA5LAIeUUpSFlFKULg==\n"]}]}}}'
+        r'{"type":"python_call","callable":"datetime:datetime",'
+        r'"checksum":"cfe4d14b7eaee4569c65f27304feb912da7b258d5ae3baa8fa690ee8",'
+        r'"args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call",'
+        r'"callable":"_pickle:loads","args":[{"type":"python_call",'
+        r'"callable":"binascii:a2b_base64","args":["gASVOAAAAAAAAACMCGRhdGV0aW1ll'
+        r'IwIdGltZXpvbmWUk5RoAIwJdGltZWRlbHRhlJOUSwBNEA5LAIeUUpSFlFKULg==\n"]}]}}}'
     )
     tzinfo = datetime.timezone(datetime.timedelta(seconds=3600))
     res = encode.dumps_python_call("datetime:datetime", 2019, 1, 1, tzinfo=tzinfo)

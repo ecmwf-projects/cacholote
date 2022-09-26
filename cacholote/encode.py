@@ -17,7 +17,6 @@
 import binascii
 import collections.abc
 import datetime
-import dis
 import inspect
 import json
 import pickle
@@ -63,12 +62,12 @@ def dictify_python_call(
 
     callable = decode.import_object(callable_fqn) if isinstance(func, str) else func
     try:
-        bytecode = dis.Bytecode(callable).dis()
+        sourcecode = inspect.getsource(callable)
     except TypeError:
         # E.g., builtins
         pass
     else:
-        python_call_simple["checksum"] = utils.hexdigestify(bytecode)
+        python_call_simple["checksum"] = utils.hexdigestify(sourcecode)
 
     try:
         sig = inspect.signature(callable)
