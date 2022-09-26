@@ -1,4 +1,5 @@
 import datetime
+import platform
 from typing import Any
 
 import pytest
@@ -115,9 +116,13 @@ def test_roundtrip(data: Any) -> None:
 
 
 def test_dumps_python_call() -> None:
+    if platform.python_version().startswith("3.8"):
+        checksum = "c8305918bafdc0148dcdb95fe19820c3eec1f0770668403f3412dc5a"
+    else:
+        checksum = "cfe4d14b7eaee4569c65f27304feb912da7b258d5ae3baa8fa690ee8"
     expected = (
         r'{"type":"python_call","callable":"datetime:datetime",'
-        r'"checksum":"cfe4d14b7eaee4569c65f27304feb912da7b258d5ae3baa8fa690ee8",'
+        f'"checksum":"{checksum}",'
         r'"args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call",'
         r'"callable":"_pickle:loads","args":[{"type":"python_call",'
         r'"callable":"binascii:a2b_base64","args":["gASVOAAAAAAAAACMCGRhdGV0aW1ll'

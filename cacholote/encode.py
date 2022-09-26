@@ -63,8 +63,8 @@ def dictify_python_call(
     callable = decode.import_object(callable_fqn) if isinstance(func, str) else func
     try:
         sourcecode = inspect.getsource(callable)
-    except TypeError:
-        # E.g., builtins
+    except (TypeError, OSError):
+        # E.g., builtins or functions instantiated with exec
         pass
     else:
         python_call_simple["checksum"] = utils.hexdigestify(sourcecode)
