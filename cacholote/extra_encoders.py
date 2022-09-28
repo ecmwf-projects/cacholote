@@ -107,7 +107,7 @@ def _get_fs_and_urlpath_to_decode(
 
     # Attempt to read from local_path
     try:
-        fs = utils.get_filesystem_from_urlpath(urlpath, storage_options)
+        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
     except:  # noqa: E722
         pass
     else:
@@ -121,7 +121,7 @@ def _get_fs_and_urlpath_to_decode(
 
     # Attempt to read from href
     urlpath = cache_dict["href"]
-    fs = utils.get_filesystem_from_urlpath(urlpath, {})
+    fs, _, _ = fsspec.get_fs_token_paths(urlpath)
     if fs.exists(urlpath):
         return (fs, urlpath)
 
@@ -196,8 +196,8 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     ext = mimetypes.guess_extension(filetype, strict=False)
     urlpath_out = posixpath.join(utils.get_cache_files_directory(), f"{root}{ext}")
 
-    fs_out = utils.get_filesystem_from_urlpath(
-        urlpath_out, config.SETTINGS["cache_files_storage_options"]
+    fs_out, _, _ = fsspec.get_fs_token_paths(
+        urlpath_out, storage_options=config.SETTINGS["cache_files_storage_options"]
     )
     if not fs_out.exists(urlpath_out):
         _store_xr_dataset(obj, fs_out, urlpath_out, filetype)
@@ -252,8 +252,8 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     _, ext = os.path.splitext(urlpath_in)
     urlpath_out = posixpath.join(utils.get_cache_files_directory(), f"{root}{ext}")
 
-    fs_out = utils.get_filesystem_from_urlpath(
-        urlpath_out, config.SETTINGS["cache_files_storage_options"]
+    fs_out, _, _ = fsspec.get_fs_token_paths(
+        urlpath_out, storage_options=config.SETTINGS["cache_files_storage_options"]
     )
     if not fs_out.exists(urlpath_out):
         _store_io_object(fs_in, urlpath_in, fs_out, urlpath_out)

@@ -15,7 +15,7 @@
 
 import hashlib
 import io
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import fsspec
 import fsspec.implementations.dirfs
@@ -57,26 +57,6 @@ def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
     protocol = fsspec.utils.get_protocol(cache_files_directory)
     fs = fsspec.filesystem(protocol, **config.SETTINGS["cache_files_storage_options"])
     return fsspec.implementations.dirfs.DirFileSystem(cache_files_directory, fs)
-
-
-def get_filesystem_from_urlpath(
-    urlpath: str, storage_options: Dict[str, Any]
-) -> fsspec.AbstractFileSystem:
-    """Return the ``fsspec`` filesystem inferred from the URL protocol.
-
-    Parameters
-    ----------
-    urlpath: str
-        URL of the form protocol://location
-    storage_options: dict
-        Storage options for fsspec.filesystem
-
-    Returns
-    -------
-    AbstractFileSystem
-    """
-    protocol = fsspec.utils.get_protocol(urlpath)
-    return fsspec.filesystem(protocol, **storage_options)
 
 
 def copy_buffered_file(

@@ -19,12 +19,6 @@ def test_get_cache_files(tmpdir: pathlib.Path) -> None:
     assert utils.get_cache_files_dirfs().fs == fsspec.filesystem("file")
 
 
-def test_get_filesystem_from_urlpath(tmpdir: pathlib.Path) -> None:
-    assert utils.get_filesystem_from_urlpath(str(tmpdir), {}) == fsspec.filesystem(
-        "file"
-    )
-
-
 def test_copy_buffered_file(tmpdir: pathlib.Path) -> None:
     src = tmpdir / "test0"
     dst = tmpdir / "test1"
