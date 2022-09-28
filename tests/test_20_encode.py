@@ -63,6 +63,7 @@ def test_filecache_default() -> None:
         "args": (date.isoformat(),),
     }
     res0 = encode.filecache_default(date)
+
     assert res0 == expected0
 
     data1 = bytes(list(range(20)) + list(range(225, 256)))
@@ -115,11 +116,11 @@ def test_roundtrip(data: Any) -> None:
 
 def test_dumps_python_call() -> None:
     expected = (
-        r'{"type":"python_call","callable":"datetime:datetime","args":[2019,1,1],'
-        r'"kwargs":{"tzinfo":{"type":"python_call","callable":"_pickle:loads",'
-        r'"args":[{"type":"python_call","callable":"binascii:a2b_base64",'
-        r'"args":["gASVOAAAAAAAAACMCGRhdGV0aW1llIwIdGltZXpvbmWUk5RoAIwJdGltZWRlbHRhlJO'
-        r'USwBNEA5LAIeUUpSFlFKULg==\n"]}]}}}'
+        r'{"type":"python_call","callable":"datetime:datetime",'
+        r'"args":[2019,1,1],"kwargs":{"tzinfo":{"type":"python_call",'
+        r'"callable":"_pickle:loads","args":[{"type":"python_call",'
+        r'"callable":"binascii:a2b_base64","args":["gASVOAAAAAAAAACMCGRhdGV0aW1ll'
+        r'IwIdGltZXpvbmWUk5RoAIwJdGltZWRlbHRhlJOUSwBNEA5LAIeUUpSFlFKULg==\n"]}]}}}'
     )
     tzinfo = datetime.timezone(datetime.timedelta(seconds=3600))
     res = encode.dumps_python_call("datetime:datetime", 2019, 1, 1, tzinfo=tzinfo)
