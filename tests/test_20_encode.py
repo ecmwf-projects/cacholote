@@ -128,3 +128,9 @@ def test_dumps_python_call() -> None:
 
     res_decoded = decode.loads(res)
     assert res_decoded == datetime.datetime(2019, 1, 1, tzinfo=tzinfo)
+
+
+def test_dumps_json_serializable() -> None:
+    expected = '{"type":"python_call","callable":"cacholote.decode:loads","args":["1"]}'
+    actual = encode.dumps(1)
+    assert expected == actual

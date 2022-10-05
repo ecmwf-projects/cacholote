@@ -162,9 +162,15 @@ def dumps(
     -------
     str
     """
+    default = kwargs.pop("default", filecache_default)
     kwargs.setdefault("separators", (",", ":"))
-    kwargs.setdefault("default", filecache_default)
-    return json.dumps(obj, **kwargs)
+    try:
+        dumped = json.dumps(obj, **kwargs)
+    except TypeError:
+        pass
+    else:
+        obj = dictify_python_call(decode.loads, dumped)
+    return json.dumps(obj, default=default, **kwargs)
 
 
 def dumps_python_call(

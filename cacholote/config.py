@@ -36,6 +36,7 @@ _SETTINGS: Dict[str, Any] = {
     "cache_files_urlpath_readonly": None,
     "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
+    "append_info": False,
 }
 
 
