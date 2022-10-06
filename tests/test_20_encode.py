@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 
-from cacholote import decode, encode
+from cacholote import config, decode, encode
 
 
 def func(
@@ -90,12 +90,20 @@ def test_filecache_default() -> None:
     res2 = encode.filecache_default(data2)
     assert res2 == expected2
 
+
+@pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
+def test_filecache_default_error(raise_all_encoding_errors: bool) -> None:
     class Dummy:
         pass
 
-    with pytest.warns(UserWarning):
-        with pytest.raises(encode.EncodeError):
-            encode.filecache_default(Dummy())
+    with config.set(raise_all_encoding_errors=raise_all_encoding_errors):
+        if raise_all_encoding_errors:
+            with pytest.raises(AttributeError, match="Can't pickle local object"):
+                encode.filecache_default(Dummy())
+        else:
+            with pytest.warns(UserWarning):
+                with pytest.raises(encode.EncodeError):
+                    encode.filecache_default(Dummy())
 
 
 @pytest.mark.parametrize(
