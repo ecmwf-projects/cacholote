@@ -17,6 +17,7 @@
 import datetime
 import functools
 import json
+import sys
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
 
@@ -50,11 +51,12 @@ def hexdigestify_python_call(
 
 def _append_info(cached: str) -> str:
     cached_dict = json.loads(cached)
-    info = cached_dict.get("__info__", {})
-    info["atime"] = str(datetime.datetime.now())
-    info["count"] = info.get("hits", 0) + 1
-    cached_dict["__info__"] = info
-    return encode.dumps(cached_dict)
+    info = cached_dict.pop("info", {})
+    info["atime"] = datetime.datetime.now().isoformat()
+    info["count"] = info.get("count", 0) + 1
+    info["size"] = info.get("size", sys.getsizeof(cached_dict))
+    cached_dict["info"] = info
+    return json.dumps(cached_dict, separators=(",", ":"))
 
 
 def cacheable(func: F) -> F:

@@ -1,3 +1,5 @@
+import datetime
+import json
 from typing import Any
 
 import pytest
@@ -54,16 +56,27 @@ def test_cacheable(set_cache: str) -> None:
 
 
 def test_hexdigestify_python_call() -> None:
-    res = cache.hexdigestify_python_call(sorted, "foo", reverse=True)
-    assert res == "10e680a1d6f1230f11cabc34b98d0f6deebeb673b9145d68caba000e"
-
-
-def test_same_key_using_args_or_kwargs() -> None:
-    def func(x: Any) -> Any:
-        return x
-
     assert (
         cache.hexdigestify_python_call(func, 1)
-        == cache.hexdigestify_python_call(func, x=1)
-        == "9d61fabe26d92ea0afa67469a084b94faca7c9e76b510de4c5d52a00"
+        == cache.hexdigestify_python_call(func, a=1)
+        == "c70ca47c460afc916aaf2804260271300aa7360d85018d1c6e9226d0"
     )
+
+
+@pytest.mark.parametrize("set_cache", ["file", "redis"], indirect=True)
+def test_append_info(set_cache: str) -> None:
+    cfunc = cache.cacheable(func)
+    cache_key = "c70ca47c460afc916aaf2804260271300aa7360d85018d1c6e9226d0"
+    with config.set(append_info=True):
+        cfunc(1)
+        cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
+        assert cache_dict["info"]["count"] == 1
+        assert cache_dict["info"]["size"] == 232
+        atime0 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
+
+        cfunc(1)
+        cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
+        assert cache_dict["info"]["count"] == 2
+        assert cache_dict["info"]["size"] == 232
+        atime1 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
+        assert atime0 < atime1
