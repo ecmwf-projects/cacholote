@@ -52,6 +52,7 @@ def _append_info(cached: str) -> str:
     cached_dict = json.loads(cached)
     info = cached_dict.pop("info", {})
     info["atime"] = datetime.datetime.now().isoformat()
+    info["mtime"] = info.get("mtime", info["atime"])
     info["count"] = info.get("count", 0) + 1
     cached_dict["info"] = info
     return json.dumps(cached_dict, separators=(",", ":"))
