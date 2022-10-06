@@ -90,7 +90,7 @@ def test_xr_cacheable(
         # Check hit & miss
         assert config.SETTINGS["cache_store"].stats() == expected_stats
 
-        infos.append(dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}"))
+        infos.append(dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}"))
 
         # Check result
         if xarray_cache_type == "application/x-grib":
@@ -132,20 +132,20 @@ def test_xr_corrupted_files(
         cfunc()
 
     # Warn if file is corrupted
-    dirfs.touch(f"06810be7ce1f5507be9180bfb9ff14fd{ext}", truncate=False)
-    touched_info = dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")
+    dirfs.touch(f"71b1251a1f7f7ce64c1e1a436613c023{ext}", truncate=False)
+    touched_info = dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}")
     with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
         UserWarning, match="checksum mismatch"
     ):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert dirfs.info(f"06810be7ce1f5507be9180bfb9ff14fd{ext}") != touched_info
+    assert dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}") != touched_info
 
     # Warn if file is deleted
-    dirfs.rm(f"06810be7ce1f5507be9180bfb9ff14fd{ext}", recursive=True)
+    dirfs.rm(f"71b1251a1f7f7ce64c1e1a436613c023{ext}", recursive=True)
     with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
         UserWarning, match="No such file or directory"
     ):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert dirfs.exists(f"06810be7ce1f5507be9180bfb9ff14fd{ext}")
+    assert dirfs.exists(f"71b1251a1f7f7ce64c1e1a436613c023{ext}")
