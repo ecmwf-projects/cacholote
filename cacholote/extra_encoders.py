@@ -95,7 +95,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
 
 
 def _get_fs_and_urlpath_to_decode(
-    cache_dict: Dict[str, Any]
+    cache_dict: Dict[str, Any], validate: bool = True
 ) -> Tuple[fsspec.AbstractFileSystem, str]:
     urlpath = cache_dict["file:local_path"]
     for k, v in cache_dict.items():
@@ -111,12 +111,12 @@ def _get_fs_and_urlpath_to_decode(
     except:  # noqa: E722
         pass
     else:
+        if not validate:
+            return (fs, urlpath)
+
         if fs.exists(urlpath):
             if fs.checksum(urlpath) == cache_dict["file:checksum"]:
                 return (fs, urlpath)
-            # Delete corrupted files
-            recursive = cache_dict.get("type") == "application/vnd+zarr"
-            fs.rm(cache_dict["file:local_path"], recursive=recursive)
             raise ValueError("checksum mismatch")
 
     # Attempt to read from href

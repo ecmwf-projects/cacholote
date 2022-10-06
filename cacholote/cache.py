@@ -88,21 +88,18 @@ def cacheable(func: F) -> F:
                 # Warn and recreate cache value
                 warnings.warn(str(ex), UserWarning)
 
-                # Clean-up
+                # Remove cache key
+                del cache_store[hexdigest]
+
+                # Delete cache file
                 cached_dict = json.loads(cached)
                 if "file:local_path" in cached_dict:
                     fs, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(
-                        cached_dict
+                        cached_dict, validate=False
                     )
                     if fs.exists(urlpath):
-                        try:
-                            fs.rm(
-                                urlpath,
-                                recursive=cached_dict["type"] == "application/vnd+zarr",
-                            )
-                        except NotImplemented:
-                            pass
-                del cache_store[hexdigest]
+                        fs.rm(urlpath, recursive=True)
+
             else:
                 if config.SETTINGS["append_info"]:
                     cache_store[hexdigest] = _append_info(cached)
