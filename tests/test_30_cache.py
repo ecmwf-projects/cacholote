@@ -71,12 +71,10 @@ def test_append_info(set_cache: str) -> None:
         cfunc(1)
         cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
         assert cache_dict["info"]["count"] == 1
-        assert cache_dict["info"]["size"] == 232
         atime0 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
 
         cfunc(1)
         cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
         assert cache_dict["info"]["count"] == 2
-        assert cache_dict["info"]["size"] == 232
         atime1 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
         assert atime0 < atime1

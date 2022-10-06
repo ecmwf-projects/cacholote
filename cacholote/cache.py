@@ -17,7 +17,6 @@
 import datetime
 import functools
 import json
-import sys
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
 
@@ -54,7 +53,6 @@ def _append_info(cached: str) -> str:
     info = cached_dict.pop("info", {})
     info["atime"] = datetime.datetime.now().isoformat()
     info["count"] = info.get("count", 0) + 1
-    info["size"] = info.get("size", sys.getsizeof(cached_dict))
     cached_dict["info"] = info
     return json.dumps(cached_dict, separators=(",", ":"))
 
