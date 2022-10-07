@@ -55,7 +55,7 @@ def _append_info(cached: str) -> str:
     info["mtime"] = info.get("mtime", info["atime"])
     info["count"] = info.get("count", 0) + 1
     cached_dict["info"] = info
-    return json.dumps(cached_dict, separators=(",", ":"))
+    return json.dumps(cached_dict, **encode._JSON_DUMPS_KWARGS)
 
 
 def cacheable(func: F) -> F:
@@ -83,7 +83,7 @@ def cacheable(func: F) -> F:
         else:
             # +1 hit
             try:
-                res = decode.loads(cached)
+                result = decode.loads(cached)
             except Exception as ex:
                 # Something wrong, e.g. cached files are corrupted
                 # Warn and recreate cache value
@@ -104,7 +104,7 @@ def cacheable(func: F) -> F:
             else:
                 if config.SETTINGS["append_info"]:
                     cache_store[hexdigest] = _append_info(cached)
-                return res
+                return result
 
         result = func(*args, **kwargs)
         try:
