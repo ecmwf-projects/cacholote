@@ -23,7 +23,7 @@ import pickle
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from . import decode
+from . import config, decode
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
@@ -141,6 +141,8 @@ def filecache_default(
             try:
                 return encoder(obj)
             except Exception as ex:
+                if config.SETTINGS["raise_all_encoding_errors"]:
+                    raise ex
                 warnings.warn(f"{encoder!r} did not work: {ex!r}")
     raise EncodeError("can't encode object")
 

@@ -37,6 +37,7 @@ _SETTINGS: Dict[str, Any] = {
     "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
     "append_info": False,
+    "raise_all_encoding_errors": False,
 }
 
 
@@ -74,6 +75,8 @@ class set:
         Type for ``xarray`` cache files.
     io_delete_original: bool, default: False
         Whether to delete the original copy of cached files.
+    raise_all_encoding_errors: bool, default: False
+        Raise an error if an encoder does not work (i.e., do not return results).
     cache_store:
         Key-value store object for the cache. Mutually exclusive with ``cache_store_directory``.
     """
