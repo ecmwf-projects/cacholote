@@ -101,7 +101,7 @@ def test_filecache_default_error(raise_all_encoding_errors: bool) -> None:
             with pytest.raises(AttributeError, match="Can't pickle local object"):
                 encode.filecache_default(Dummy())
         else:
-            with pytest.warns(UserWarning):
+            with pytest.warns(UserWarning, match="Can't pickle local object"):
                 with pytest.raises(encode.EncodeError):
                     encode.filecache_default(Dummy())
 
