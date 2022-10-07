@@ -74,6 +74,8 @@ def cacheable(func: F) -> F:
             return func(*args, **kwargs)
 
         cache_store = config.SETTINGS["cache_store"]
+
+        # Get result from cache
         try:
             # Use try/except to update stats correctly
             cached = cache_store[hexdigest]
@@ -100,19 +102,18 @@ def cacheable(func: F) -> F:
                     )
                     if fs.exists(urlpath):
                         fs.rm(urlpath, recursive=True)
-
             else:
                 if config.SETTINGS["append_info"]:
                     cache_store[hexdigest] = _append_info(cached)
                 return result
 
+        # Compute result
         result = func(*args, **kwargs)
         try:
             cached = encode.dumps(result)
         except encode.EncodeError:
             warnings.warn("can NOT encode output", UserWarning)
             return result
-
         if config.SETTINGS["append_info"]:
             cached = _append_info(cached)
         cache_store[hexdigest] = cached
