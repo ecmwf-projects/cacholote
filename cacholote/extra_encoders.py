@@ -97,6 +97,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
 def _get_fs_and_urlpath_to_decode(
     cache_dict: Dict[str, Any], validate: bool = True
 ) -> Tuple[fsspec.AbstractFileSystem, str]:
+
     urlpath = cache_dict["file:local_path"]
     for k, v in cache_dict.items():
         if k.endswith(":storage_options"):
@@ -105,15 +106,16 @@ def _get_fs_and_urlpath_to_decode(
     else:
         storage_options = {}
 
+    if not validate:
+        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
+        return (fs, urlpath)
+
     # Attempt to read from local_path
     try:
         fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
     except:  # noqa: E722
         pass
     else:
-        if not validate:
-            return (fs, urlpath)
-
         if fs.exists(urlpath):
             if fs.checksum(urlpath) == cache_dict["file:checksum"]:
                 return (fs, urlpath)

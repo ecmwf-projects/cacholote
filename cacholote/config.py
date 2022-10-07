@@ -75,6 +75,8 @@ class set:
         Type for ``xarray`` cache files.
     io_delete_original: bool, default: False
         Whether to delete the original copy of cached files.
+    append_info: bool, default: False
+        Append info such as statistics each time a cache key is used.
     raise_all_encoding_errors: bool, default: False
         Raise an error if an encoder does not work (i.e., do not return results).
     cache_store:
