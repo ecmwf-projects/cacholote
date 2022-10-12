@@ -167,8 +167,7 @@ def dumps(
     str
     """
     default = kwargs.pop("default", filecache_default)
-    for k, v in _JSON_DUMPS_KWARGS.items():
-        kwargs.setdefault(k, v)
+    kwargs = {**_JSON_DUMPS_KWARGS, **kwargs}
 
     try:
         dumped = json.dumps(obj, **kwargs)
