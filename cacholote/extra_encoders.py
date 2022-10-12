@@ -26,7 +26,7 @@ from typing import Any, Callable, Dict, Tuple, TypeVar, Union, cast
 import fsspec
 import fsspec.implementations.local
 
-from . import config, encode, utils
+from . import config, decode, encode, utils
 
 try:
     import dask
@@ -134,11 +134,13 @@ def _get_fs_and_urlpath_to_decode(
 
 
 @_requires_xarray_and_dask
-def decode_xr_dataset(xr_dict: Dict[str, Any]) -> "xr.Dataset":
-    """Decode ``xr.Dataset`` from JSON deserialized data (``dict``)."""
-    fs, urlpath = _get_fs_and_urlpath_to_decode(xr_dict)
+def decode_xr_dataset(obj: Dict[str, Any]) -> "xr.Dataset":
+    if not {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
+        raise decode.DecodeError
 
-    if xr_dict["type"] == "application/vnd+zarr":
+    fs, urlpath = _get_fs_and_urlpath_to_decode(obj)
+
+    if obj["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
     else:
         if fsspec.utils.get_protocol(urlpath) == "file":
@@ -152,7 +154,14 @@ def decode_xr_dataset(xr_dict: Dict[str, Any]) -> "xr.Dataset":
                 **{protocol: fs.storage_options},
             ) as of:
                 filename_or_obj = of.name
-    return xr.open_dataset(filename_or_obj, **xr_dict["xarray:open_kwargs"])
+    return xr.open_dataset(filename_or_obj, **obj["xarray:open_kwargs"])
+
+
+def decode_io_object(obj: Dict[str, Any]) -> _UNION_IO_TYPES:
+    if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
+        fs, urlpath = _get_fs_and_urlpath_to_decode(obj)
+        return fs.open(urlpath)
+    raise decode.DecodeError
 
 
 @_requires_xarray_and_dask
@@ -282,5 +291,7 @@ def register_all() -> None:
         fsspec.implementations.local.LocalFileOpener,
     ):
         encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))
+    decode.FILECACHE_DECODERS.append(decode_io_object)
     if _HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
+        decode.FILECACHE_DECODERS.append(decode_xr_dataset)
