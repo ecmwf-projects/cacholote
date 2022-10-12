@@ -16,9 +16,7 @@
 
 import importlib
 import json
-from typing import Any, Dict, Union
-
-from . import extra_encoders
+from typing import Any, Callable, Dict, List, Union
 
 
 def import_object(fully_qualified_name: str) -> Any:
@@ -33,11 +31,17 @@ def import_object(fully_qualified_name: str) -> Any:
     return obj
 
 
-def object_hook(obj: Dict[str, Any]) -> Any:
-    """Decode deserialized JSON data (``dict``)."""
+class DecodeError(Exception):
+    pass
+
+
+def decode_python_object(obj: Dict[str, Any]) -> Any:
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
+    raise DecodeError
 
+
+def decode_python_call(obj: Dict[str, Any]) -> Any:
     if obj.get("type") == "python_call" and "callable" in obj:
         if callable(obj["callable"]):
             func = obj["callable"]
@@ -46,13 +50,22 @@ def object_hook(obj: Dict[str, Any]) -> Any:
         args = obj.get("args", ())
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
+    raise DecodeError
 
-    if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
-        fs, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(obj)
-        return fs.open(urlpath)
 
-    if {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
-        return extra_encoders.decode_xr_dataset(obj)
+FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
+    decode_python_object,
+    decode_python_call,
+]
+
+
+def object_hook(obj: Dict[str, Any]) -> Any:
+    """Decode deserialized JSON data (``dict``)."""
+    for decoder in reversed(FILECACHE_DECODERS):
+        try:
+            return decoder(obj)
+        except DecodeError:
+            continue
 
     return obj
 
