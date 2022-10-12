@@ -1,3 +1,5 @@
+import datetime
+import json
 from typing import Any
 
 import pytest
@@ -54,16 +56,29 @@ def test_cacheable(set_cache: str) -> None:
 
 
 def test_hexdigestify_python_call() -> None:
-    res = cache.hexdigestify_python_call(sorted, "foo", reverse=True)
-    assert res == "29a102cc6e599572ddadf8fdc05bc09e8bf793257b18ae2440b5fc42"
-
-
-def test_same_key_using_args_or_kwargs() -> None:
-    def func(x: Any) -> Any:
-        return x
-
     assert (
         cache.hexdigestify_python_call(func, 1)
-        == cache.hexdigestify_python_call(func, x=1)
-        == "f3569dae5c7b8023be97156b43642fbd80f5e1e93a1d4df75d308a7e"
+        == cache.hexdigestify_python_call(func, a=1)
+        == "c70ca47c460afc916aaf2804260271300aa7360d85018d1c6e9226d0"
     )
+
+
+@pytest.mark.parametrize("set_cache", ["file", "redis"], indirect=True)
+def test_append_info(set_cache: str) -> None:
+    cfunc = cache.cacheable(func)
+    cache_key = "c70ca47c460afc916aaf2804260271300aa7360d85018d1c6e9226d0"
+    with config.set(append_info=True):
+        cfunc(1)
+        cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
+        assert cache_dict["info"]["count"] == 1
+        mtime0 = datetime.datetime.fromisoformat(cache_dict["info"]["mtime"])
+        atime0 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
+        assert mtime0 == atime0
+
+        cfunc(1)
+        cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
+        assert cache_dict["info"]["count"] == 2
+        mtime1 = datetime.datetime.fromisoformat(cache_dict["info"]["mtime"])
+        atime1 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
+        assert mtime1 == mtime0
+        assert atime0 < atime1

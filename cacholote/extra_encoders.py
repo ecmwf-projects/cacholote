@@ -95,8 +95,9 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
 
 
 def _get_fs_and_urlpath_to_decode(
-    cache_dict: Dict[str, Any]
+    cache_dict: Dict[str, Any], validate: bool = True
 ) -> Tuple[fsspec.AbstractFileSystem, str]:
+
     urlpath = cache_dict["file:local_path"]
     for k, v in cache_dict.items():
         if k.endswith(":storage_options"):
@@ -104,6 +105,10 @@ def _get_fs_and_urlpath_to_decode(
             break
     else:
         storage_options = {}
+
+    if not validate:
+        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
+        return (fs, urlpath)
 
     # Attempt to read from local_path
     try:
@@ -114,9 +119,6 @@ def _get_fs_and_urlpath_to_decode(
         if fs.exists(urlpath):
             if fs.checksum(urlpath) == cache_dict["file:checksum"]:
                 return (fs, urlpath)
-            # Delete corrupted files
-            recursive = cache_dict.get("type") == "application/vnd+zarr"
-            fs.rm(cache_dict["file:local_path"], recursive=recursive)
             raise ValueError("checksum mismatch")
 
     # Attempt to read from href
