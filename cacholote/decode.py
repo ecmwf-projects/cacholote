@@ -61,7 +61,7 @@ FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     """Decode deserialized JSON data (``dict``)."""
-    for decoder in FILECACHE_DECODERS:
+    for decoder in reversed(FILECACHE_DECODERS):
         try:
             return decoder(obj)
         except DecodeError:
