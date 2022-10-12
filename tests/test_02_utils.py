@@ -15,6 +15,8 @@ def test_hexdigestify() -> None:
 def test_get_cache_files(tmpdir: pathlib.Path) -> None:
     assert utils.get_cache_files_directory() == tmpdir
 
+    assert utils.get_cache_files_fs() == fsspec.filesystem("file")
+
     assert utils.get_cache_files_dirfs().path == tmpdir
     assert utils.get_cache_files_dirfs().fs == fsspec.filesystem("file")
 
