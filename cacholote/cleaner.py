@@ -20,7 +20,7 @@ def clean_cache_files(
     maxsize: int
         Maximum total size of cache files.
     database: str, default=":memory:"
-        Path to the database file.
+        Path to the cleaner database file.
     method: str, default="LRU"
         * LRU: Last Recently Used
         * LFU: Least Frequently Used
