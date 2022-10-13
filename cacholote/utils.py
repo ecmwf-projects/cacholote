@@ -51,12 +51,20 @@ def get_cache_files_directory_readonly() -> str:
     return str(config.SETTINGS["cache_files_urlpath_readonly"])
 
 
+def get_cache_files_fs() -> fsspec.implementations.dirfs.DirFileSystem:
+    """Return the ``fsspec`` filesystem where cache files are stored."""
+    fs, _, _ = fsspec.get_fs_token_paths(
+        get_cache_files_directory(),
+        storage_options=config.SETTINGS["cache_files_storage_options"],
+    )
+    return fs
+
+
 def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
     """Return the ``fsspec`` directory filesystem where cache files are stored."""
-    cache_files_directory = get_cache_files_directory()
-    protocol = fsspec.utils.get_protocol(cache_files_directory)
-    fs = fsspec.filesystem(protocol, **config.SETTINGS["cache_files_storage_options"])
-    return fsspec.implementations.dirfs.DirFileSystem(cache_files_directory, fs)
+    return fsspec.implementations.dirfs.DirFileSystem(
+        get_cache_files_directory(), get_cache_files_fs()
+    )
 
 
 def copy_buffered_file(
