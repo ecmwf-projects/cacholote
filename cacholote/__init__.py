@@ -16,7 +16,7 @@
 
 from . import config, extra_encoders, utils
 from .cache import cacheable, hexdigestify_python_call
-from .cleaner import cache_files_cleaner
+from .cleaner import clean_cache_files
 from .decode import loads
 from .encode import dumps
 
@@ -32,8 +32,8 @@ extra_encoders.register_all()
 
 __all__ = [
     "__version__",
-    "cache_files_cleaner",
     "cacheable",
+    "clean_cache_files",
     "config",
     "dumps",
     "dumps_python_call",
