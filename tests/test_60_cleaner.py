@@ -22,11 +22,13 @@ def test_cleaner(tmpdir: pathlib.Path, set_cache: str, append_info: bool) -> Non
         dirname = utils.get_cache_files_directory()
 
         # Create files and copy to cache dir
+        checksums = []
         for i in range(3):
             time.sleep(1)
             filename = tmpdir / f"test{i}.txt"
             with open(filename, "w") as f:
-                f.write(str(i))
+                f.write("0")
+            checksums.append(fsspec.filesystem("file").checksum(filename))
             open_url(filename)
 
         # Re-use cache file
@@ -40,6 +42,26 @@ def test_cleaner(tmpdir: pathlib.Path, set_cache: str, append_info: bool) -> Non
         cleaner.cache_files_cleaner(1)
         assert len(list(utils.cache_store_keys_iter())) == fs.du(dirname) == 1
 
-        filename, *_ = fs.ls(dirname)
-        with fs.open(filename, "rt") as f:
-            assert f.read() == "0" if append_info else "2"
+        checksum = checksums[0] if append_info else checksums[-1]
+        assert fs.exists(dirname + f"/{checksum}.txt")
+
+
+@pytest.mark.parametrize("delete_unknown_files", [True, False])
+@pytest.mark.parametrize("set_cache", ["redis"], indirect=True)
+def test_clean_unknown(
+    tmpdir: pathlib.Path, set_cache: str, delete_unknown_files: bool
+) -> None:
+
+    dirfs = utils.get_cache_files_dirfs()
+    with dirfs.open("unknown.txt", "wt") as f:
+        f.write("0")
+
+    with open(tmpdir / "test.txt", "w") as f:
+        f.write("0")
+    open_url(tmpdir / "test.txt")
+
+    assert dirfs.du(".") == 2
+    cleaner.cache_files_cleaner(1, delete_unknown_files=delete_unknown_files)
+    assert dirfs.du(".") == 1
+
+    assert dirfs.exists("unknown.txt") is not delete_unknown_files
