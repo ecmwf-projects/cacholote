@@ -52,16 +52,18 @@ def test_clean_unknown(
     tmpdir: pathlib.Path, set_cache: str, delete_unknown_files: bool
 ) -> None:
 
-    dirfs = utils.get_cache_files_dirfs()
-    with dirfs.open("unknown.txt", "wt") as f:
+    fs = utils.get_cache_files_fs()
+    dirname = utils.get_cache_files_directory()
+
+    with fs.open(dirname + "/unknown.txt", "wt") as f:
         f.write("0")
 
     with open(tmpdir / "test.txt", "w") as f:
         f.write("0")
     open_url(tmpdir / "test.txt")
 
-    assert dirfs.du(".") == 2
+    assert fs.du(dirname) == 2
     cleaner.cache_files_cleaner(1, delete_unknown_files=delete_unknown_files)
-    assert dirfs.du(".") == 1
+    assert fs.du(dirname) == 1
 
-    assert dirfs.exists("unknown.txt") is not delete_unknown_files
+    assert fs.exists(dirname + "/unknown.txt") is not delete_unknown_files
