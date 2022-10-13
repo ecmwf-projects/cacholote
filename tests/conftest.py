@@ -130,7 +130,10 @@ def set_cache(
                 yield request.param
     elif request.param == "redis":
         redislite = pytest.importorskip("redislite")
-        with config.set(cache_store=redislite.Redis()):
+        os.mkdir(tmpdir / "cache_files")
+        with config.set(
+            cache_files_urlpath=tmpdir / "cache_files", cache_store=redislite.Redis()
+        ):
             yield request.param
     else:
         raise ValueError

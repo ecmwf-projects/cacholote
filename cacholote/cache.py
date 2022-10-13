@@ -25,6 +25,13 @@ from . import config, decode, encode, extra_encoders, utils
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+def _delete_key(key: str) -> None:
+    try:
+        config.SETTINGS["cache_store"].delete(key)
+    except AttributeError:
+        del config.SETTINGS["cache_store"][key]
+
+
 def hexdigestify_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
@@ -92,7 +99,7 @@ def cacheable(func: F) -> F:
                 warnings.warn(str(ex), UserWarning)
 
                 # Remove cache key
-                del cache_store[hexdigest]
+                _delete_key(hexdigest)
 
                 # Delete cache file
                 cached_dict = json.loads(cached)

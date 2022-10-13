@@ -15,7 +15,7 @@
 
 import hashlib
 import io
-from typing import Optional
+from typing import Iterator, Optional, Union
 
 import fsspec
 import fsspec.implementations.dirfs
@@ -89,3 +89,20 @@ def copy_buffered_file(
         if not data:
             break
         f_out.write(data)
+
+
+def delete_cache_store_key(key: Union[str, bytes]) -> None:
+    try:
+        config.SETTINGS["cache_store"].delete(key)
+    except AttributeError:
+        del config.SETTINGS["cache_store"][key]
+
+
+def cache_store_keys_iter() -> Iterator[Union[str, bytes]]:
+    try:
+        # Redis
+        for k in config.SETTINGS["cache_store"].scan_iter():
+            yield k
+    except AttributeError:
+        for k in config.SETTINGS["cache_store"]:
+            yield k
