@@ -31,7 +31,9 @@ def test_cleaner(
         # Create files and copy to cache dir
         checksums = []
         for i in range(3):
-            time.sleep(1)
+            if not append_info:
+                # Only seconds are stored in metadata
+                time.sleep(1)
             filename = tmpdir / f"test{i}.txt"
             with open(filename, "w") as f:
                 f.write("0")
