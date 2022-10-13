@@ -68,7 +68,7 @@ def clean_cache_files(
             cur.execute(
                 "INSERT INTO cleaner VALUES(?, ?, ?, ?)", (path, key, atime, count)
             )
-            con.commit()
+    con.commit()
 
     # Add unknown files
     if delete_unknown_files:
@@ -79,7 +79,7 @@ def clean_cache_files(
                     "INSERT INTO cleaner VALUES(?, ?, ?, ?)",
                     (path, "", fs.modified(path), 0),
                 )
-                con.commit()
+    con.commit()
 
     # Sort and clean
     for path, key in cur.execute(
