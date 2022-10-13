@@ -36,6 +36,9 @@ def test_cleaner(tmpdir: pathlib.Path, set_cache: str, append_info: bool) -> Non
 
         assert len(list(utils.cache_store_keys_iter())) == fs.du(dirname) == 3
 
+        cleaner.cache_files_cleaner(3)
+        assert len(list(utils.cache_store_keys_iter())) == fs.du(dirname) == 3
+
         cleaner.cache_files_cleaner(2)
         assert len(list(utils.cache_store_keys_iter())) == fs.du(dirname) == 2
 
@@ -43,7 +46,7 @@ def test_cleaner(tmpdir: pathlib.Path, set_cache: str, append_info: bool) -> Non
         assert len(list(utils.cache_store_keys_iter())) == fs.du(dirname) == 1
 
         checksum = checksums[0] if append_info else checksums[-1]
-        assert fs.exists(dirname + f"/{checksum}.txt")
+        assert fs.exists(f"{dirname}/{checksum}.txt")
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
@@ -55,7 +58,7 @@ def test_clean_unknown(
     fs = utils.get_cache_files_fs()
     dirname = utils.get_cache_files_directory()
 
-    with fs.open(dirname + "/unknown.txt", "wt") as f:
+    with fs.open(f"{dirname}/unknown.txt", "wt") as f:
         f.write("0")
 
     with open(tmpdir / "test.txt", "w") as f:
@@ -63,7 +66,7 @@ def test_clean_unknown(
     open_url(tmpdir / "test.txt")
 
     assert fs.du(dirname) == 2
+
     cleaner.cache_files_cleaner(1, delete_unknown_files=delete_unknown_files)
     assert fs.du(dirname) == 1
-
-    assert fs.exists(dirname + "/unknown.txt") is not delete_unknown_files
+    assert fs.exists(f"{dirname}/unknown.txt") is not delete_unknown_files
