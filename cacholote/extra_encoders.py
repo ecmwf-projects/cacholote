@@ -21,12 +21,12 @@ import mimetypes
 import os
 import posixpath
 import tempfile
-from typing import Any, Callable, Dict, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
 
-from . import config, decode, encode, utils
+from . import config, encode, utils
 
 try:
     import dask
@@ -95,16 +95,12 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
 
 
 def _get_fs_and_urlpath_to_decode(
-    cache_dict: Dict[str, Any], validate: bool = True
+    cache_dict: Dict[str, Any], storage_options: Optional[Dict[str, Any]] = None, validate: bool = True
 ) -> Tuple[fsspec.AbstractFileSystem, str]:
 
     urlpath = cache_dict["file:local_path"]
-    for k, v in cache_dict.items():
-        if k.endswith(":storage_options"):
-            storage_options = v
-            break
-    else:
-        storage_options = {}
+    if storage_options is None:
+        storage_options = config.SETTINGS["cache_files_storage_options"]
 
     if not validate:
         fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
@@ -134,11 +130,10 @@ def _get_fs_and_urlpath_to_decode(
 
 
 @_requires_xarray_and_dask
-def decode_xr_dataset(obj: Dict[str, Any]) -> "xr.Dataset":
-    if not {"xarray:open_kwargs", "xarray:storage_options"} <= set(obj):
-        raise decode.DecodeError
-
-    fs, urlpath = _get_fs_and_urlpath_to_decode(obj)
+def decode_xr_dataset(
+    obj: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+) -> "xr.Dataset":
+    fs, urlpath = _get_fs_and_urlpath_to_decode(obj, storage_options=storage_options)
 
     if obj["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
@@ -154,14 +149,14 @@ def decode_xr_dataset(obj: Dict[str, Any]) -> "xr.Dataset":
                 **{protocol: fs.storage_options},
             ) as of:
                 filename_or_obj = of.name
-    return xr.open_dataset(filename_or_obj, **obj["xarray:open_kwargs"])
+    return xr.open_dataset(filename_or_obj, **kwargs)
 
 
-def decode_io_object(obj: Dict[str, Any]) -> _UNION_IO_TYPES:
-    if {"tmp:open_kwargs", "tmp:storage_options"} <= set(obj):
-        fs, urlpath = _get_fs_and_urlpath_to_decode(obj)
-        return fs.open(urlpath)
-    raise decode.DecodeError
+def decode_io_object(
+    obj: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+) -> _UNION_IO_TYPES:
+    fs, urlpath = _get_fs_and_urlpath_to_decode(obj, storage_options=storage_options)
+    return fs.open(urlpath, **kwargs)
 
 
 @_requires_xarray_and_dask
@@ -213,18 +208,22 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     if not fs_out.exists(urlpath_out):
         _store_xr_dataset(obj, fs_out, urlpath_out, filetype)
 
-    xr_dict = _dictify_file(fs_out, urlpath_out)
-    xr_dict["xarray:storage_options"] = config.SETTINGS["cache_files_storage_options"]
+    io_dict = _dictify_file(fs_out, urlpath_out)
     if filetype == "application/vnd+zarr":
-        xr_dict["xarray:open_kwargs"] = {
+        kwargs = {
             "engine": "zarr",
             "consolidated": True,
             "chunks": "auto",
         }
     else:
-        xr_dict["xarray:open_kwargs"] = {"chunks": "auto"}
+        kwargs = {"chunks": "auto"}
 
-    return xr_dict
+    return encode.dictify_python_call(
+        decode_xr_dataset,
+        io_dict,
+        storage_options=config.SETTINGS["cache_files_storage_options"],
+        **kwargs,
+    )
 
 
 def _store_io_object(
@@ -269,17 +268,16 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     if not fs_out.exists(urlpath_out):
         _store_io_object(fs_in, urlpath_in, fs_out, urlpath_out)
 
-    io_json = _dictify_file(fs_out, urlpath_out)
+    io_dict = _dictify_file(fs_out, urlpath_out)
     params = inspect.signature(open).parameters
-    open_kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
-    io_json.update(
-        {
-            "tmp:storage_options": config.SETTINGS["cache_files_storage_options"],
-            "tmp:open_kwargs": open_kwargs,
-        }
-    )
+    kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
 
-    return io_json
+    return encode.dictify_python_call(
+        decode_io_object,
+        io_dict,
+        storage_options=config.SETTINGS["cache_files_storage_options"],
+        **kwargs,
+    )
 
 
 def register_all() -> None:
@@ -291,7 +289,5 @@ def register_all() -> None:
         fsspec.implementations.local.LocalFileOpener,
     ):
         encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))
-    decode.FILECACHE_DECODERS.append(decode_io_object)
     if _HAS_XARRAY_AND_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
-        decode.FILECACHE_DECODERS.append(decode_xr_dataset)

@@ -37,13 +37,19 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
     local_path = f"{tmpdir}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
-        "type": "application/netcdf",
-        "href": href,
-        "file:checksum": fsspec.filesystem("file").checksum(local_path),
-        "file:size": 669,
-        "file:local_path": local_path,
-        "xarray:storage_options": {},
-        "xarray:open_kwargs": {"chunks": "auto"},
+        "type": "python_call",
+        "callable": "cacholote.extra_encoders:decode_xr_dataset",
+        "args": (
+            {
+                "type": "application/netcdf",
+                "href": href,
+                "file:checksum": fsspec.filesystem("file").checksum(local_path),
+                "file:size": 669,
+                "file:local_path": local_path,
+            },
+            {},
+        ),
+        "kwargs": {"chunks": "auto"},
     }
     assert actual == expected
 
