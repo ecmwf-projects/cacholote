@@ -59,7 +59,8 @@ _SETTINGS: Dict[str, Any] = {
 
 def _create_engine() -> None:
     _SETTINGS["engine"] = sqlalchemy.create_engine(
-        _SETTINGS["cache_db_urlpath"], future=True
+        _SETTINGS["cache_db_urlpath"],
+        future=True,
     )
     Base.metadata.create_all(_SETTINGS["engine"])
 

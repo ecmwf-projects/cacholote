@@ -84,16 +84,16 @@ def cacheable(func: F) -> F:
                     warnings.warn(str(ex), UserWarning)
 
                     # Delete cache file
-                    cached_dict = json.loads(cache_entry.value)
-                    if (
-                        isinstance(cached_dict, dict)
-                        and "file:local_path" in cached_dict
-                    ):
+                    cached_json = json.loads(cache_entry.value)
+                    if extra_encoders._is_file_json(cached_json):
                         fs, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(
-                            cached_dict, validate=False
+                            *cached_json["args"]
                         )
                         if fs.exists(urlpath):
-                            fs.rm(urlpath, recursive=True)
+                            recursive = (
+                                cached_json["args"][0]["type"] == "application/vnd+zarr"
+                            )
+                            fs.rm(urlpath, recursive=recursive)
 
                     # Remove cache entry
                     session.delete(cache_entry)

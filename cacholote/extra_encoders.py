@@ -94,11 +94,26 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     return file_dict
 
 
+def _is_file_json(obj: Any) -> bool:
+    try:
+        return set(obj["args"][0]) == {
+            "type",
+            "href",
+            "file:checksum",
+            "file:size",
+            "file:local_path",
+        }
+    except:  # noqa: E722
+        return False
+
+
 def _get_fs_and_urlpath_to_decode(
-    cache_dict: Dict[str, Any], storage_options: Optional[Dict[str, Any]] = None, validate: bool = True
+    file_json: Dict[str, Any],
+    storage_options: Optional[Dict[str, Any]] = None,
+    validate: bool = False,
 ) -> Tuple[fsspec.AbstractFileSystem, str]:
 
-    urlpath = cache_dict["file:local_path"]
+    urlpath = file_json["file:local_path"]
     if storage_options is None:
         storage_options = config.SETTINGS["cache_files_storage_options"]
 
@@ -113,29 +128,31 @@ def _get_fs_and_urlpath_to_decode(
         pass
     else:
         if fs.exists(urlpath):
-            if fs.checksum(urlpath) == cache_dict["file:checksum"]:
+            if fs.checksum(urlpath) == file_json["file:checksum"]:
                 return (fs, urlpath)
             raise ValueError("checksum mismatch")
 
     # Attempt to read from href
-    urlpath = cache_dict["href"]
+    urlpath = file_json["href"]
     fs, _, _ = fsspec.get_fs_token_paths(urlpath)
     if fs.exists(urlpath):
         return (fs, urlpath)
 
     # Nothing worked
     raise ValueError(
-        f"No such file or directory: {cache_dict['file:local_path']!r} nor {cache_dict['href']!r}"
+        f"No such file or directory: {file_json['file:local_path']!r} nor {file_json['href']!r}"
     )
 
 
 @_requires_xarray_and_dask
 def decode_xr_dataset(
-    obj: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
 ) -> "xr.Dataset":
-    fs, urlpath = _get_fs_and_urlpath_to_decode(obj, storage_options=storage_options)
+    fs, urlpath = _get_fs_and_urlpath_to_decode(
+        file_json, storage_options=storage_options, validate=True
+    )
 
-    if obj["type"] == "application/vnd+zarr":
+    if file_json["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
     else:
         if fsspec.utils.get_protocol(urlpath) == "file":
@@ -153,9 +170,11 @@ def decode_xr_dataset(
 
 
 def decode_io_object(
-    obj: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
 ) -> _UNION_IO_TYPES:
-    fs, urlpath = _get_fs_and_urlpath_to_decode(obj, storage_options=storage_options)
+    fs, urlpath = _get_fs_and_urlpath_to_decode(
+        file_json, storage_options=storage_options, validate=True
+    )
     return fs.open(urlpath, **kwargs)
 
 
@@ -208,7 +227,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     if not fs_out.exists(urlpath_out):
         _store_xr_dataset(obj, fs_out, urlpath_out, filetype)
 
-    io_dict = _dictify_file(fs_out, urlpath_out)
+    file_json = _dictify_file(fs_out, urlpath_out)
     if filetype == "application/vnd+zarr":
         kwargs = {
             "engine": "zarr",
@@ -220,7 +239,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
 
     return encode.dictify_python_call(
         decode_xr_dataset,
-        io_dict,
+        file_json,
         storage_options=config.SETTINGS["cache_files_storage_options"],
         **kwargs,
     )
@@ -268,13 +287,13 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     if not fs_out.exists(urlpath_out):
         _store_io_object(fs_in, urlpath_in, fs_out, urlpath_out)
 
-    io_dict = _dictify_file(fs_out, urlpath_out)
+    file_json = _dictify_file(fs_out, urlpath_out)
     params = inspect.signature(open).parameters
     kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
 
     return encode.dictify_python_call(
         decode_io_object,
-        io_dict,
+        file_json,
         storage_options=config.SETTINGS["cache_files_storage_options"],
         **kwargs,
     )

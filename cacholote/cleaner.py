@@ -28,17 +28,20 @@ def clean_cache_files(
         raise ValueError("`method` must be 'LRU' or 'LFU'.")
 
     fs = utils.get_cache_files_fs()
+    if fs.du(config.SETTINGS["cache_files_urlpath"]) <= maxsize:
+        return
+
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
         for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
-            if fs.du(config.SETTINGS["cache_files_urlpath"]) <= maxsize:
-                break
-
-            cached_dict = json.loads(cache_entry.value)
-            if isinstance(cached_dict, dict) and "file:local_path" in cached_dict:
+            cached_json = json.loads(cache_entry.value)
+            if extra_encoders._is_file_json(cached_json):
                 fs_entry, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(
-                    cached_dict, validate=False
+                    *cached_json["args"]
                 )
                 if fs == fs_entry and fs.exists(urlpath):
-                    fs.rm(urlpath, recursive=True)
+                    recursive = cached_json["args"][0]["type"] == "application/vnd+zarr"
+                    fs.rm(urlpath, recursive=recursive)
                     session.delete(cache_entry)
+                    if fs.du(config.SETTINGS["cache_files_urlpath"]) <= maxsize:
+                        break
         session.commit()
