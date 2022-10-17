@@ -7,7 +7,6 @@ Efficiently cache calls to functions
 ```python
 >>> import cacholote
 
->>> from tempfile import TemporaryDirectory
 >>> from time import sleep
 >>> from timeit import repeat
 
@@ -16,9 +15,9 @@ Efficiently cache calls to functions
 ...     sleep(x)
 ...     return x
 
->>> with TemporaryDirectory() as tmpdir, cacholote.config.set(cache_store_directory=tmpdir):
-...    timings = repeat(lambda: cached_func(1), number=1, repeat=5)
-...    cached_result = cached_func(1)
+>>> with cacholote.config.set(cache_db_urlpath="sqlite://"):
+...     timings = repeat(lambda: cached_func(1), number=1, repeat=5)
+...     cached_result = cached_func(1)
 
 >>> cached_result
 1

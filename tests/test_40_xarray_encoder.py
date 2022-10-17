@@ -1,4 +1,5 @@
 import pathlib
+import sqlite3
 
 import fsspec
 import pytest
@@ -34,7 +35,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
         actual = extra_encoders.dictify_xr_dataset(ds)
 
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
-    local_path = f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
+    local_path = f"{tmpdir}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
         "type": "application/netcdf",
         "href": href,
@@ -58,7 +59,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("set_cache", ["file", "ftp", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 @pytest.mark.filterwarnings(
     "ignore:GRIB write support is experimental, DO NOT RELY ON IT!"
 )
@@ -66,6 +67,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     "ignore:distutils Version classes are deprecated. Use packaging.version instead."
 )
 def test_xr_cacheable(
+    tmpdir: pathlib.Path,
     xarray_cache_type: str,
     ext: str,
     importorskip: str,
@@ -73,22 +75,21 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
-    if xarray_cache_type == "application/vnd+zarr" and set_cache == "ftp":
-        pytest.xfail(
-            "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory"
-        )
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
 
     expected = get_grib_ds()
     cfunc = cache.cacheable(get_grib_ds)
 
     infos = []
-    for expected_stats in ((0, 1), (1, 1)):
+    for expected_count in [1, 2]:
         with config.set(xarray_cache_type=xarray_cache_type):
             dirfs = utils.get_cache_files_dirfs()
             actual = cfunc()
 
-        # Check hit & miss
-        assert config.SETTINGS["cache_store"].stats() == expected_stats
+        # Check hits
+        cur.execute("SELECT count FROM cacholote")
+        assert cur.fetchall() == [(expected_count,)]
 
         infos.append(dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}"))
 

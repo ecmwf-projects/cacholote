@@ -1,10 +1,10 @@
-import datetime
-import json
+import pathlib
+import sqlite3
 from typing import Any
 
 import pytest
 
-from cacholote import cache, config
+from cacholote import cache
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
@@ -18,29 +18,33 @@ def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
         return LocalClass()
 
 
-@pytest.mark.parametrize("set_cache", ["file", "redis"], indirect=True)
-def test_cacheable(set_cache: str) -> None:
+def test_cacheable(tmpdir: pathlib.Path) -> None:
 
-    cache_store = config.SETTINGS["cache_store"]
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
 
     cfunc = cache.cacheable(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    if set_cache == "redis":
-        assert cache_store.info()["keyspace_hits"] == 0
-        assert cache_store.info()["keyspace_misses"] == 1
-    else:
-        # diskcache
-        assert cache_store.stats() == (0, 1)
+    cur.execute("SELECT key, value, count FROM cacholote")
+    assert cur.fetchall() == [
+        (
+            "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
+            '{"a":"test","b":null,"args":[],"kwargs":{}}',
+            1,
+        )
+    ]
 
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    if set_cache == "redis":
-        assert cache_store.info()["keyspace_hits"] == 1
-        assert cache_store.info()["keyspace_misses"] == 1
-    else:
-        # diskcache
-        assert cache_store.stats() == (1, 1)
+    cur.execute("SELECT key, value, count FROM cacholote")
+    assert cur.fetchall() == [
+        (
+            "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
+            '{"a":"test","b":null,"args":[],"kwargs":{}}',
+            2,
+        )
+    ]
 
     class Dummy:
         pass
@@ -59,26 +63,5 @@ def test_hexdigestify_python_call() -> None:
     assert (
         cache.hexdigestify_python_call(func, 1)
         == cache.hexdigestify_python_call(func, a=1)
-        == "c70ca47c460afc916aaf2804260271300aa7360d85018d1c6e9226d0"
+        == "54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c"
     )
-
-
-@pytest.mark.parametrize("set_cache", ["file", "redis"], indirect=True)
-def test_append_info(set_cache: str) -> None:
-    cfunc = cache.cacheable(func)
-    cache_key = "c70ca47c460afc916aaf2804260271300aa7360d85018d1c6e9226d0"
-    with config.set(append_info=True):
-        cfunc(1)
-        cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
-        assert cache_dict["info"]["count"] == 1
-        mtime0 = datetime.datetime.fromisoformat(cache_dict["info"]["mtime"])
-        atime0 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
-        assert mtime0 == atime0
-
-        cfunc(1)
-        cache_dict = json.loads(config.SETTINGS["cache_store"][cache_key])
-        assert cache_dict["info"]["count"] == 2
-        mtime1 = datetime.datetime.fromisoformat(cache_dict["info"]["mtime"])
-        atime1 = datetime.datetime.fromisoformat(cache_dict["info"]["atime"])
-        assert mtime1 == mtime0
-        assert atime0 < atime1

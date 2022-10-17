@@ -169,12 +169,6 @@ def dumps(
     default = kwargs.pop("default", filecache_default)
     kwargs = {**_JSON_DUMPS_KWARGS, **kwargs}
 
-    try:
-        dumped = json.dumps(obj, **kwargs)
-    except TypeError:
-        pass
-    else:
-        obj = dictify_python_call(decode.loads, dumped)
     return json.dumps(obj, default=default, **kwargs)
 
 

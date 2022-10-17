@@ -1,4 +1,5 @@
 import pathlib
+import sqlite3
 
 import fsspec
 import pytest
@@ -28,7 +29,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
         actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
 
     href = f"{readonly_dir}/{tmp_checksum}.txt"
-    local_path = f"{tmpdir}/{tmp_checksum}.txt"
+    local_path = f"{tmpdir}/cache_files/{tmp_checksum}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
         "type": "text/plain",
@@ -47,18 +48,22 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
 
 
 @pytest.mark.parametrize(
-    "set_cache, cache_dir",
-    [("file", None), ("ftp", ""), ("s3", "test-bucket")],
-    indirect=["set_cache"],
+    "set_cache",
+    ["file", "s3"],
+    indirect=True,
 )
 def test_copy_from_http_to_cache(
     tmpdir: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
-    cache_dir: str,
 ) -> None:
-    if cache_dir is None:
-        cache_dir = str(tmpdir)
+    if set_cache == "s3":
+        cache_dir = "test-bucket"
+    else:
+        cache_dir = str(tmpdir / "cache_files")
+
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
 
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
@@ -66,12 +71,13 @@ def test_copy_from_http_to_cache(
 
     cfunc = cache.cacheable(open_url)
     infos = []
-    for expected_stats in ((0, 1), (1, 1)):
+    for expected_count in (1, 2):
         dirfs = utils.get_cache_files_dirfs()
         result = cfunc(url)
 
-        # Check hit & miss
-        assert config.SETTINGS["cache_store"].stats() == expected_stats
+        # Check hits
+        cur.execute("SELECT count FROM cacholote")
+        assert cur.fetchall() == [(expected_count,)]
 
         infos.append(dirfs.info(cached_basename))
 
@@ -85,7 +91,9 @@ def test_copy_from_http_to_cache(
     assert infos[0] == infos[1]
 
 
-def test_io_corrupted_files(httpserver: pytest_httpserver.HTTPServer) -> None:
+def test_io_corrupted_files(
+    tmpdir: pathlib.Path, httpserver: pytest_httpserver.HTTPServer
+) -> None:
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
     cached_basename = str(fsspec.filesystem("http").checksum(url))

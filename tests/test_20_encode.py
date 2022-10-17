@@ -139,6 +139,6 @@ def test_dumps_python_call() -> None:
 
 
 def test_dumps_json_serializable() -> None:
-    expected = '{"type":"python_call","callable":"cacholote.decode:loads","args":["1"]}'
+    expected = "1"
     actual = encode.dumps(1)
     assert expected == actual

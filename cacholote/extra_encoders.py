@@ -205,7 +205,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
 
     filetype = config.SETTINGS["xarray_cache_type"]
     ext = mimetypes.guess_extension(filetype, strict=False)
-    urlpath_out = posixpath.join(utils.get_cache_files_directory(), f"{root}{ext}")
+    urlpath_out = posixpath.join(config.SETTINGS["cache_files_urlpath"], f"{root}{ext}")
 
     fs_out, _, _ = fsspec.get_fs_token_paths(
         urlpath_out, storage_options=config.SETTINGS["cache_files_storage_options"]
@@ -261,7 +261,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
 
     root = fs_in.checksum(urlpath_in)
     _, ext = os.path.splitext(urlpath_in)
-    urlpath_out = posixpath.join(utils.get_cache_files_directory(), f"{root}{ext}")
+    urlpath_out = posixpath.join(config.SETTINGS["cache_files_urlpath"], f"{root}{ext}")
 
     fs_out, _, _ = fsspec.get_fs_token_paths(
         urlpath_out, storage_options=config.SETTINGS["cache_files_storage_options"]

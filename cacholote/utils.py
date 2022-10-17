@@ -15,7 +15,7 @@
 
 import hashlib
 import io
-from typing import Iterator, Optional, Union
+from typing import Optional
 
 import fsspec
 import fsspec.implementations.dirfs
@@ -29,32 +29,17 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()
 
 
-def get_cache_files_directory() -> str:
-    """Return the directory where cache files are stored."""
-    if (
-        config.SETTINGS["cache_files_urlpath"]
-        is config.SETTINGS["cache_store_directory"]
-        is None
-    ):
-        raise ValueError(
-            "please set 'cache_files_urlpath' and 'cache_files_storage_options'"
-        )
-    if config.SETTINGS["cache_files_urlpath"] is None:
-        return str(config.SETTINGS["cache_store_directory"])
-    return str(config.SETTINGS["cache_files_urlpath"])
-
-
 def get_cache_files_directory_readonly() -> str:
     """Return the directory where cache files are stored."""
     if config.SETTINGS["cache_files_urlpath_readonly"] is None:
-        return get_cache_files_directory()
+        return str(config.SETTINGS["cache_files_urlpath"])
     return str(config.SETTINGS["cache_files_urlpath_readonly"])
 
 
 def get_cache_files_fs() -> fsspec.implementations.dirfs.DirFileSystem:
     """Return the ``fsspec`` filesystem where cache files are stored."""
     fs, _, _ = fsspec.get_fs_token_paths(
-        get_cache_files_directory(),
+        config.SETTINGS["cache_files_urlpath"],
         storage_options=config.SETTINGS["cache_files_storage_options"],
     )
     return fs
@@ -63,7 +48,7 @@ def get_cache_files_fs() -> fsspec.implementations.dirfs.DirFileSystem:
 def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
     """Return the ``fsspec`` directory filesystem where cache files are stored."""
     return fsspec.implementations.dirfs.DirFileSystem(
-        get_cache_files_directory(), get_cache_files_fs()
+        config.SETTINGS["cache_files_urlpath"], get_cache_files_fs()
     )
 
 
@@ -89,20 +74,3 @@ def copy_buffered_file(
         if not data:
             break
         f_out.write(data)
-
-
-def delete_cache_store_key(key: Union[str, bytes]) -> None:
-    try:
-        config.SETTINGS["cache_store"].delete(key)
-    except AttributeError:
-        del config.SETTINGS["cache_store"][key]
-
-
-def cache_store_keys_iter() -> Iterator[Union[str, bytes]]:
-    try:
-        # Redis
-        for k in config.SETTINGS["cache_store"].scan_iter():
-            yield k
-    except AttributeError:
-        for k in config.SETTINGS["cache_store"]:
-            yield k

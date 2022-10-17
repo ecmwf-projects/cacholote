@@ -7,10 +7,9 @@ dependencies:
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - aiohttp
-- diskcache
 - fsspec
 - moto
-- pyftpdlib
 - pytest-httpserver
 - requests
 - s3fs
+- sqlalchemy
