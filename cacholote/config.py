@@ -77,9 +77,9 @@ class set:
 
     Parameters
     ----------
-    database_url: str, default:"sqlite:////system_tmp_dir/cacholote.db"
+    cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote.db"
         URL for cache database.
-    cache_files_urlpath : str, optional
+    cache_files_urlpath : str, default:"/system_tmp_dir/cache_files"
         URL for cache files.
     cache_files_storage_options : dict, default: {}
         ``fsspec`` storage options for storing cache files.
@@ -94,7 +94,7 @@ class set:
     raise_all_encoding_errors: bool, default: False
         Raise an error if an encoder does not work (i.e., do not return results).
     engine:
-        `sqlalchemy` Engine. Mutually exclusive with ``database_url``.
+        `sqlalchemy` Engine. Mutually exclusive with ``cache_db_urlpath``.
     """
 
     def __init__(self, **kwargs: Any):
