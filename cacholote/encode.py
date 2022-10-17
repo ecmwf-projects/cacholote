@@ -166,10 +166,10 @@ def dumps(
     -------
     str
     """
-    default = kwargs.pop("default", filecache_default)
-    kwargs = {**_JSON_DUMPS_KWARGS, **kwargs}
-
-    return json.dumps(obj, default=default, **kwargs)
+    for k, v in _JSON_DUMPS_KWARGS.items():
+        kwargs.setdefault(k, v)
+    kwargs.setdefault("default", filecache_default)
+    return json.dumps(obj, **kwargs)
 
 
 def dumps_python_call(
