@@ -31,13 +31,19 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     local_path = f"{tmpdir}/{tmp_checksum}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
-        "type": "text/plain",
-        "href": href,
-        "file:checksum": checksum,
-        "file:size": 4,
-        "file:local_path": local_path,
-        "tmp:open_kwargs": {"mode": "rb"},
-        "tmp:storage_options": {},
+        "type": "python_call",
+        "callable": "cacholote.extra_encoders:decode_io_object",
+        "args": (
+            {
+                "type": "text/plain",
+                "href": href,
+                "file:checksum": checksum,
+                "file:size": 4,
+                "file:local_path": local_path,
+            },
+            {},
+        ),
+        "kwargs": {"mode": "rb"},
     }
     assert actual == expected
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
