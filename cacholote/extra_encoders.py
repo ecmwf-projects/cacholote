@@ -94,20 +94,25 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     return file_dict
 
 
-def _is_file_json(obj: Any) -> bool:
+def _are_file_args(*args: Any) -> bool:
     try:
-        return set(obj["args"][0]) == {
-            "type",
-            "href",
-            "file:checksum",
-            "file:size",
-            "file:local_path",
-        }
-    except:  # noqa: E722
+        return (
+            len(args) <= 2
+            and all(isinstance(arg, dict) for arg in args)
+            and set(args[0])
+            == {
+                "type",
+                "href",
+                "file:checksum",
+                "file:size",
+                "file:local_path",
+            }
+        )
+    except TypeError:
         return False
 
 
-def _get_fs_and_urlpath_to_decode(
+def _get_fs_and_urlpath(
     file_json: Dict[str, Any],
     storage_options: Optional[Dict[str, Any]] = None,
     validate: bool = False,
@@ -148,7 +153,7 @@ def _get_fs_and_urlpath_to_decode(
 def decode_xr_dataset(
     file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
 ) -> "xr.Dataset":
-    fs, urlpath = _get_fs_and_urlpath_to_decode(
+    fs, urlpath = _get_fs_and_urlpath(
         file_json, storage_options=storage_options, validate=True
     )
 
@@ -172,7 +177,7 @@ def decode_xr_dataset(
 def decode_io_object(
     file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
 ) -> _UNION_IO_TYPES:
-    fs, urlpath = _get_fs_and_urlpath_to_decode(
+    fs, urlpath = _get_fs_and_urlpath(
         file_json, storage_options=storage_options, validate=True
     )
     return fs.open(urlpath, **kwargs)

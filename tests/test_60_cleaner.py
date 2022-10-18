@@ -43,17 +43,17 @@ def test_cleaner(
     assert fs.du(dirname) == 3
 
     cleaner.clean_cache_files(3, method=method)
-    cur.execute("SELECT key FROM cacholote")
+    cur.execute("SELECT key FROM cache_entries")
     keys = cur.fetchall()
     assert len(keys) == fs.du(dirname) == 3
 
     cleaner.clean_cache_files(2, method=method)
-    cur.execute("SELECT key FROM cacholote")
+    cur.execute("SELECT key FROM cache_entries")
     keys = cur.fetchall()
     assert len(keys) == fs.du(dirname) == 2
 
     cleaner.clean_cache_files(1, method=method)
-    cur.execute("SELECT key FROM cacholote")
+    cur.execute("SELECT key FROM cache_entries")
     keys = cur.fetchall()
     assert len(keys) == fs.du(dirname) == 1
 

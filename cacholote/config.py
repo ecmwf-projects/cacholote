@@ -23,17 +23,19 @@ import fsspec
 import sqlalchemy
 import sqlalchemy.orm
 
-TMPDIR = os.path.join(tempfile.gettempdir(), "cacholote")
-FILES_DIR = os.path.join(TMPDIR, "cache_files")
-os.makedirs(FILES_DIR, exist_ok=True)
+from . import decode, encode
+
+CACHE_DIR = os.path.join(tempfile.gettempdir(), "cacholote")
+CACHE_FILES_DIR = os.path.join(CACHE_DIR, "cache_files")
+os.makedirs(CACHE_FILES_DIR, exist_ok=True)
 
 Base = sqlalchemy.orm.declarative_base()
 
 
 class CacheEntry(Base):
-    __tablename__ = "cacholote"
+    __tablename__ = "cache_entries"
     key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True)
-    value = sqlalchemy.Column(sqlalchemy.String)
+    result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(sqlalchemy.DateTime)
     count = sqlalchemy.Column(sqlalchemy.Integer)
 
@@ -47,8 +49,8 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 }
 
 _SETTINGS: Dict[str, Any] = {
-    "cache_db_urlpath": "sqlite:///" + os.path.join(TMPDIR, "cacholote.db"),
-    "cache_files_urlpath": os.path.join(TMPDIR, "cache_files"),
+    "cache_db_urlpath": "sqlite:///" + os.path.join(CACHE_DIR, "cacholote.db"),
+    "cache_files_urlpath": CACHE_FILES_DIR,
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
@@ -61,6 +63,8 @@ def _create_engine() -> None:
     _SETTINGS["engine"] = sqlalchemy.create_engine(
         _SETTINGS["cache_db_urlpath"],
         future=True,
+        json_serializer=encode.dumps,
+        json_deserializer=decode.loads,
     )
     Base.metadata.create_all(_SETTINGS["engine"])
 
@@ -78,16 +82,16 @@ class set:
 
     Parameters
     ----------
-    cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote.db"
+    cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
         URL for cache database.
-    cache_files_urlpath : str, default:"/system_tmp_dir/cache_files"
+    cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
         URL for cache files.
-    cache_files_storage_options : dict, default: {}
+    cache_files_storage_options: dict, default: {}
         ``fsspec`` storage options for storing cache files.
-    cache_files_urlpath_readonly : str, None, default: None
+    cache_files_urlpath_readonly: str, None, default: None
         URL for cache files accessible in read-only mode.
         None: same as ``cache_files_urlpath``
-    xarray_cache_type : {"application/netcdf", "application/x-grib", "application/vnd+zarr"}, \
+    xarray_cache_type: {"application/netcdf", "application/x-grib", "application/vnd+zarr"}, \
         default: "application/netcdf"
         Type for ``xarray`` cache files.
     io_delete_original: bool, default: False

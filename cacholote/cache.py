@@ -15,7 +15,6 @@
 
 import datetime
 import functools
-import json
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
 
@@ -65,60 +64,59 @@ def cacheable(func: F) -> F:
             warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
-        stmt = sqlalchemy.select(config.CacheEntry).where(
-            config.CacheEntry.key == hexdigest
-        )
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
             try:
                 # Get result from cache
-                cache_entry = session.scalars(stmt).one()
+                cache_entry = (
+                    session.query(config.CacheEntry)
+                    .filter(config.CacheEntry.key == hexdigest)
+                    .one()
+                )
             except sqlalchemy.exc.NoResultFound:
                 # Not in the cache
                 pass
+            except decode.DecodeError as ex:
+                # Something wrong, e.g. cached files are corrupted
+                warnings.warn(str(ex), UserWarning)
+
+                # Delete cache file
+                cached_args = (
+                    session.query(config.CacheEntry.result["args"].as_json())
+                    .filter(config.CacheEntry.key == hexdigest)
+                    .one()[0]
+                )
+                if extra_encoders._are_file_args(*cached_args):
+                    fs, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
+                    if fs.exists(urlpath):
+                        recursive = cached_args[0]["type"] == "application/vnd+zarr"
+                        fs.rm(urlpath, recursive=recursive)
+
+                # Remove cache entry
+                session.query(config.CacheEntry).filter(
+                    config.CacheEntry.key == hexdigest
+                ).delete()
+                session.commit()
             else:
-                # Attempt to decode from cache
-                try:
-                    result = decode.loads(cache_entry.value)
-                except Exception as ex:
-                    # Something wrong, e.g. cached files are corrupted
-                    warnings.warn(str(ex), UserWarning)
-
-                    # Delete cache file
-                    cached_json = json.loads(cache_entry.value)
-                    if extra_encoders._is_file_json(cached_json):
-                        fs, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(
-                            *cached_json["args"]
-                        )
-                        if fs.exists(urlpath):
-                            recursive = (
-                                cached_json["args"][0]["type"] == "application/vnd+zarr"
-                            )
-                            fs.rm(urlpath, recursive=recursive)
-
-                    # Remove cache entry
-                    session.delete(cache_entry)
-                    session.commit()
-                else:
-                    # Update stats and return cached result
-                    cache_entry.timestamp = datetime.datetime.now()
-                    cache_entry.count += 1
-                    session.commit()
-                    return result
+                # Update stats and return cached result
+                cache_entry.timestamp = datetime.datetime.now()
+                cache_entry.count += 1
+                session.commit()
+                return cache_entry.result
 
             # Compute result
             result = func(*args, **kwargs)
             try:
-                value = encode.dumps(result)
-            except encode.EncodeError:
+                cache_entry = config.CacheEntry(
+                    key=hexdigest,
+                    result=result,
+                    timestamp=datetime.datetime.now(),
+                    count=1,
+                )
+                session.add(cache_entry)
+                session.commit()
+            except sqlalchemy.exc.StatementError:
                 warnings.warn("can NOT encode output", UserWarning)
                 return result
-
-            # Add cache entry and return result computed
-            cache_entry = config.CacheEntry(
-                key=hexdigest, value=value, timestamp=datetime.datetime.now(), count=1
-            )
-            session.add(cache_entry)
-            session.commit()
-            return decode.loads(value)
+            return cache_entry.result
 
     return cast(F, wrapper)

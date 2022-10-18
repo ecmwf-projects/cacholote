@@ -1,4 +1,3 @@
-import json
 from typing import Literal
 
 import sqlalchemy.orm
@@ -31,17 +30,16 @@ def clean_cache_files(
     if fs.du(config.SETTINGS["cache_files_urlpath"]) <= maxsize:
         return
 
+    delete_stmt = sqlalchemy.delete(config.CacheEntry)
+    query_tuple = (config.CacheEntry.key, config.CacheEntry.result["args"].as_json())
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
-            cached_json = json.loads(cache_entry.value)
-            if extra_encoders._is_file_json(cached_json):
-                fs_entry, urlpath = extra_encoders._get_fs_and_urlpath_to_decode(
-                    *cached_json["args"]
-                )
+        for key, cached_args in session.query(*query_tuple).order_by(*sorters):
+            if extra_encoders._are_file_args(*cached_args):
+                fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
                 if fs == fs_entry and fs.exists(urlpath):
-                    recursive = cached_json["args"][0]["type"] == "application/vnd+zarr"
+                    recursive = cached_args[0]["type"] == "application/vnd+zarr"
                     fs.rm(urlpath, recursive=recursive)
-                    session.delete(cache_entry)
+                    session.execute(delete_stmt.where(config.CacheEntry.key == key))
                     if fs.du(config.SETTINGS["cache_files_urlpath"]) <= maxsize:
                         break
         session.commit()

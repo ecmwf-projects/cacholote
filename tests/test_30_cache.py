@@ -26,7 +26,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
     cfunc = cache.cacheable(func)
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    cur.execute("SELECT key, value, count FROM cacholote")
+    cur.execute("SELECT key, result, count FROM cache_entries")
     assert cur.fetchall() == [
         (
             "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
@@ -37,7 +37,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
 
     res = cfunc("test")
     assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    cur.execute("SELECT key, value, count FROM cacholote")
+    cur.execute("SELECT key, result, count FROM cache_entries")
     assert cur.fetchall() == [
         (
             "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",

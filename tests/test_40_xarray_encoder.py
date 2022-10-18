@@ -94,7 +94,7 @@ def test_xr_cacheable(
             actual = cfunc()
 
         # Check hits
-        cur.execute("SELECT count FROM cacholote")
+        cur.execute("SELECT count FROM cache_entries")
         assert cur.fetchall() == [(expected_count,)]
 
         infos.append(dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}"))

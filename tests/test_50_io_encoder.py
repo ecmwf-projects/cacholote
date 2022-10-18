@@ -82,7 +82,7 @@ def test_copy_from_http_to_cache(
         result = cfunc(url)
 
         # Check hits
-        cur.execute("SELECT count FROM cacholote")
+        cur.execute("SELECT count FROM cache_entries")
         assert cur.fetchall() == [(expected_count,)]
 
         infos.append(dirfs.info(cached_basename))

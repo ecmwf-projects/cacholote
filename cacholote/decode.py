@@ -38,7 +38,6 @@ class DecodeError(Exception):
 def decode_python_object(obj: Dict[str, Any]) -> Any:
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
-    raise DecodeError
 
 
 def decode_python_call(obj: Dict[str, Any]) -> Any:
@@ -50,7 +49,6 @@ def decode_python_call(obj: Dict[str, Any]) -> Any:
         args = obj.get("args", ())
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
-    raise DecodeError
 
 
 FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
@@ -61,11 +59,14 @@ FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     """Decode deserialized JSON data (``dict``)."""
-    for decoder in reversed(FILECACHE_DECODERS):
-        try:
-            return decoder(obj)
-        except DecodeError:
-            continue
+    if isinstance(obj, dict):
+        for decoder in reversed(FILECACHE_DECODERS):
+            try:
+                result = decoder(obj)
+                if result is not None:
+                    return result
+            except Exception as ex:
+                raise DecodeError(ex)
 
     return obj
 
