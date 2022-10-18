@@ -104,10 +104,7 @@ def cacheable(func: F) -> F:
             # Compute result
             result = func(*args, **kwargs)
             try:
-                cache_entry = config.CacheEntry(
-                    key=hexdigest,
-                    result=result,
-                )
+                cache_entry = config.CacheEntry(key=hexdigest, result=result)
                 session.add(cache_entry)
                 session.commit()
             except sqlalchemy.exc.StatementError:

@@ -64,3 +64,23 @@ def test_cleaner(
         # Most recently used
         checksum = checksums[0]
     assert fs.exists(f"{dirname}/{checksum}.txt")
+
+
+@pytest.mark.parametrize("delete_unknown_files", [True, False])
+def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
+    fs = utils.get_cache_files_fs()
+    dirname = config.SETTINGS["cache_files_urlpath"]
+
+    tmpfile = tmpdir / "test.txt"
+    with open(tmpfile, "w") as f:
+        f.write("0")
+    open_url(tmpfile)
+    fs.copy(str(tmpfile), f"{dirname}/unknown.txt")
+
+    if delete_unknown_files:
+        cleaner.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
+        assert fs.du(dirname) == 0
+    else:
+        with pytest.raises(ValueError):
+            cleaner.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
+        assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
