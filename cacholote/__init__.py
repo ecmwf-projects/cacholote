@@ -1,6 +1,7 @@
 """Efficiently cache calls to functions."""
 
 # Copyright 2019, B-Open Solutions srl.
+# Copyright 2022, European Union.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
