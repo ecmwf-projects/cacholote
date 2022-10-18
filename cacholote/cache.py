@@ -79,10 +79,10 @@ def cacheable(func: F) -> F:
                 warnings.warn(str(ex), UserWarning)
 
                 # Delete cache file
-                cached_args = (
+                cached_args, *_ = (
                     session.query(config.CacheEntry.result["args"].as_json())
                     .filter(config.CacheEntry.key == hexdigest)
-                    .one()[0]
+                    .one()
                 )
                 if extra_encoders._are_file_args(*cached_args):
                     fs, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
