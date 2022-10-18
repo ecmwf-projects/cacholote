@@ -88,14 +88,14 @@ def test_xr_cacheable(
     cfunc = cache.cacheable(get_grib_ds)
 
     infos = []
-    for expected_count in [1, 2]:
+    for expected_counter in [1, 2]:
         with config.set(xarray_cache_type=xarray_cache_type):
             dirfs = utils.get_cache_files_dirfs()
             actual = cfunc()
 
         # Check hits
-        cur.execute("SELECT count FROM cache_entries")
-        assert cur.fetchall() == [(expected_count,)]
+        cur.execute("SELECT counter FROM cache_entries")
+        assert cur.fetchall() == [(expected_counter,)]
 
         infos.append(dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}"))
 

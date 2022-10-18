@@ -20,9 +20,9 @@ def clean_cache_files(
         * LFU: Least Frequently Used
     """
     if method == "LRU":
-        sorters = (config.CacheEntry.timestamp, config.CacheEntry.count)
+        sorters = (config.CacheEntry.timestamp, config.CacheEntry.counter)
     elif method == "LFU":
-        sorters = (config.CacheEntry.count, config.CacheEntry.timestamp)
+        sorters = (config.CacheEntry.counter, config.CacheEntry.timestamp)
     else:
         raise ValueError("`method` must be 'LRU' or 'LFU'.")
 

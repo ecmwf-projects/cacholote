@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import os
 import tempfile
 from types import MappingProxyType, TracebackType
@@ -34,10 +35,11 @@ Base = sqlalchemy.orm.declarative_base()
 
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
+
     key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True)
     result = sqlalchemy.Column(sqlalchemy.JSON)
-    timestamp = sqlalchemy.Column(sqlalchemy.DateTime)
-    count = sqlalchemy.Column(sqlalchemy.Integer)
+    timestamp = sqlalchemy.Column(sqlalchemy.DateTime, onupdate=datetime.datetime.now)
+    counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
 
 
 _ALLOWED_SETTINGS: Dict[str, List[Any]] = {

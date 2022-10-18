@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
 import functools
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
@@ -98,8 +97,7 @@ def cacheable(func: F) -> F:
                 session.commit()
             else:
                 # Update stats and return cached result
-                cache_entry.timestamp = datetime.datetime.now()
-                cache_entry.count += 1
+                cache_entry.counter += 1
                 session.commit()
                 return cache_entry.result
 
@@ -109,8 +107,6 @@ def cacheable(func: F) -> F:
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
                     result=result,
-                    timestamp=datetime.datetime.now(),
-                    count=1,
                 )
                 session.add(cache_entry)
                 session.commit()

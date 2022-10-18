@@ -77,13 +77,13 @@ def test_copy_from_http_to_cache(
 
     cfunc = cache.cacheable(open_url)
     infos = []
-    for expected_count in (1, 2):
+    for expected_counter in (1, 2):
         dirfs = utils.get_cache_files_dirfs()
         result = cfunc(url)
 
         # Check hits
-        cur.execute("SELECT count FROM cache_entries")
-        assert cur.fetchall() == [(expected_count,)]
+        cur.execute("SELECT counter FROM cache_entries")
+        assert cur.fetchall() == [(expected_counter,)]
 
         infos.append(dirfs.info(cached_basename))
 
