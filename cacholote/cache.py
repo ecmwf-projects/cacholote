@@ -19,8 +19,7 @@ import functools
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
 
-from . import decode, encode, utils
-from .config import SETTINGS
+from . import config, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -53,6 +52,9 @@ def cacheable(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not config.SETTINGS["use_cache"]:
+            return func(*args, **kwargs)
+
         try:
             hexdigest = hexdigestify_python_call(
                 func,
@@ -63,7 +65,7 @@ def cacheable(func: F) -> F:
             warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
-        cache_store = SETTINGS["cache_store"]
+        cache_store = config.SETTINGS["cache_store"]
         try:
             # Use try/except to update stats correctly
             cached = cache_store[hexdigest]
