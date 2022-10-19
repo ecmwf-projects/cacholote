@@ -1,3 +1,4 @@
+import json
 import os
 
 import pytest
@@ -45,3 +46,14 @@ def test_change_settings(tmpdir: str) -> None:
 
     with pytest.raises(ValueError, match="Wrong settings. Available settings: "):
         config.set(dummy="dummy")
+
+
+def test_json_dumps() -> None:
+    old_settings = dict(config._SETTINGS)
+    json_settings = json.loads(config.json_dumps())
+
+    with config.set(**json_settings):
+        new_settings = dict(config._SETTINGS)
+        assert old_settings["engine"].url == config.SETTINGS["engine"].url
+        assert new_settings.pop("engine") != old_settings.pop("engine")
+        assert old_settings == new_settings

@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import datetime
+import json
 import os
 import tempfile
 from types import MappingProxyType, TracebackType
@@ -75,6 +76,13 @@ _create_engine()
 
 # Immutable settings to be used by other modules
 SETTINGS = MappingProxyType(_SETTINGS)
+
+
+def json_dumps() -> str:
+    """Serialize configuration to a JSON formatted string."""
+    if SETTINGS["cache_db_urlpath"] is None:
+        raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
+    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})
 
 
 class set:
