@@ -30,6 +30,7 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 }
 
 _SETTINGS: Dict[str, Any] = {
+    "use_cache": True,
     "cache_store_directory": os.path.join(tempfile.gettempdir(), "cacholote"),
     "cache_files_urlpath": None,
     "cache_files_storage_options": {},
@@ -59,6 +60,8 @@ class set:
 
     Parameters
     ----------
+    use_cache: bool, default: True
+        Enable/disable cache.
     cache_store_directory : str, default: "system-specific-tmpdir/cacholote"
         Directory for the cache store. Mutually exclusive with ``cache_store``.
     cache_files_urlpath : str, None, default: None

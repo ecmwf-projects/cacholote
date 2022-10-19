@@ -1,3 +1,4 @@
+import datetime
 from typing import Any
 
 import pytest
@@ -67,3 +68,16 @@ def test_same_key_using_args_or_kwargs() -> None:
         == cache.hexdigestify_python_call(func, x=1)
         == "f3569dae5c7b8023be97156b43642fbd80f5e1e93a1d4df75d308a7e"
     )
+
+
+@pytest.mark.parametrize("use_cache", [True, False])
+def test_use_cache(use_cache: bool) -> None:
+    @cache.cacheable
+    def cached_now() -> datetime.datetime:
+        return datetime.datetime.now()
+
+    with config.set(use_cache=use_cache):
+        if use_cache:
+            assert cached_now() == cached_now()
+        else:
+            assert cached_now() < cached_now()
