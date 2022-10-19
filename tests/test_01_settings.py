@@ -31,6 +31,12 @@ def test_set_engine(tmpdir: str) -> None:
     ):
         config.set(engine=new_engine, cache_db_urlpath=new_db)
 
+    with pytest.raises(
+        ValueError,
+        match=r"Can NOT dump to JSON when `engine` has been directly set.",
+    ):
+        config.json_dumps()
+
 
 def test_change_settings(tmpdir: str) -> None:
     new_db = "sqlite:///" + os.path.join(tmpdir, "dummy.db")
@@ -57,3 +63,4 @@ def test_json_dumps() -> None:
         assert old_settings["engine"].url == config.SETTINGS["engine"].url
         assert new_settings.pop("engine") != old_settings.pop("engine")
         assert old_settings == new_settings
+        assert json.loads(config.json_dumps()) == json_settings
