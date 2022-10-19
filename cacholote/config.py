@@ -39,7 +39,11 @@ class CacheEntry(Base):
 
     key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True, unique=True)
     result = sqlalchemy.Column(sqlalchemy.JSON)
-    timestamp = sqlalchemy.Column(sqlalchemy.DateTime, onupdate=datetime.datetime.now)
+    timestamp = sqlalchemy.Column(
+        sqlalchemy.DateTime,
+        default=datetime.datetime.now,
+        onupdate=datetime.datetime.now,
+    )
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
 
 
