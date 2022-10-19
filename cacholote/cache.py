@@ -83,7 +83,7 @@ def cacheable(func: F) -> F:
                 warnings.warn(str(ex), UserWarning)
 
                 # Delete cache file
-                cached_args, *_ = (
+                (cached_args,) = (
                     session.query(config.CacheEntry.result["args"].as_json())
                     .filter(config.CacheEntry.key == hexdigest)
                     .one()

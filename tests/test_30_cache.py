@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 import sqlite3
 from typing import Any
@@ -24,27 +25,25 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
     cur = con.cursor()
 
     cfunc = cache.cacheable(func)
-    res = cfunc("test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    cur.execute("SELECT key, result, counter FROM cache_entries")
-    assert cur.fetchall() == [
-        (
-            "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
-            '{"a":"test","b":null,"args":[],"kwargs":{}}',
-            1,
-        )
-    ]
 
-    res = cfunc("test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    cur.execute("SELECT key, result, counter FROM cache_entries")
-    assert cur.fetchall() == [
-        (
-            "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
-            '{"a":"test","b":null,"args":[],"kwargs":{}}',
-            2,
-        )
-    ]
+    for counter in range(1, 3):
+        before = datetime.datetime.now()
+        res = cfunc("test")
+        after = datetime.datetime.now()
+        assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
+
+        cur.execute("SELECT key, result, counter FROM cache_entries")
+        assert cur.fetchall() == [
+            (
+                "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
+                '{"a":"test","b":null,"args":[],"kwargs":{}}',
+                counter,
+            )
+        ]
+
+        cur.execute("SELECT timestamp FROM cache_entries")
+        (timestamp,) = cur.fetchone()
+        assert before < datetime.datetime.fromisoformat(timestamp) < after
 
     class Dummy:
         pass
