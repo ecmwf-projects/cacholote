@@ -71,6 +71,10 @@ def cacheable(func: F) -> F:
                     .filter(config.CacheEntry.key == hexdigest)
                     .one()
                 )
+
+                # Update stats and return cached result
+                cache_entry.counter += 1
+                return cache_entry.result
             except sqlalchemy.exc.NoResultFound:
                 # Not in the cache
                 pass
@@ -94,22 +98,18 @@ def cacheable(func: F) -> F:
                 session.query(config.CacheEntry).filter(
                     config.CacheEntry.key == hexdigest
                 ).delete()
+            finally:
                 session.commit()
-            else:
-                # Update stats and return cached result
-                cache_entry.counter += 1
-                session.commit()
-                return cache_entry.result
 
-            # Compute result
+            # Not in the cache: Compute result
             result = func(*args, **kwargs)
             try:
                 cache_entry = config.CacheEntry(key=hexdigest, result=result)
                 session.add(cache_entry)
                 session.commit()
+                return cache_entry.result
             except sqlalchemy.exc.StatementError:
                 warnings.warn("can NOT encode output", UserWarning)
                 return result
-            return cache_entry.result
 
     return cast(F, wrapper)
