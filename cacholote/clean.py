@@ -46,8 +46,10 @@ def clean_cache_files(
     else:
         raise ValueError("`method` must be 'LRU' or 'LFU'.")
 
+    # Freeze directory content
     fs, dirname = utils.get_cache_files_fs_dirname()
-    if fs.du(dirname) <= maxsize:
+    sizes = {path: fs.du(path) for path in fs.du(dirname, total=False, maxdepth=1)}
+    if sum(sizes.values()) <= maxsize:
         return
 
     # Clean files in database
@@ -57,20 +59,24 @@ def clean_cache_files(
         for key, cached_args in session.query(*query_tuple).order_by(*sorters):
             if extra_encoders._are_file_args(*cached_args):
                 fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
-                if fs == fs_entry and fs.exists(urlpath):
+                if fs == fs_entry and urlpath in sizes:
+                    # Delete file
+                    sizes.pop(urlpath)
                     recursive = cached_args[0]["type"] == "application/vnd+zarr"
                     fs.rm(urlpath, recursive=recursive)
+                    # Delete database entry
                     session.execute(delete_stmt.where(config.CacheEntry.key == key))
                     session.commit()
-                    if fs.du(dirname) <= maxsize:
+                    if sum(sizes.values()) <= maxsize:
                         return
 
-    # Clean unknown files
-    paths = fs.ls(dirname) if delete_unknown_files else []
-    times = [fs.modified(path) for path in paths]
-    for _, path in sorted(zip(times, paths)):
-        fs.rm(path)
-        if fs.du(dirname) <= maxsize:
-            return
+    if delete_unknown_files:
+        # Sort by modification time
+        times = [fs.modified(k) for k in sizes]
+        for _, urlpath in sorted(zip(times, sizes)):
+            sizes.pop(urlpath)
+            fs.rm(urlpath)
+            if sum(sizes.values()) <= maxsize:
+                return
 
     raise ValueError(f"Unable to clean {dirname!r}. It has size {fs.du(dirname)!r}.")
