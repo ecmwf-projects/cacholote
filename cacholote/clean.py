@@ -54,7 +54,7 @@ def clean_cache_files(
 
     # Clean files in database
     delete_stmt = sqlalchemy.delete(config.CacheEntry)
-    query_tuple = (config.CacheEntry.key, config.CacheEntry.result["args"].as_json())
+    query_tuple = (config.CacheEntry.key, config.CacheEntry.result["args"])
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
         for key, cached_args in session.query(*query_tuple).order_by(*sorters):
             if extra_encoders._are_file_args(*cached_args):

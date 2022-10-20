@@ -88,7 +88,7 @@ def cacheable(func: F) -> F:
 
                 # Delete cache file
                 (cached_args,) = (
-                    session.query(config.CacheEntry.result["args"].as_json())
+                    session.query(config.CacheEntry.result["args"])
                     .filter(config.CacheEntry.key == hexdigest)
                     .one()
                 )
