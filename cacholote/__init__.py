@@ -17,7 +17,7 @@
 
 from . import config, extra_encoders, utils
 from .cache import cacheable, hexdigestify_python_call
-from .cleaner import clean_cache_files
+from .clean import clean_cache_files
 from .decode import loads
 from .encode import dumps
 

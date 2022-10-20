@@ -5,7 +5,7 @@ from typing import Literal
 import fsspec
 import pytest
 
-from cacholote import cache, cleaner, utils
+from cacholote import cache, clean, utils
 
 
 @cache.cacheable
@@ -15,7 +15,7 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 
 
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
-def test_cleaner(
+def test_clean_cache_files(
     tmpdir: pathlib.Path,
     method: Literal["LRU", "LFU"],
 ) -> None:
@@ -41,17 +41,17 @@ def test_cleaner(
 
     assert fs.du(dirname) == 3
 
-    cleaner.clean_cache_files(3, method=method)
+    clean.clean_cache_files(3, method=method)
     cur.execute("SELECT key FROM cache_entries")
     keys = cur.fetchall()
     assert len(keys) == fs.du(dirname) == 3
 
-    cleaner.clean_cache_files(2, method=method)
+    clean.clean_cache_files(2, method=method)
     cur.execute("SELECT key FROM cache_entries")
     keys = cur.fetchall()
     assert len(keys) == fs.du(dirname) == 2
 
-    cleaner.clean_cache_files(1, method=method)
+    clean.clean_cache_files(1, method=method)
     cur.execute("SELECT key FROM cache_entries")
     keys = cur.fetchall()
     assert len(keys) == fs.du(dirname) == 1
@@ -76,9 +76,9 @@ def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) 
     fs.copy(str(tmpfile), f"{dirname}/unknown.txt")
 
     if delete_unknown_files:
-        cleaner.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
+        clean.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
         assert fs.du(dirname) == 0
     else:
         with pytest.raises(ValueError):
-            cleaner.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
+            clean.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
         assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
