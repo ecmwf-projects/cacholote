@@ -15,8 +15,10 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 
 
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 def test_clean_cache_files(
     tmpdir: pathlib.Path,
+    set_cache: str,
     method: Literal["LRU", "LFU"],
 ) -> None:
 
@@ -66,14 +68,17 @@ def test_clean_cache_files(
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
-def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+def test_delete_unknown_files(
+    tmpdir: pathlib.Path, set_cache: str, delete_unknown_files: bool
+) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     tmpfile = tmpdir / "test.txt"
     with open(tmpfile, "w") as f:
         f.write("0")
     open_url(tmpfile)
-    fs.copy(str(tmpfile), f"{dirname}/unknown.txt")
+    fs.put(str(tmpfile), f"{dirname}/unknown.txt")
 
     if delete_unknown_files:
         clean.clean_cache_files(0, delete_unknown_files=delete_unknown_files)

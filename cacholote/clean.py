@@ -48,7 +48,10 @@ def clean_cache_files(
 
     # Freeze directory content
     fs, dirname = utils.get_cache_files_fs_dirname()
-    sizes = {path: fs.du(path) for path in fs.du(dirname, total=False, maxdepth=1)}
+    sizes = {
+        fs.unstrip_protocol(path): fs.du(path)
+        for path in fs.du(dirname, total=False, maxdepth=1)
+    }
     if sum(sizes.values()) <= maxsize:
         return
 
@@ -59,6 +62,7 @@ def clean_cache_files(
         for key, cached_args in session.query(*query_tuple).order_by(*sorters):
             if extra_encoders._are_file_args(*cached_args):
                 fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
+                urlpath = fs_entry.unstrip_protocol(urlpath)
                 if fs == fs_entry and urlpath in sizes:
                     # Delete file
                     sizes.pop(urlpath)
