@@ -64,3 +64,16 @@ def test_hexdigestify_python_call() -> None:
         == cache.hexdigestify_python_call(func, a=1)
         == "54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c"
     )
+
+
+@pytest.mark.parametrize("use_cache", [True, False])
+def test_use_cache(use_cache: bool) -> None:
+    @cache.cacheable
+    def cached_now() -> datetime.datetime:
+        return datetime.datetime.now()
+
+    with config.set(use_cache=use_cache):
+        if use_cache:
+            assert cached_now() == cached_now()
+        else:
+            assert cached_now() < cached_now()

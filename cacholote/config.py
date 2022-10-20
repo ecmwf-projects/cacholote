@@ -1,6 +1,6 @@
 """Global settings."""
 
-# Copyright 2019, B-Open Solutions srl.
+# Copyright 2022, European Union.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,6 +56,7 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 }
 
 _SETTINGS: Dict[str, Any] = {
+    "use_cache": True,
     "cache_db_urlpath": "sqlite:///" + os.path.join(CACHE_DIR, "cacholote.db"),
     "cache_files_urlpath": CACHE_FILES_DIR,
     "cache_files_urlpath_readonly": None,
@@ -96,6 +97,8 @@ class set:
 
     Parameters
     ----------
+    use_cache: bool, default: True
+        Enable/disable cache.
     cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
         URL for cache database.
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
