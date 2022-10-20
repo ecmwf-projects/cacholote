@@ -54,18 +54,16 @@ def clean_cache_files(
     delete_stmt = sqlalchemy.delete(config.CacheEntry)
     query_tuple = (config.CacheEntry.key, config.CacheEntry.result["args"].as_json())
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        try:
-            for key, cached_args in session.query(*query_tuple).order_by(*sorters):
-                if extra_encoders._are_file_args(*cached_args):
-                    fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
-                    if fs == fs_entry and fs.exists(urlpath):
-                        recursive = cached_args[0]["type"] == "application/vnd+zarr"
-                        fs.rm(urlpath, recursive=recursive)
-                        session.execute(delete_stmt.where(config.CacheEntry.key == key))
-                        if fs.du(dirname) <= maxsize:
-                            return
-        finally:
-            session.commit()
+        for key, cached_args in session.query(*query_tuple).order_by(*sorters):
+            if extra_encoders._are_file_args(*cached_args):
+                fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
+                if fs == fs_entry and fs.exists(urlpath):
+                    recursive = cached_args[0]["type"] == "application/vnd+zarr"
+                    fs.rm(urlpath, recursive=recursive)
+                    session.execute(delete_stmt.where(config.CacheEntry.key == key))
+                    session.commit()
+                    if fs.du(dirname) <= maxsize:
+                        return
 
     # Clean unknown files
     paths = fs.ls(dirname) if delete_unknown_files else []
