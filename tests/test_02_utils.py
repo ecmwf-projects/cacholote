@@ -13,10 +13,10 @@ def test_hexdigestify() -> None:
 
 
 def test_get_cache_files(tmpdir: pathlib.Path) -> None:
-    assert utils.get_cache_files_fs() == fsspec.filesystem("file")
-
-    assert utils.get_cache_files_dirfs().path == tmpdir / "cache_files"
-    assert utils.get_cache_files_dirfs().fs == fsspec.filesystem("file")
+    assert utils.get_cache_files_fs_dirname() == (
+        fsspec.filesystem("file"),
+        str(tmpdir / "cache_files"),
+    )
 
 
 def test_copy_buffered_file(tmpdir: pathlib.Path) -> None:

@@ -85,7 +85,9 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     file_dict = {
         "type": filetype,
         "href": posixpath.join(
-            utils.get_cache_files_directory_readonly(), posixpath.basename(local_path)
+            config.SETTINGS["cache_files_urlpath_readonly"]
+            or config.SETTINGS["cache_files_urlpath"],
+            posixpath.basename(local_path),
         ),
         "file:checksum": fs.checksum(local_path),
         "file:size": fs.size(local_path),

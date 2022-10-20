@@ -46,8 +46,7 @@ def clean_cache_files(
     else:
         raise ValueError("`method` must be 'LRU' or 'LFU'.")
 
-    fs = utils.get_cache_files_fs()
-    dirname = config.SETTINGS["cache_files_urlpath"]
+    fs, dirname = utils.get_cache_files_fs_dirname()
     if fs.du(dirname) <= maxsize:
         return
 

@@ -63,12 +63,9 @@ def test_copy_from_http_to_cache(
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
 ) -> None:
-    if set_cache == "s3":
-        cache_dir = "test-bucket"
-    else:
-        cache_dir = str(tmpdir / "cache_files")
+    fs, dirname = utils.get_cache_files_fs_dirname()
 
-    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    con = sqlite3.connect(tmpdir / "cacholote.db")
     cur = con.cursor()
 
     httpserver.expect_request("/test").respond_with_data(b"test")
@@ -78,20 +75,19 @@ def test_copy_from_http_to_cache(
     cfunc = cache.cacheable(open_url)
     infos = []
     for expected_counter in (1, 2):
-        dirfs = utils.get_cache_files_dirfs()
         result = cfunc(url)
 
         # Check hits
         cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == [(expected_counter,)]
 
-        infos.append(dirfs.info(cached_basename))
+        infos.append(fs.info(f"{dirname}/{cached_basename}"))
 
         # Check result
         assert result.read() == b"test"
 
         # Check file in cache
-        assert result.path == f"{cache_dir}/{cached_basename}"
+        assert result.path == f"{dirname}/{cached_basename}"
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
@@ -105,20 +101,21 @@ def test_io_corrupted_files(
     cached_basename = str(fsspec.filesystem("http").checksum(url))
 
     cfunc = cache.cacheable(open_url)
-    dirfs = utils.get_cache_files_dirfs()
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
     cfunc(url)
 
     # Warn if file is corrupted
-    dirfs.touch(cached_basename)
-    touched_info = dirfs.info(cached_basename)
+    fs.touch(f"{dirname}/{cached_basename}")
+    touched_info = fs.info(f"{dirname}/{cached_basename}")
     with pytest.warns(UserWarning, match="checksum mismatch"):
         result = cfunc(url)
     assert result.read() == b"test"
-    assert dirfs.info(cached_basename) != touched_info
+    assert fs.info(f"{dirname}/{cached_basename}") != touched_info
 
     # Warn if file is deleted
-    dirfs.rm(cached_basename)
+    fs.rm(f"{dirname}/{cached_basename}")
     with pytest.warns(UserWarning, match="No such file or directory"):
         result = cfunc(url)
     assert result.read() == b"test"
-    assert dirfs.exists(cached_basename)
+    assert fs.exists(f"{dirname}/{cached_basename}")

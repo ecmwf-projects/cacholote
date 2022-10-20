@@ -90,14 +90,14 @@ def test_xr_cacheable(
     infos = []
     for expected_counter in [1, 2]:
         with config.set(xarray_cache_type=xarray_cache_type):
-            dirfs = utils.get_cache_files_dirfs()
+            fs, dirname = utils.get_cache_files_fs_dirname()
             actual = cfunc()
 
         # Check hits
         cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == [(expected_counter,)]
 
-        infos.append(dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}"))
+        infos.append(fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}"))
 
         # Check result
         if xarray_cache_type == "application/x-grib":
@@ -135,24 +135,24 @@ def test_xr_corrupted_files(
     cfunc = cache.cacheable(get_grib_ds)
 
     with config.set(xarray_cache_type=xarray_cache_type):
-        dirfs = utils.get_cache_files_dirfs()
+        fs, dirname = utils.get_cache_files_fs_dirname()
         cfunc()
 
     # Warn if file is corrupted
-    dirfs.touch(f"71b1251a1f7f7ce64c1e1a436613c023{ext}", truncate=False)
-    touched_info = dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}")
+    fs.touch(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}", truncate=False)
+    touched_info = fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}")
     with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
         UserWarning, match="checksum mismatch"
     ):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}") != touched_info
+    assert fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}") != touched_info
 
     # Warn if file is deleted
-    dirfs.rm(f"71b1251a1f7f7ce64c1e1a436613c023{ext}", recursive=True)
+    fs.rm(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}", recursive=True)
     with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
         UserWarning, match="No such file or directory"
     ):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert dirfs.exists(f"71b1251a1f7f7ce64c1e1a436613c023{ext}")
+    assert fs.exists(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}")

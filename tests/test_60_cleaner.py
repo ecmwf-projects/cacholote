@@ -5,7 +5,7 @@ from typing import Literal
 import fsspec
 import pytest
 
-from cacholote import cache, cleaner, config, utils
+from cacholote import cache, cleaner, utils
 
 
 @cache.cacheable
@@ -23,8 +23,7 @@ def test_cleaner(
     con = sqlite3.connect(str(tmpdir / "cacholote.db"))
     cur = con.cursor()
 
-    fs = utils.get_cache_files_fs()
-    dirname = config.SETTINGS["cache_files_urlpath"]
+    fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create files and copy to cache dir
     checksums = []
@@ -68,8 +67,7 @@ def test_cleaner(
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
 def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
-    fs = utils.get_cache_files_fs()
-    dirname = config.SETTINGS["cache_files_urlpath"]
+    fs, dirname = utils.get_cache_files_fs_dirname()
 
     tmpfile = tmpdir / "test.txt"
     with open(tmpfile, "w") as f:
