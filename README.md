@@ -6,24 +6,21 @@ Efficiently cache calls to functions
 
 ```python
 >>> import cacholote
-
->>> from time import sleep
->>> from timeit import repeat
+>>> cacholote.config.set(cache_db_urlpath="sqlite://")
+<cacholote.config.set ...
 
 >>> @cacholote.cacheable
-... def cached_func(x):
-...     sleep(x)
-...     return x
+... def now():
+...     import datetime
+...     return datetime.datetime.now()
 
->>> with cacholote.config.set(cache_db_urlpath="sqlite://"):
-...     timings = repeat(lambda: cached_func(1), number=1, repeat=5)
-...     cached_result = cached_func(1)
+>>> with cacholote.config.set(use_cache=True):
+...     now() == now()
+True
 
->>> cached_result
-1
-
->>> [int(t) for t in timings]
-[1, 0, 0, 0, 0]
+>>> with cacholote.config.set(use_cache=False):
+...     now() == now()
+False
 
 ```
 
