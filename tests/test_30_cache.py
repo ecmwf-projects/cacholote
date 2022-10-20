@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from cacholote import cache
+from cacholote import cache, config
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
