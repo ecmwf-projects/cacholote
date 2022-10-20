@@ -282,6 +282,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     else:
         urlpath_in = obj.path
         fs_in = obj.fs
+    urlpath_in = str(urlpath_in)
 
     root = fs_in.checksum(urlpath_in)
     _, ext = os.path.splitext(urlpath_in)
