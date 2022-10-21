@@ -1,4 +1,6 @@
 import datetime
+import pathlib
+import sqlite3
 from typing import Any
 
 import pytest
@@ -17,29 +19,31 @@ def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
         return LocalClass()
 
 
-@pytest.mark.parametrize("set_cache", ["file", "redis"], indirect=True)
-def test_cacheable(set_cache: str) -> None:
+def test_cacheable(tmpdir: pathlib.Path) -> None:
 
-    cache_store = config.SETTINGS["cache_store"]
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
 
     cfunc = cache.cacheable(func)
-    res = cfunc("test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    if set_cache == "redis":
-        assert cache_store.info()["keyspace_hits"] == 0
-        assert cache_store.info()["keyspace_misses"] == 1
-    else:
-        # diskcache
-        assert cache_store.stats() == (0, 1)
 
-    res = cfunc("test")
-    assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
-    if set_cache == "redis":
-        assert cache_store.info()["keyspace_hits"] == 1
-        assert cache_store.info()["keyspace_misses"] == 1
-    else:
-        # diskcache
-        assert cache_store.stats() == (1, 1)
+    for counter in range(1, 3):
+        before = datetime.datetime.now()
+        res = cfunc("test")
+        after = datetime.datetime.now()
+        assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
+
+        cur.execute("SELECT key, result, counter FROM cache_entries")
+        assert cur.fetchall() == [
+            (
+                "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
+                '{"a":"test","b":null,"args":[],"kwargs":{}}',
+                counter,
+            )
+        ]
+
+        cur.execute("SELECT timestamp FROM cache_entries")
+        (timestamp,) = cur.fetchone()
+        assert before < datetime.datetime.fromisoformat(timestamp) < after
 
     class Dummy:
         pass
@@ -55,18 +59,10 @@ def test_cacheable(set_cache: str) -> None:
 
 
 def test_hexdigestify_python_call() -> None:
-    res = cache.hexdigestify_python_call(sorted, "foo", reverse=True)
-    assert res == "29a102cc6e599572ddadf8fdc05bc09e8bf793257b18ae2440b5fc42"
-
-
-def test_same_key_using_args_or_kwargs() -> None:
-    def func(x: Any) -> Any:
-        return x
-
     assert (
         cache.hexdigestify_python_call(func, 1)
-        == cache.hexdigestify_python_call(func, x=1)
-        == "f3569dae5c7b8023be97156b43642fbd80f5e1e93a1d4df75d308a7e"
+        == cache.hexdigestify_python_call(func, a=1)
+        == "54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c"
     )
 
 

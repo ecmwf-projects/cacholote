@@ -1,4 +1,5 @@
 import pathlib
+import sqlite3
 
 import fsspec
 import pytest
@@ -28,16 +29,22 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
         actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
 
     href = f"{readonly_dir}/{tmp_checksum}.txt"
-    local_path = f"{tmpdir}/{tmp_checksum}.txt"
+    local_path = f"{tmpdir}/cache_files/{tmp_checksum}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
-        "type": "text/plain",
-        "href": href,
-        "file:checksum": checksum,
-        "file:size": 4,
-        "file:local_path": local_path,
-        "tmp:open_kwargs": {"mode": "rb"},
-        "tmp:storage_options": {},
+        "type": "python_call",
+        "callable": "cacholote.extra_encoders:decode_io_object",
+        "args": (
+            {
+                "type": "text/plain",
+                "href": href,
+                "file:checksum": checksum,
+                "file:size": 4,
+                "file:local_path": local_path,
+            },
+            {},
+        ),
+        "kwargs": {"mode": "rb"},
     }
     assert actual == expected
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
@@ -47,18 +54,19 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
 
 
 @pytest.mark.parametrize(
-    "set_cache, cache_dir",
-    [("file", None), ("ftp", ""), ("s3", "test-bucket")],
-    indirect=["set_cache"],
+    "set_cache",
+    ["file", "s3"],
+    indirect=True,
 )
 def test_copy_from_http_to_cache(
     tmpdir: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
-    cache_dir: str,
 ) -> None:
-    if cache_dir is None:
-        cache_dir = str(tmpdir)
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
+    con = sqlite3.connect(tmpdir / "cacholote.db")
+    cur = con.cursor()
 
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
@@ -66,45 +74,48 @@ def test_copy_from_http_to_cache(
 
     cfunc = cache.cacheable(open_url)
     infos = []
-    for expected_stats in ((0, 1), (1, 1)):
-        dirfs = utils.get_cache_files_dirfs()
+    for expected_counter in (1, 2):
         result = cfunc(url)
 
-        # Check hit & miss
-        assert config.SETTINGS["cache_store"].stats() == expected_stats
+        # Check hits
+        cur.execute("SELECT counter FROM cache_entries")
+        assert cur.fetchall() == [(expected_counter,)]
 
-        infos.append(dirfs.info(cached_basename))
+        infos.append(fs.info(f"{dirname}/{cached_basename}"))
 
         # Check result
         assert result.read() == b"test"
 
         # Check file in cache
-        assert result.path == f"{cache_dir}/{cached_basename}"
+        assert result.path == f"{dirname}/{cached_basename}"
 
     # Check cached file is not modified
     assert infos[0] == infos[1]
 
 
-def test_io_corrupted_files(httpserver: pytest_httpserver.HTTPServer) -> None:
+def test_io_corrupted_files(
+    tmpdir: pathlib.Path, httpserver: pytest_httpserver.HTTPServer
+) -> None:
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
     cached_basename = str(fsspec.filesystem("http").checksum(url))
 
     cfunc = cache.cacheable(open_url)
-    dirfs = utils.get_cache_files_dirfs()
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
     cfunc(url)
 
     # Warn if file is corrupted
-    dirfs.touch(cached_basename)
-    touched_info = dirfs.info(cached_basename)
+    fs.touch(f"{dirname}/{cached_basename}")
+    touched_info = fs.info(f"{dirname}/{cached_basename}")
     with pytest.warns(UserWarning, match="checksum mismatch"):
         result = cfunc(url)
     assert result.read() == b"test"
-    assert dirfs.info(cached_basename) != touched_info
+    assert fs.info(f"{dirname}/{cached_basename}") != touched_info
 
     # Warn if file is deleted
-    dirfs.rm(cached_basename)
+    fs.rm(f"{dirname}/{cached_basename}")
     with pytest.warns(UserWarning, match="No such file or directory"):
         result = cfunc(url)
     assert result.read() == b"test"
-    assert dirfs.exists(cached_basename)
+    assert fs.exists(f"{dirname}/{cached_basename}")

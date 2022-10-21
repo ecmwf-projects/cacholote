@@ -1,4 +1,5 @@
 import pathlib
+import sqlite3
 
 import fsspec
 import pytest
@@ -34,15 +35,21 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
         actual = extra_encoders.dictify_xr_dataset(ds)
 
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
-    local_path = f"{tmpdir}/247fd17e087ae491996519c097e70e48.nc"
+    local_path = f"{tmpdir}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
-        "type": "application/netcdf",
-        "href": href,
-        "file:checksum": fsspec.filesystem("file").checksum(local_path),
-        "file:size": 669,
-        "file:local_path": local_path,
-        "xarray:storage_options": {},
-        "xarray:open_kwargs": {"chunks": "auto"},
+        "type": "python_call",
+        "callable": "cacholote.extra_encoders:decode_xr_dataset",
+        "args": (
+            {
+                "type": "application/netcdf",
+                "href": href,
+                "file:checksum": fsspec.filesystem("file").checksum(local_path),
+                "file:size": 669,
+                "file:local_path": local_path,
+            },
+            {},
+        ),
+        "kwargs": {"chunks": "auto"},
     }
     assert actual == expected
 
@@ -58,7 +65,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("set_cache", ["file", "ftp", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 @pytest.mark.filterwarnings(
     "ignore:GRIB write support is experimental, DO NOT RELY ON IT!"
 )
@@ -66,6 +73,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     "ignore:distutils Version classes are deprecated. Use packaging.version instead."
 )
 def test_xr_cacheable(
+    tmpdir: pathlib.Path,
     xarray_cache_type: str,
     ext: str,
     importorskip: str,
@@ -73,24 +81,23 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
-    if xarray_cache_type == "application/vnd+zarr" and set_cache == "ftp":
-        pytest.xfail(
-            "fsspec mapper does not play well with pyftpdlib: 550 No such file or directory"
-        )
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
 
     expected = get_grib_ds()
     cfunc = cache.cacheable(get_grib_ds)
 
     infos = []
-    for expected_stats in ((0, 1), (1, 1)):
+    for expected_counter in [1, 2]:
         with config.set(xarray_cache_type=xarray_cache_type):
-            dirfs = utils.get_cache_files_dirfs()
+            fs, dirname = utils.get_cache_files_fs_dirname()
             actual = cfunc()
 
-        # Check hit & miss
-        assert config.SETTINGS["cache_store"].stats() == expected_stats
+        # Check hits
+        cur.execute("SELECT counter FROM cache_entries")
+        assert cur.fetchall() == [(expected_counter,)]
 
-        infos.append(dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}"))
+        infos.append(fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}"))
 
         # Check result
         if xarray_cache_type == "application/x-grib":
@@ -128,24 +135,24 @@ def test_xr_corrupted_files(
     cfunc = cache.cacheable(get_grib_ds)
 
     with config.set(xarray_cache_type=xarray_cache_type):
-        dirfs = utils.get_cache_files_dirfs()
+        fs, dirname = utils.get_cache_files_fs_dirname()
         cfunc()
 
     # Warn if file is corrupted
-    dirfs.touch(f"71b1251a1f7f7ce64c1e1a436613c023{ext}", truncate=False)
-    touched_info = dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}")
+    fs.touch(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}", truncate=False)
+    touched_info = fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}")
     with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
         UserWarning, match="checksum mismatch"
     ):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert dirfs.info(f"71b1251a1f7f7ce64c1e1a436613c023{ext}") != touched_info
+    assert fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}") != touched_info
 
     # Warn if file is deleted
-    dirfs.rm(f"71b1251a1f7f7ce64c1e1a436613c023{ext}", recursive=True)
+    fs.rm(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}", recursive=True)
     with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
         UserWarning, match="No such file or directory"
     ):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert dirfs.exists(f"71b1251a1f7f7ce64c1e1a436613c023{ext}")
+    assert fs.exists(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}")

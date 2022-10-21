@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import functools
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
 
-from . import config, decode, encode, utils
+import sqlalchemy
+import sqlalchemy.exc
+
+from . import config, decode, encode, extra_encoders, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -65,31 +67,53 @@ def cacheable(func: F) -> F:
             warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
-        cache_store = config.SETTINGS["cache_store"]
-        try:
-            # Use try/except to update stats correctly
-            cached = cache_store[hexdigest]
-        except KeyError:
-            # +1 miss
-            pass
-        else:
-            # +1 hit
+        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
             try:
-                return decode.loads(cached)
-            except Exception as ex:
+                # Get result from cache
+                cache_entry = (
+                    session.query(config.CacheEntry)
+                    .filter(config.CacheEntry.key == hexdigest)
+                    .one()
+                )
+
+                # Update stats and return cached result
+                cache_entry.counter += 1
+                return cache_entry.result
+            except sqlalchemy.exc.NoResultFound:
+                # Not in the cache
+                pass
+            except decode.DecodeError as ex:
                 # Something wrong, e.g. cached files are corrupted
-                # Warn and recreate cache value
                 warnings.warn(str(ex), UserWarning)
-                del cache_store[hexdigest]
 
-        result = func(*args, **kwargs)
-        try:
-            cached = encode.dumps(result)
-        except encode.EncodeError:
-            warnings.warn("can NOT encode output", UserWarning)
-            return result
+                # Delete cache file
+                (cached_args,) = (
+                    session.query(config.CacheEntry.result["args"])
+                    .filter(config.CacheEntry.key == hexdigest)
+                    .one()
+                )
+                if extra_encoders._are_file_args(*cached_args):
+                    fs, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
+                    if fs.exists(urlpath):
+                        recursive = cached_args[0]["type"] == "application/vnd+zarr"
+                        fs.rm(urlpath, recursive=recursive)
 
-        cache_store[hexdigest] = cached
-        return decode.loads(cached)
+                # Remove cache entry
+                session.query(config.CacheEntry).filter(
+                    config.CacheEntry.key == hexdigest
+                ).delete()
+            finally:
+                session.commit()
+
+            # Not in the cache: Compute result
+            result = func(*args, **kwargs)
+            try:
+                cache_entry = config.CacheEntry(key=hexdigest, result=result)
+                session.add(cache_entry)
+                session.commit()
+                return cache_entry.result
+            except sqlalchemy.exc.StatementError:
+                warnings.warn("can NOT encode output", UserWarning)
+                return result
 
     return cast(F, wrapper)

@@ -16,10 +16,9 @@
 
 import hashlib
 import io
-from typing import Optional
+from typing import Optional, Tuple
 
 import fsspec
-import fsspec.implementations.dirfs
 
 from . import config
 
@@ -30,42 +29,13 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()
 
 
-def get_cache_files_directory() -> str:
-    """Return the directory where cache files are stored."""
-    if (
-        config.SETTINGS["cache_files_urlpath"]
-        is config.SETTINGS["cache_store_directory"]
-        is None
-    ):
-        raise ValueError(
-            "please set 'cache_files_urlpath' and 'cache_files_storage_options'"
-        )
-    if config.SETTINGS["cache_files_urlpath"] is None:
-        return str(config.SETTINGS["cache_store_directory"])
-    return str(config.SETTINGS["cache_files_urlpath"])
-
-
-def get_cache_files_directory_readonly() -> str:
-    """Return the directory where cache files are stored."""
-    if config.SETTINGS["cache_files_urlpath_readonly"] is None:
-        return get_cache_files_directory()
-    return str(config.SETTINGS["cache_files_urlpath_readonly"])
-
-
-def get_cache_files_fs() -> fsspec.implementations.dirfs.DirFileSystem:
-    """Return the ``fsspec`` filesystem where cache files are stored."""
-    fs, _, _ = fsspec.get_fs_token_paths(
-        get_cache_files_directory(),
+def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
+    """Return the ``fsspec`` filesystem and directory name where cache files are stored."""
+    fs, _, (path,) = fsspec.get_fs_token_paths(
+        config.SETTINGS["cache_files_urlpath"],
         storage_options=config.SETTINGS["cache_files_storage_options"],
     )
-    return fs
-
-
-def get_cache_files_dirfs() -> fsspec.implementations.dirfs.DirFileSystem:
-    """Return the ``fsspec`` directory filesystem where cache files are stored."""
-    return fsspec.implementations.dirfs.DirFileSystem(
-        get_cache_files_directory(), get_cache_files_fs()
-    )
+    return (fs, path)
 
 
 def copy_buffered_file(

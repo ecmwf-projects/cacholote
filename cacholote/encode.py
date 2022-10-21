@@ -26,6 +26,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from . import config, decode
 
+_JSON_DUMPS_KWARGS: Dict[str, Any] = {"separators": (",", ":"), "skipkeys": False}
+
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
     """Return the fully qualified name of a python object."""
@@ -165,8 +167,10 @@ def dumps(
     -------
     str
     """
-    kwargs.setdefault("separators", (",", ":"))
+    for k, v in _JSON_DUMPS_KWARGS.items():
+        kwargs.setdefault(k, v)
     kwargs.setdefault("default", filecache_default)
+
     return json.dumps(obj, **kwargs)
 
 
