@@ -48,10 +48,7 @@ def clean_cache_files(
 
     # Freeze directory content
     fs, dirname = utils.get_cache_files_fs_dirname()
-    sizes = {
-        fs.unstrip_protocol(path): fs.du(path)
-        for path in fs.du(dirname, total=False, maxdepth=1)
-    }
+    sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
     if sum(sizes.values()) <= maxsize:
         return
 
@@ -79,8 +76,10 @@ def clean_cache_files(
         times = [fs.modified(k) for k in sizes]
         for _, urlpath in sorted(zip(times, sizes)):
             sizes.pop(urlpath)
-            fs.rm(urlpath)
+            fs.rm(urlpath, recursive=True)
             if sum(sizes.values()) <= maxsize:
                 return
 
-    raise ValueError(f"Unable to clean {dirname!r}. It has size {fs.du(dirname)!r}.")
+    raise ValueError(
+        f"Unable to clean {dirname!r}. Final size: {sum(sizes.values())!r}."
+    )
