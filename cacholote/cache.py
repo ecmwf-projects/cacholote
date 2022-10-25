@@ -22,7 +22,7 @@ from typing import Any, Callable, TypeVar, Union, cast
 import sqlalchemy
 import sqlalchemy.exc
 
-from . import config, decode, encode, extra_encoders, utils
+from . import clean, config, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -98,27 +98,7 @@ def cacheable(func: F) -> F:
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
-
-                    filters = [
-                        config.CacheEntry.key == k,
-                        config.CacheEntry.expiration == e,
-                    ]
-                    (cached_args,) = (
-                        session.query(config.CacheEntry.result["args"])
-                        .filter(*filters)
-                        .one()
-                    )
-
-                    # Remove cache entry
-                    session.query(config.CacheEntry).filter(*filters).delete()
-                    session.commit()
-
-                    # Delete cache file
-                    if extra_encoders._are_file_args(*cached_args):
-                        fs, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
-                        if fs.exists(urlpath):
-                            recursive = cached_args[0]["type"] == "application/vnd+zarr"
-                            fs.rm(urlpath, recursive=recursive)
+                    clean.delete_entry(k, e)
 
             # Not in the cache: Compute result
             result = func(*args, **kwargs)

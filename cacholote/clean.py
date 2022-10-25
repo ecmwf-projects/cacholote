@@ -23,6 +23,28 @@ import sqlalchemy.orm
 from . import config, extra_encoders, utils
 
 
+def delete_entry(key: str, expiration: datetime.datetime) -> None:
+    with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+        filters = [
+            config.CacheEntry.key == key,
+            config.CacheEntry.expiration == expiration,
+        ]
+        (cached_args,) = (
+            session.query(config.CacheEntry.result["args"]).filter(*filters).one()
+        )
+
+        # Remove cache entry
+        session.query(config.CacheEntry).filter(*filters).delete()
+        session.commit()
+
+        # Delete cache file
+        if extra_encoders._are_file_args(*cached_args):
+            fs, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
+            if fs.exists(urlpath):
+                recursive = cached_args[0]["type"] == "application/vnd+zarr"
+                fs.rm(urlpath, recursive=recursive)
+
+
 def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
@@ -66,20 +88,10 @@ def clean_cache_files(
                 fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*args)
                 urlpath = fs_entry.unstrip_protocol(urlpath)
                 if fs == fs_entry and urlpath in sizes:
-                    filters = (
-                        config.CacheEntry.key == key,
-                        config.CacheEntry.expiration == expiration,
-                    )
-                    # Delete database entry
-                    session.query(config.CacheEntry).filter(*filters).delete()
-                    session.commit()
+                    delete_entry(key, expiration)
 
                     # Delete file
                     sizes.pop(urlpath)
-                    if fs.exists(urlpath):
-                        recursive = args[0]["type"] == "application/vnd+zarr"
-                        fs.rm(urlpath, recursive=recursive)
-
                     if sum(sizes.values()) <= maxsize:
                         return
 
