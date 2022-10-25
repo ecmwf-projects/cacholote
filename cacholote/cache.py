@@ -93,6 +93,7 @@ def cacheable(func: F) -> F:
                         )
                     ).one()
                     cache_entry.counter += 1
+                    session.commit()
                     return cache_entry.result
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
@@ -110,6 +111,7 @@ def cacheable(func: F) -> F:
 
                     # Remove cache entry
                     session.query(config.CacheEntry).filter(*filters).delete()
+                    session.commit()
 
                     # Delete cache file
                     if extra_encoders._are_file_args(*cached_args):
@@ -117,8 +119,6 @@ def cacheable(func: F) -> F:
                         if fs.exists(urlpath):
                             recursive = cached_args[0]["type"] == "application/vnd+zarr"
                             fs.rm(urlpath, recursive=recursive)
-                finally:
-                    session.commit()
 
             # Not in the cache: Compute result
             result = func(*args, **kwargs)

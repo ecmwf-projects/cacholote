@@ -47,6 +47,8 @@ class CacheEntry(Base):
     )
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
 
+    constraint = sqlalchemy.UniqueConstraint(key, expiration)
+
 
 _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
     "xarray_cache_type": [
