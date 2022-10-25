@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 
@@ -64,3 +65,11 @@ def test_json_dumps() -> None:
         assert new_settings.pop("engine") != old_settings.pop("engine")
         assert old_settings == new_settings
         assert json.loads(config.json_dumps()) == json_settings
+
+
+def test_expiration() -> None:
+    with config.set(expiration=datetime.datetime(1492, 10, 12)):
+        assert config.SETTINGS["expiration"] == "1492-10-12T00:00:00"
+
+    with config.set(expiration="1492-10-12T00:00:00"):
+        assert config.SETTINGS["expiration"] == "1492-10-12T00:00:00"

@@ -40,11 +40,12 @@ def clean_cache_files(
         Delete files that are not present in the cache database.
     """
     if method == "LRU":
-        sorters = (config.CacheEntry.timestamp, config.CacheEntry.counter)
+        sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
     elif method == "LFU":
-        sorters = (config.CacheEntry.counter, config.CacheEntry.timestamp)
+        sorters = [config.CacheEntry.counter, config.CacheEntry.timestamp]
     else:
         raise ValueError("`method` must be 'LRU' or 'LFU'.")
+    sorters.append(config.CacheEntry.expiration)
 
     # Freeze directory content
     fs, dirname = utils.get_cache_files_fs_dirname()
@@ -54,19 +55,28 @@ def clean_cache_files(
 
     # Clean files in database
     delete_stmt = sqlalchemy.delete(config.CacheEntry)
-    query_tuple = (config.CacheEntry.key, config.CacheEntry.result["args"])
+    query_tuple = (
+        config.CacheEntry.key,
+        config.CacheEntry.expiration,
+        config.CacheEntry.result["args"],
+    )
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        for key, cached_args in session.query(*query_tuple).order_by(*sorters):
-            if extra_encoders._are_file_args(*cached_args):
-                fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
+        for key, expiration, args in session.query(*query_tuple).order_by(*sorters):
+            if extra_encoders._are_file_args(*args):
+                fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*args)
                 urlpath = fs_entry.unstrip_protocol(urlpath)
                 if fs == fs_entry and urlpath in sizes:
                     # Delete file
                     sizes.pop(urlpath)
-                    recursive = cached_args[0]["type"] == "application/vnd+zarr"
+                    recursive = args[0]["type"] == "application/vnd+zarr"
                     fs.rm(urlpath, recursive=recursive)
                     # Delete database entry
-                    session.execute(delete_stmt.where(config.CacheEntry.key == key))
+                    session.execute(
+                        delete_stmt.where(
+                            config.CacheEntry.key == key
+                            and config.CacheEntry.expiration == expiration
+                        )
+                    )
                     session.commit()
                     if sum(sizes.values()) <= maxsize:
                         return

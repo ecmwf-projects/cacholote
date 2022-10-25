@@ -32,10 +32,11 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
         after = datetime.datetime.now()
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
 
-        cur.execute("SELECT key, result, counter FROM cache_entries")
+        cur.execute("SELECT key, expiration, result, counter FROM cache_entries")
         assert cur.fetchall() == [
             (
                 "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
+                "9999-12-31 23:59:59.999999",
                 '{"a":"test","b":null,"args":[],"kwargs":{}}',
                 counter,
             )

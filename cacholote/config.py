@@ -37,7 +37,10 @@ Base = sqlalchemy.orm.declarative_base()
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
-    key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True, unique=True)
+    key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True)
+    expiration = sqlalchemy.Column(
+        sqlalchemy.DateTime, primary_key=True, default=datetime.datetime.max
+    )
     result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
@@ -64,6 +67,7 @@ _SETTINGS: Dict[str, Any] = {
     "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
     "raise_all_encoding_errors": False,
+    "expiration": datetime.datetime.max.isoformat(),
 }
 
 
@@ -131,6 +135,9 @@ class set:
                     "'engine' and 'cache_db_urlpath' are mutually exclusive"
                 )
             kwargs["cache_db_urlpath"] = None
+
+        if hasattr(kwargs.get("expiration"), "isoformat"):
+            kwargs["expiration"] = kwargs["expiration"].isoformat()
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}
