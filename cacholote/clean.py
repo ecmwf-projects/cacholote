@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 from typing import Literal
 
 import sqlalchemy.orm
@@ -54,39 +55,43 @@ def clean_cache_files(
         return
 
     # Clean files in database
-    delete_stmt = sqlalchemy.delete(config.CacheEntry)
-    query_tuple = (
+    queries = (
         config.CacheEntry.key,
         config.CacheEntry.expiration,
         config.CacheEntry.result["args"],
     )
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        for key, expiration, args in session.query(*query_tuple).order_by(*sorters):
+        for key, expiration, args in session.query(*queries).order_by(*sorters):
             if extra_encoders._are_file_args(*args):
                 fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*args)
                 urlpath = fs_entry.unstrip_protocol(urlpath)
                 if fs == fs_entry and urlpath in sizes:
+                    filters = (
+                        config.CacheEntry.key == key,
+                        config.CacheEntry.expiration == expiration,
+                    )
+                    # Delete database entry
+                    session.query(config.CacheEntry).filter(*filters).delete()
+                    session.commit()
+
                     # Delete file
                     sizes.pop(urlpath)
-                    recursive = args[0]["type"] == "application/vnd+zarr"
-                    fs.rm(urlpath, recursive=recursive)
-                    # Delete database entry
-                    session.execute(
-                        delete_stmt.where(
-                            config.CacheEntry.key == key
-                            and config.CacheEntry.expiration == expiration
-                        )
-                    )
-                    session.commit()
+                    if fs.exists(urlpath):
+                        recursive = args[0]["type"] == "application/vnd+zarr"
+                        fs.rm(urlpath, recursive=recursive)
+
                     if sum(sizes.values()) <= maxsize:
                         return
 
     if delete_unknown_files:
         # Sort by modification time
-        times = [fs.modified(k) for k in sizes]
+        times = [
+            fs.modified(k) if fs.exists(k) else datetime.datetime.min for k in sizes
+        ]
         for _, urlpath in sorted(zip(times, sizes)):
             sizes.pop(urlpath)
-            fs.rm(urlpath, recursive=True)
+            if fs.exists(urlpath):
+                fs.rm(urlpath, recursive=True)
             if sum(sizes.values()) <= maxsize:
                 return
 

@@ -38,9 +38,7 @@ class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
     key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True)
-    expiration = sqlalchemy.Column(
-        sqlalchemy.DateTime, primary_key=True, default=datetime.datetime.max
-    )
+    expiration = sqlalchemy.Column(sqlalchemy.DateTime, primary_key=True)
     result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
@@ -67,7 +65,7 @@ _SETTINGS: Dict[str, Any] = {
     "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
     "raise_all_encoding_errors": False,
-    "expiration": datetime.datetime.max.isoformat(),
+    "expiration": None,
 }
 
 

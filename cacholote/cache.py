@@ -68,51 +68,55 @@ def cacheable(func: F) -> F:
             warnings.warn("can NOT encode python call", UserWarning)
             return func(*args, **kwargs)
 
-        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-            filters = session.query(
-                config.CacheEntry.key, config.CacheEntry.expiration
-            ).filter(
-                config.CacheEntry.key == hexdigest
-                and config.CacheEntry.expiration
-                == datetime.datetime.fromisoformat(config.SETTINGS["expiration"])
-                and config.CacheEntry.expiration < datetime.datetime.now()
-            )
+        # Database query settings
+        queries = (config.CacheEntry.key, config.CacheEntry.expiration)
+        sorters = (config.CacheEntry.timestamp.desc(),)
+        filters = [
+            config.CacheEntry.key == hexdigest,
+            config.CacheEntry.expiration > datetime.datetime.now(),
+        ]
+        expiration = config.SETTINGS["expiration"]
+        if expiration:
+            # If expiration is provided, only get entries with matching expiration
+            expiration = datetime.datetime.fromisoformat(expiration)
+            filters.append(config.CacheEntry.expiration == expiration)
+        else:
+            expiration = datetime.datetime.max
 
-            for filter in filters.order_by(config.CacheEntry.timestamp):
+        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+            for (k, e) in session.query(*queries).filter(*filters).order_by(*sorters):
                 try:
-                    # Get result from cache
                     cache_entry = (
-                        session.query(config.CacheEntry)
-                        .filter(
-                            config.CacheEntry.key == filter[0]
-                            and config.CacheEntry.expiration == filter[1]
+                        session.query(config.CacheEntry).filter(
+                            config.CacheEntry.key == k,
+                            config.CacheEntry.expiration == e,
                         )
-                        .one()
-                    )
+                    ).one()
+                    cache_entry.counter += 1
+                    return cache_entry.result
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
 
-                    # Delete cache file
+                    filters = [
+                        config.CacheEntry.key == k,
+                        config.CacheEntry.expiration == e,
+                    ]
                     (cached_args,) = (
                         session.query(config.CacheEntry.result["args"])
-                        .filter(config.CacheEntry.key == hexdigest)
+                        .filter(*filters)
                         .one()
                     )
+
+                    # Remove cache entry
+                    session.query(config.CacheEntry).filter(*filters).delete()
+
+                    # Delete cache file
                     if extra_encoders._are_file_args(*cached_args):
                         fs, urlpath = extra_encoders._get_fs_and_urlpath(*cached_args)
                         if fs.exists(urlpath):
                             recursive = cached_args[0]["type"] == "application/vnd+zarr"
                             fs.rm(urlpath, recursive=recursive)
-
-                    # Remove cache entry
-                    session.query(config.CacheEntry).filter(
-                        config.CacheEntry.key == hexdigest
-                    ).delete()
-                else:
-                    # Update stats and return cached result
-                    cache_entry.counter += 1
-                    return cache_entry.result
                 finally:
                     session.commit()
 
@@ -120,11 +124,7 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             try:
                 cache_entry = config.CacheEntry(
-                    key=hexdigest,
-                    result=result,
-                    expiration=datetime.datetime.fromisoformat(
-                        config.SETTINGS["expiration"]
-                    ),
+                    key=hexdigest, expiration=expiration, result=result
                 )
                 session.add(cache_entry)
                 session.commit()

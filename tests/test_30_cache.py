@@ -19,6 +19,11 @@ def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
         return LocalClass()
 
 
+@cache.cacheable
+def cached_now() -> datetime.datetime:
+    return datetime.datetime.now()
+
+
 def test_cacheable(tmpdir: pathlib.Path) -> None:
 
     con = sqlite3.connect(str(tmpdir / "cacholote.db"))
@@ -69,12 +74,18 @@ def test_hexdigestify_python_call() -> None:
 
 @pytest.mark.parametrize("use_cache", [True, False])
 def test_use_cache(use_cache: bool) -> None:
-    @cache.cacheable
-    def cached_now() -> datetime.datetime:
-        return datetime.datetime.now()
 
     with config.set(use_cache=use_cache):
         if use_cache:
             assert cached_now() == cached_now()
         else:
             assert cached_now() < cached_now()
+
+
+def test_expiration() -> None:
+
+    first = cached_now()
+    with config.set(expiration=datetime.datetime.now()):
+        second = cached_now()
+        assert second != first
+    assert first == cached_now()
