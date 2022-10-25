@@ -38,7 +38,9 @@ class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
     key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True)
-    expiration = sqlalchemy.Column(sqlalchemy.DateTime, primary_key=True)
+    expiration = sqlalchemy.Column(
+        sqlalchemy.DateTime, default=datetime.datetime.max, primary_key=True
+    )
     result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
@@ -48,6 +50,16 @@ class CacheEntry(Base):
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
 
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
+
+    def __repr__(self) -> str:
+        return json.dumps(
+            {
+                "key": self.key,
+                "expiration": self.expiration.isoformat()
+                if self.expiration
+                else self.expiration,
+            }
+        )
 
 
 _ALLOWED_SETTINGS: Dict[str, List[Any]] = {

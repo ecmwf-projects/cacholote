@@ -16,6 +16,7 @@
 
 import datetime
 import functools
+import logging
 import warnings
 from typing import Any, Callable, TypeVar, Union, cast
 
@@ -93,6 +94,7 @@ def cacheable(func: F) -> F:
                         )
                     ).one()
                     cache_entry.counter += 1
+                    logging.info(cache_entry)
                     session.commit()
                     return cache_entry.result
                 except decode.DecodeError as ex:
@@ -107,6 +109,7 @@ def cacheable(func: F) -> F:
                     key=hexdigest, expiration=expiration, result=result
                 )
                 session.add(cache_entry)
+                logging.info(cache_entry)
                 session.commit()
                 return cache_entry.result
             except sqlalchemy.exc.StatementError:
