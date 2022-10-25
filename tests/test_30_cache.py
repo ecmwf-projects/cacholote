@@ -75,7 +75,6 @@ def test_hexdigestify_python_call() -> None:
 
 @pytest.mark.parametrize("use_cache", [True, False])
 def test_use_cache(use_cache: bool) -> None:
-
     with config.set(use_cache=use_cache):
         if use_cache:
             assert cached_now() == cached_now()
@@ -84,7 +83,6 @@ def test_use_cache(use_cache: bool) -> None:
 
 
 def test_expiration() -> None:
-
     first = cached_now()
     with config.set(expiration=datetime.datetime.now()):
         second = cached_now()
