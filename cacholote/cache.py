@@ -85,19 +85,22 @@ def cacheable(func: F) -> F:
             config.CacheEntry.key == hexdigest,
             config.CacheEntry.expiration > datetime.datetime.now(),
         ]
-        expiration = config.SETTINGS["expiration"]
-        if expiration:
+        if config.SETTINGS["expiration"]:
             # If expiration is provided, only get entries with matching expiration
-            expiration = datetime.datetime.fromisoformat(expiration)
-            filters.append(config.CacheEntry.expiration == expiration)
+            filters.append(
+                config.CacheEntry.expiration
+                == datetime.datetime.fromisoformat(config.SETTINGS["expiration"])
+            )
 
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-            for (k, e) in session.query(*queries).filter(*filters).order_by(*sorters):
+            for (key, expiration) in (
+                session.query(*queries).filter(*filters).order_by(*sorters)
+            ):
                 try:
                     cache_entry = (
                         session.query(config.CacheEntry).filter(
-                            config.CacheEntry.key == k,
-                            config.CacheEntry.expiration == e,
+                            config.CacheEntry.key == key,
+                            config.CacheEntry.expiration == expiration,
                         )
                     ).one()
                     cache_entry.counter += 1
@@ -107,14 +110,14 @@ def cacheable(func: F) -> F:
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
-                    clean.delete_entry(k, e)
+                    clean.delete_entry(key, expiration)
 
             # Not in the cache: Compute result
             result = func(*args, **kwargs)
             try:
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
-                    expiration=expiration or datetime.datetime.max,
+                    expiration=config.SETTINGS["expiration"],
                     result=result,
                 )
                 session.add(cache_entry)

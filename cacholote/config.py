@@ -52,6 +52,14 @@ class CacheEntry(Base):
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
 
+@sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[no-untyped-def]
+def set_epiration_to_max(mapper, connection, target):
+    expiration = target.expiration or datetime.datetime.max
+    if isinstance(expiration, str):
+        expiration = datetime.datetime.fromisoformat(expiration)
+    target.expiration = expiration
+
+
 _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
     "xarray_cache_type": [
         "application/netcdf",
