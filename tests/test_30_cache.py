@@ -1,12 +1,11 @@
 import datetime
-import logging
 import pathlib
 import sqlite3
 from typing import Any
 
 import pytest
 
-from cacholote import cache, config
+from cacholote import cache, config, utils
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
@@ -84,29 +83,20 @@ def test_use_cache(use_cache: bool) -> None:
 
 def test_expiration() -> None:
     first = cached_now()
-    with config.set(expiration=datetime.datetime.now()):
+    assert utils.LAST_PRIMARY_KEYS == {
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+        "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
+    }
+    with config.set(expiration=datetime.datetime(1908, 3, 9)):
         second = cached_now()
         assert second != first
+        assert utils.LAST_PRIMARY_KEYS == {
+            "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+            "expiration": datetime.datetime(1908, 3, 9),
+        }
+
     assert first == cached_now()
-
-
-def test_logging(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.INFO):
-        cached_now()
-        assert caplog.text.endswith(
-            '{"key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6", '
-            '"expiration": "9999-12-31T23:59:59.999999"}\n'
-        )
-
-        with config.set(expiration=datetime.datetime(1492, 12, 10)):
-            cached_now()
-            assert caplog.text.endswith(
-                '{"key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6", '
-                '"expiration": "1492-12-10T00:00:00"}\n'
-            )
-
-        cached_now()
-        assert caplog.text.endswith(
-            '{"key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6", '
-            '"expiration": "9999-12-31T23:59:59.999999"}\n'
-        )
+    assert utils.LAST_PRIMARY_KEYS == {
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+        "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
+    }

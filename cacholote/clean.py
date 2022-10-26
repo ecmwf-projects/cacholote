@@ -88,9 +88,9 @@ def clean_cache_files(
                 fs_entry, urlpath = extra_encoders._get_fs_and_urlpath(*args)
                 urlpath = fs_entry.unstrip_protocol(urlpath)
                 if fs == fs_entry and urlpath in sizes:
+                    # Delete db entry and file
                     delete_entry(key, expiration)
 
-                    # Delete file
                     sizes.pop(urlpath)
                     if sum(sizes.values()) <= maxsize:
                         return
@@ -101,9 +101,10 @@ def clean_cache_files(
             fs.modified(k) if fs.exists(k) else datetime.datetime.min for k in sizes
         ]
         for _, urlpath in sorted(zip(times, sizes)):
-            sizes.pop(urlpath)
             if fs.exists(urlpath):
                 fs.rm(urlpath, recursive=True)
+
+            sizes.pop(urlpath)
             if sum(sizes.values()) <= maxsize:
                 return
 

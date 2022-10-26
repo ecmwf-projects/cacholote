@@ -16,11 +16,13 @@
 
 import hashlib
 import io
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import fsspec
 
 from . import config
+
+LAST_PRIMARY_KEYS: Dict[str, Any] = {}
 
 
 def hexdigestify(text: str) -> str:

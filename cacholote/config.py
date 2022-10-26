@@ -51,16 +51,6 @@ class CacheEntry(Base):
 
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
-    def __repr__(self) -> str:
-        return json.dumps(
-            {
-                "key": self.key,
-                "expiration": self.expiration.isoformat()
-                if self.expiration
-                else self.expiration,
-            }
-        )
-
 
 _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
     "xarray_cache_type": [

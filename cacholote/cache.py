@@ -16,9 +16,8 @@
 
 import datetime
 import functools
-import logging
 import warnings
-from typing import Any, Callable, TypeVar, Union, cast
+from typing import Any, Callable, Dict, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.exc
@@ -26,6 +25,13 @@ import sqlalchemy.exc
 from . import clean, config, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def _get_last_primary_keys(cache_entry: config.CacheEntry) -> Dict[str, Any]:
+    return {
+        k.name: getattr(cache_entry, k.name)
+        for k in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
+    }
 
 
 def hexdigestify_python_call(
@@ -57,6 +63,7 @@ def cacheable(func: F) -> F:
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not config.SETTINGS["use_cache"]:
+            utils.LAST_PRIMARY_KEYS = {}
             return func(*args, **kwargs)
 
         try:
@@ -67,6 +74,7 @@ def cacheable(func: F) -> F:
             )
         except encode.EncodeError:
             warnings.warn("can NOT encode python call", UserWarning)
+            utils.LAST_PRIMARY_KEYS = {}
             return func(*args, **kwargs)
 
         # Database query settings
@@ -94,8 +102,8 @@ def cacheable(func: F) -> F:
                         )
                     ).one()
                     cache_entry.counter += 1
-                    logging.info(cache_entry)
                     session.commit()
+                    utils.LAST_PRIMARY_KEYS = _get_last_primary_keys(cache_entry)
                     return cache_entry.result
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
@@ -109,11 +117,12 @@ def cacheable(func: F) -> F:
                     key=hexdigest, expiration=expiration, result=result
                 )
                 session.add(cache_entry)
-                logging.info(cache_entry)
                 session.commit()
+                utils.LAST_PRIMARY_KEYS = _get_last_primary_keys(cache_entry)
                 return cache_entry.result
             except sqlalchemy.exc.StatementError:
                 warnings.warn("can NOT encode output", UserWarning)
+                utils.LAST_PRIMARY_KEYS = {}
                 return result
 
     return cast(F, wrapper)
