@@ -1,4 +1,5 @@
 """Public decorator."""
+
 # Copyright 2019, B-Open Solutions srl.
 # Copyright 2022, European Union.
 #
@@ -27,7 +28,7 @@ from . import clean, config, decode, encode, utils
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def _get_last_primary_keys(cache_entry: config.CacheEntry) -> Dict[str, Any]:
+def _get_primary_keys(cache_entry: config.CacheEntry) -> Dict[str, Any]:
     return {
         k.name: getattr(cache_entry, k.name)
         for k in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
@@ -89,8 +90,6 @@ def cacheable(func: F) -> F:
             # If expiration is provided, only get entries with matching expiration
             expiration = datetime.datetime.fromisoformat(expiration)
             filters.append(config.CacheEntry.expiration == expiration)
-        else:
-            expiration = datetime.datetime.max
 
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
             for (k, e) in session.query(*queries).filter(*filters).order_by(*sorters):
@@ -103,7 +102,7 @@ def cacheable(func: F) -> F:
                     ).one()
                     cache_entry.counter += 1
                     session.commit()
-                    utils.LAST_PRIMARY_KEYS = _get_last_primary_keys(cache_entry)
+                    utils.LAST_PRIMARY_KEYS = _get_primary_keys(cache_entry)
                     return cache_entry.result
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
@@ -114,11 +113,13 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             try:
                 cache_entry = config.CacheEntry(
-                    key=hexdigest, expiration=expiration, result=result
+                    key=hexdigest,
+                    expiration=expiration or datetime.datetime.max,
+                    result=result,
                 )
                 session.add(cache_entry)
                 session.commit()
-                utils.LAST_PRIMARY_KEYS = _get_last_primary_keys(cache_entry)
+                utils.LAST_PRIMARY_KEYS = _get_primary_keys(cache_entry)
                 return cache_entry.result
             except sqlalchemy.exc.StatementError:
                 warnings.warn("can NOT encode output", UserWarning)

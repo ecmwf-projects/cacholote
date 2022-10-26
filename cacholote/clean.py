@@ -1,6 +1,5 @@
 """Functions to clean cache database and files."""
 
-
 # Copyright 2022, European Union.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -98,7 +97,8 @@ def clean_cache_files(
     if delete_unknown_files:
         # Sort by modification time
         times = [
-            fs.modified(k) if fs.exists(k) else datetime.datetime.min for k in sizes
+            fs.modified(urlpath) if fs.exists(urlpath) else datetime.datetime.min
+            for urlpath in sizes
         ]
         for _, urlpath in sorted(zip(times, sizes)):
             if fs.exists(urlpath):

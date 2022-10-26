@@ -1,4 +1,5 @@
 """Encode to JSON data."""
+
 # Copyright 2019, B-Open Solutions srl.
 # Copyright 2022, European Union.
 #
