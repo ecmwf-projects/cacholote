@@ -52,8 +52,12 @@ class CacheEntry(Base):
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
 
-@sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[no-untyped-def]
-def set_epiration_to_max(mapper, connection, target):
+@sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
+def set_epiration_to_max(
+    mapper: sqlalchemy.orm.Mapper,
+    connection: sqlalchemy.engine.Connection,
+    target: CacheEntry,
+) -> None:
     expiration = target.expiration or datetime.datetime.max
     if isinstance(expiration, str):
         expiration = datetime.datetime.fromisoformat(expiration)
