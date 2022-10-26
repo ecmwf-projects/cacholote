@@ -4,6 +4,7 @@ import sqlite3
 from typing import Any
 
 import pytest
+import sqlalchemy.exc
 
 from cacholote import cache, config, utils
 
@@ -51,19 +52,34 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
         (timestamp,) = cur.fetchone()
         assert before < datetime.datetime.fromisoformat(timestamp) < after
 
+
+@pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
+def test_encode_errors(raise_all_encoding_errors: bool) -> None:
+    cfunc = cache.cacheable(func)
+
     class Dummy:
         pass
 
     inst = Dummy()
-    with pytest.warns(UserWarning, match="can NOT encode python call"):
-        res = cfunc(inst)
-    assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
-    assert utils.LAST_PRIMARY_KEYS == {}
 
-    with pytest.warns(UserWarning, match="can NOT encode output"):
-        res = cfunc("test", b=1)
-    assert res.__class__.__name__ == "LocalClass"
-    assert utils.LAST_PRIMARY_KEYS == {}
+    with config.set(raise_all_encoding_errors=raise_all_encoding_errors):
+        if raise_all_encoding_errors:
+            with pytest.raises(AttributeError):
+                cfunc(inst)
+        else:
+            with pytest.warns(UserWarning, match="can NOT encode python call"):
+                res = cfunc(inst)
+            assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
+            assert utils.LAST_PRIMARY_KEYS == {}
+
+        if raise_all_encoding_errors:
+            with pytest.raises(sqlalchemy.exc.StatementError):
+                cfunc("test", b=1)
+        else:
+            with pytest.warns(UserWarning, match="can NOT encode output"):
+                res = cfunc("test", b=1)
+            assert res.__class__.__name__ == "LocalClass"
+            assert utils.LAST_PRIMARY_KEYS == {}
 
 
 def test_hexdigestify_python_call() -> None:

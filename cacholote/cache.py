@@ -124,8 +124,10 @@ def cacheable(func: F) -> F:
                 session.commit()
                 utils.LAST_PRIMARY_KEYS = _get_primary_keys(cache_entry)
                 return cache_entry.result
-            except sqlalchemy.exc.StatementError:
-                warnings.warn("can NOT encode output", UserWarning)
+            except sqlalchemy.exc.StatementError as ex:
+                if config.SETTINGS["raise_all_encoding_errors"]:
+                    raise ex
+                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                 utils.LAST_PRIMARY_KEYS = {}
                 return result
 
