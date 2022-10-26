@@ -121,6 +121,8 @@ class set:
         Whether to delete the original copy of cached files.
     raise_all_encoding_errors: bool, default: False
         Raise an error if an encoder does not work (i.e., do not return results).
+    expiration: datetime, optional, default: None
+        Expiration for cached results.
     engine:
         `sqlalchemy` Engine. Mutually exclusive with ``cache_db_urlpath``.
     """
