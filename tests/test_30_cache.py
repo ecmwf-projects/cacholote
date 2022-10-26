@@ -58,10 +58,12 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
     with pytest.warns(UserWarning, match="can NOT encode python call"):
         res = cfunc(inst)
     assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
+    assert utils.LAST_PRIMARY_KEYS == {}
 
     with pytest.warns(UserWarning, match="can NOT encode output"):
         res = cfunc("test", b=1)
     assert res.__class__.__name__ == "LocalClass"
+    assert utils.LAST_PRIMARY_KEYS == {}
 
 
 def test_hexdigestify_python_call() -> None:
@@ -77,8 +79,13 @@ def test_use_cache(use_cache: bool) -> None:
     with config.set(use_cache=use_cache):
         if use_cache:
             assert cached_now() == cached_now()
+            assert utils.LAST_PRIMARY_KEYS == {
+                "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+                "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
+            }
         else:
             assert cached_now() < cached_now()
+            assert utils.LAST_PRIMARY_KEYS == {}
 
 
 def test_expiration() -> None:
