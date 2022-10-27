@@ -68,8 +68,8 @@ def cacheable(func: F) -> F:
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not config.SETTINGS["use_cache"]:
-            utils.LAST_PRIMARY_KEYS = {}
-            return _update_last_primary_keys_and_return(func(*args, **kwargs))
+            result = func(*args, **kwargs)
+            return _update_last_primary_keys_and_return(result)
 
         try:
             hexdigest = hexdigestify_python_call(
@@ -79,7 +79,8 @@ def cacheable(func: F) -> F:
             )
         except encode.EncodeError:
             warnings.warn("can NOT encode python call", UserWarning)
-            return _update_last_primary_keys_and_return(func(*args, **kwargs))
+            result = func(*args, **kwargs)
+            return _update_last_primary_keys_and_return(result)
 
         # Database query settings
         queries = (config.CacheEntry.key, config.CacheEntry.expiration)
