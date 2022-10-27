@@ -33,9 +33,9 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
     cfunc = cache.cacheable(func)
 
     for counter in range(1, 3):
-        before = datetime.datetime.now()
+        before = datetime.datetime.utcnow()
         res = cfunc("test")
-        after = datetime.datetime.now()
+        after = datetime.datetime.utcnow()
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
 
         cur.execute("SELECT key, expiration, result, counter FROM cache_entries")

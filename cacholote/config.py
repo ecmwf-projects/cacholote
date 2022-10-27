@@ -44,8 +44,8 @@ class CacheEntry(Base):
     result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
-        default=datetime.datetime.now,
-        onupdate=datetime.datetime.now,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
     )
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
 
