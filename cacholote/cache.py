@@ -18,7 +18,7 @@
 import datetime
 import functools
 import warnings
-from typing import Any, Callable, Dict, TypeVar, Union, cast
+from typing import Any, Callable, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.exc
@@ -28,11 +28,15 @@ from . import clean, config, decode, encode, utils
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def _get_primary_keys(cache_entry: config.CacheEntry) -> Dict[str, Any]:
-    return {
-        k.name: getattr(cache_entry, k.name)
-        for k in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
-    }
+def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
+    if isinstance(cache_entry_or_result, config.CacheEntry):
+        utils.LAST_PRIMARY_KEYS = {
+            k.name: getattr(cache_entry_or_result, k.name)
+            for k in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
+        }
+        return cache_entry_or_result.result
+    utils.LAST_PRIMARY_KEYS = {}
+    return cache_entry_or_result
 
 
 def hexdigestify_python_call(
@@ -65,7 +69,7 @@ def cacheable(func: F) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not config.SETTINGS["use_cache"]:
             utils.LAST_PRIMARY_KEYS = {}
-            return func(*args, **kwargs)
+            return _update_last_primary_keys_and_return(func(*args, **kwargs))
 
         try:
             hexdigest = hexdigestify_python_call(
@@ -75,8 +79,7 @@ def cacheable(func: F) -> F:
             )
         except encode.EncodeError:
             warnings.warn("can NOT encode python call", UserWarning)
-            utils.LAST_PRIMARY_KEYS = {}
-            return func(*args, **kwargs)
+            return _update_last_primary_keys_and_return(func(*args, **kwargs))
 
         # Database query settings
         queries = (config.CacheEntry.key, config.CacheEntry.expiration)
@@ -105,8 +108,7 @@ def cacheable(func: F) -> F:
                     ).one()
                     cache_entry.counter += 1
                     session.commit()
-                    utils.LAST_PRIMARY_KEYS = _get_primary_keys(cache_entry)
-                    return cache_entry.result
+                    return _update_last_primary_keys_and_return(cache_entry)
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
@@ -122,13 +124,11 @@ def cacheable(func: F) -> F:
                 )
                 session.add(cache_entry)
                 session.commit()
-                utils.LAST_PRIMARY_KEYS = _get_primary_keys(cache_entry)
-                return cache_entry.result
+                return _update_last_primary_keys_and_return(cache_entry)
             except sqlalchemy.exc.StatementError as ex:
                 if config.SETTINGS["raise_all_encoding_errors"]:
                     raise ex
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                utils.LAST_PRIMARY_KEYS = {}
-                return result
+                return _update_last_primary_keys_and_return(result)
 
     return cast(F, wrapper)
