@@ -18,7 +18,7 @@
 import datetime
 import functools
 import warnings
-from typing import Any, Callable, TypeVar, Union, cast
+from typing import Any, Callable, Dict, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.exc
@@ -27,16 +27,21 @@ from . import clean, config, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+LAST_PRIMARY_KEYS: Dict[str, Any] = {}
+
 
 def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
-    if isinstance(cache_entry_or_result, config.CacheEntry):
-        utils.LAST_PRIMARY_KEYS = {
-            k.name: getattr(cache_entry_or_result, k.name)
-            for k in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
+    if not isinstance(cache_entry_or_result, config.CacheEntry):
+        LAST_PRIMARY_KEYS.clear()
+        return cache_entry_or_result
+
+    LAST_PRIMARY_KEYS.update(
+        {
+            key.name: getattr(cache_entry_or_result, key.name)
+            for key in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
         }
-        return cache_entry_or_result.result
-    utils.LAST_PRIMARY_KEYS = {}
-    return cache_entry_or_result
+    )
+    return cache_entry_or_result.result
 
 
 def hexdigestify_python_call(
