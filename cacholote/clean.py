@@ -16,6 +16,7 @@
 
 import functools
 import json
+import logging
 import posixpath
 from typing import Any, Dict, Literal, Optional, Set
 
@@ -41,14 +42,14 @@ def delete_cache_file(
         fs, urlpath = extra_encoders._get_fs_and_urlpath(*obj["args"][:2])
         urlpath = fs.unstrip_protocol(urlpath)
 
-        if cache_fs == fs and posixpath.dirname(urlpath) == cache_dirname:
+        if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                # Clean database
+                logging.info(f"Deleting cache entry: {cache_entry!r}")
                 session.delete(cache_entry)
                 session.commit()
             if fs.exists(urlpath) and not dry_run:
-                # Remove file
+                logging.info(f"Deleting {urlpath!r}")
                 fs.rm(urlpath, recursive=True)
 
     return obj
@@ -72,12 +73,18 @@ def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
 def delete_cache_entry(
     session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
 ) -> None:
-    # Delete cache entry
+    logging.info(f"Deleting cache entry: {cache_entry!r}")
     session.delete(cache_entry)
     session.commit()
 
     # Delete cache file
     json.loads(cache_entry.result, object_hook=delete_cache_file)
+
+
+def _stop_cleaning(maxsize: int, sizes: Dict[str, int], dirname: str) -> bool:
+    size = sum(sizes.values())
+    logging.info(f"Size of {dirname!r}: {size!r}")
+    return size <= maxsize
 
 
 def clean_cache_files(
@@ -109,15 +116,16 @@ def clean_cache_files(
     # Freeze directory content
     fs, dirname = utils.get_cache_files_fs_dirname()
     sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
-    if sum(sizes.values()) <= maxsize:
+    if _stop_cleaning(maxsize, sizes, dirname):
         return
 
     if delete_unknown_files:
         for urlpath in _get_unknown_files(sizes):
-            if fs.exists(urlpath):
-                fs.rm(urlpath)
             sizes.pop(urlpath)
-            if sum(sizes.values()) <= maxsize:
+            if fs.exists(urlpath):
+                logging.info(f"Deleting {urlpath!r}")
+                fs.rm(urlpath)
+            if _stop_cleaning(maxsize, sizes, dirname):
                 return
 
     # Clean files in database
@@ -132,7 +140,7 @@ def clean_cache_files(
                     sizes=sizes,
                 ),
             )
-            if sum(sizes.values()) <= maxsize:
+            if _stop_cleaning(maxsize, sizes, dirname):
                 return
 
     raise ValueError(

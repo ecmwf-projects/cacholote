@@ -49,6 +49,13 @@ class CacheEntry(Base):
 
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
+    @property
+    def _primary_keys(self) -> Dict[str, Any]:
+        return {name: getattr(self, name) for name in ["key", "expiration"]}
+
+    def __repr__(self) -> str:
+        return str(self._primary_keys)
+
 
 @sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
 def set_epiration_to_max(

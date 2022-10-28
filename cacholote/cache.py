@@ -34,12 +34,7 @@ def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
         LAST_PRIMARY_KEYS.clear()
         return cache_entry_or_result
 
-    LAST_PRIMARY_KEYS.update(
-        {
-            key.name: getattr(cache_entry_or_result, key.name)
-            for key in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
-        }
-    )
+    LAST_PRIMARY_KEYS.update(cache_entry_or_result._primary_keys)
     return decode.loads(cache_entry_or_result.result)
 
 
