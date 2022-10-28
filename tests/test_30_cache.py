@@ -4,7 +4,6 @@ import sqlite3
 from typing import Any
 
 import pytest
-import sqlalchemy.exc
 
 from cacholote import cache, config
 
@@ -73,7 +72,7 @@ def test_encode_errors(raise_all_encoding_errors: bool) -> None:
             assert cache.LAST_PRIMARY_KEYS == {}
 
         if raise_all_encoding_errors:
-            with pytest.raises(sqlalchemy.exc.StatementError):
+            with pytest.raises(AttributeError):
                 cfunc("test", b=1)
         else:
             with pytest.warns(UserWarning, match="can NOT encode output"):

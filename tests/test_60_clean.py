@@ -68,22 +68,18 @@ def test_clean_cache_files(
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
-@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
-def test_delete_unknown_files(
-    tmpdir: pathlib.Path, set_cache: str, delete_unknown_files: bool
-) -> None:
+def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     tmpfile = tmpdir / "test.txt"
     with open(tmpfile, "w") as f:
         f.write("0")
     open_url(tmpfile)
+
     fs.put(str(tmpfile), f"{dirname}/unknown.txt")
 
+    clean.clean_cache_files(1, delete_unknown_files=delete_unknown_files)
     if delete_unknown_files:
-        clean.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
-        assert fs.du(dirname) == 0
+        assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpfile)}.txt"]
     else:
-        with pytest.raises(ValueError):
-            clean.clean_cache_files(0, delete_unknown_files=delete_unknown_files)
         assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]

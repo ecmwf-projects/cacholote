@@ -21,7 +21,6 @@ import warnings
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
 import sqlalchemy
-import sqlalchemy.exc
 
 from . import clean, config, decode, encode, utils
 
@@ -41,7 +40,7 @@ def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
             for key in sqlalchemy.orm.class_mapper(config.CacheEntry).primary_key
         }
     )
-    return cache_entry_or_result.result
+    return decode.loads(cache_entry_or_result.result)
 
 
 def hexdigestify_python_call(
@@ -87,12 +86,10 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             return _update_last_primary_keys_and_return(result)
 
-        # Database query settings
-        queries = (config.CacheEntry.key, config.CacheEntry.expiration)
-        sorters = (config.CacheEntry.timestamp.desc(),)
+        # Filters
         filters = [
             config.CacheEntry.key == hexdigest,
-            config.CacheEntry.expiration > datetime.datetime.now(),
+            config.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
         if config.SETTINGS["expiration"]:
             # If expiration is provided, only get entries with matching expiration
@@ -102,23 +99,20 @@ def cacheable(func: F) -> F:
             )
 
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-            for (key, expiration) in (
-                session.query(*queries).filter(*filters).order_by(*sorters)
+            for cache_entry in (
+                session.query(config.CacheEntry)
+                .filter(*filters)
+                .order_by(config.CacheEntry.timestamp.desc())
             ):
                 try:
-                    cache_entry = (
-                        session.query(config.CacheEntry).filter(
-                            config.CacheEntry.key == key,
-                            config.CacheEntry.expiration == expiration,
-                        )
-                    ).one()
+                    result = _update_last_primary_keys_and_return(cache_entry)
                     cache_entry.counter += 1
                     session.commit()
-                    return _update_last_primary_keys_and_return(cache_entry)
+                    return result
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
-                    clean.delete_entry(key, expiration)
+                    clean.delete_cache_entry(session, cache_entry)
 
             # Not in the cache: Compute result
             result = func(*args, **kwargs)
@@ -126,14 +120,12 @@ def cacheable(func: F) -> F:
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
-                    result=result,
+                    result=encode.dumps(result),
                 )
                 session.add(cache_entry)
                 session.commit()
                 return _update_last_primary_keys_and_return(cache_entry)
-            except sqlalchemy.exc.StatementError as ex:
-                if config.SETTINGS["raise_all_encoding_errors"]:
-                    raise ex
+            except encode.EncodeError as ex:
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                 return _update_last_primary_keys_and_return(result)
 
