@@ -150,14 +150,15 @@ def _lock_file(
         fs.rm(urlpath)
 
 
-def _wait_until_unlocked(fs: fsspec.AbstractFileSystem, urlpath: str) -> None:
+def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
     locked_file = urlpath + ".lock"
-    msg = f"can NOT proceed until {locked_file!r} is removed."
+    msg = f"can NOT proceed until {locked_file!r} is deleted."
     while fs.exists(locked_file):
         if msg:
             warnings.warn(msg, UserWarning)
             msg = ""
         time.sleep(1)
+    return not fs.exists(urlpath)
 
 
 @_requires_xarray_and_dask
@@ -198,8 +199,7 @@ def decode_io_object(
 def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
-    _wait_until_unlocked(fs, urlpath)
-    if not fs.exists(urlpath):
+    if not _store_file(fs, urlpath):
         with _lock_file(fs, urlpath):
             if filetype == "application/vnd+zarr":
                 # Write directly on any filesystem
@@ -269,8 +269,7 @@ def _maybe_store_io_object(
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
 ) -> None:
-    _wait_until_unlocked(fs_out, urlpath_out)
-    if not fs_out.exists(urlpath_out):
+    if _store_file(fs_out, urlpath_out):
         with _lock_file(fs_out, urlpath_out):
             if fs_in == fs_out:
                 if config.SETTINGS["io_delete_original"]:
