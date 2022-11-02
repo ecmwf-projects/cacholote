@@ -16,6 +16,7 @@
 # limitations under the License.
 
 
+import contextlib
 import functools
 import inspect
 import io
@@ -23,7 +24,7 @@ import mimetypes
 import os
 import posixpath
 import tempfile
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Generator, Optional, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
@@ -135,6 +136,18 @@ def _get_fs_and_urlpath(
     )
 
 
+@contextlib.contextmanager
+def _lock_file(
+    fs: fsspec.AbstractFileSystem, urlpath: str
+) -> Generator[None, None, None]:
+    urlpath = urlpath + ".lock"
+    fs.touch(urlpath)
+    try:
+        yield
+    finally:
+        fs.rm(urlpath)
+
+
 @_requires_xarray_and_dask
 def decode_xr_dataset(
     file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
@@ -173,33 +186,34 @@ def decode_io_object(
 def _store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
-    if filetype == "application/vnd+zarr":
-        # Write directly on any filesystem
-        mapper = fs.get_mapper(urlpath)
-        obj.to_zarr(mapper, consolidated=True)
-    else:
-        # Need a tmp local copy to write on a different filesystem
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            basename = os.path.basename(urlpath)
-            tmpfilename = os.path.join(tmpdirname, basename)
+    with _lock_file(fs, urlpath):
+        if filetype == "application/vnd+zarr":
+            # Write directly on any filesystem
+            mapper = fs.get_mapper(urlpath)
+            obj.to_zarr(mapper, consolidated=True)
+        else:
+            # Need a tmp local copy to write on a different filesystem
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                basename = os.path.basename(urlpath)
+                tmpfilename = os.path.join(tmpdirname, basename)
 
-            if filetype == "application/netcdf":
-                obj.to_netcdf(tmpfilename)
-            elif filetype == "application/x-grib":
-                import cfgrib.xarray_to_grib
+                if filetype == "application/netcdf":
+                    obj.to_netcdf(tmpfilename)
+                elif filetype == "application/x-grib":
+                    import cfgrib.xarray_to_grib
 
-                cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
-            else:
-                # Should never get here! xarray_cache_type is checked in config.py
-                raise ValueError(f"type {filetype!r} is NOT supported.")
+                    cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
+                else:
+                    # Should never get here! xarray_cache_type is checked in config.py
+                    raise ValueError(f"type {filetype!r} is NOT supported.")
 
-            if fs == fsspec.filesystem("file"):
-                fsspec.filesystem("file").mv(tmpfilename, urlpath)
-            else:
-                with fsspec.open(tmpfilename, "rb") as f_in, fs.open(
-                    urlpath, "wb"
-                ) as f_out:
-                    utils.copy_buffered_file(f_in, f_out)
+                if fs == fsspec.filesystem("file"):
+                    fsspec.filesystem("file").mv(tmpfilename, urlpath)
+                else:
+                    with fsspec.open(tmpfilename, "rb") as f_in, fs.open(
+                        urlpath, "wb"
+                    ) as f_out:
+                        utils.copy_buffered_file(f_in, f_out)
 
 
 @_requires_xarray_and_dask
@@ -242,18 +256,19 @@ def _store_io_object(
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
 ) -> None:
-    if fs_in == fs_out:
-        if config.SETTINGS["io_delete_original"]:
-            fs_in.mv(urlpath_in, urlpath_out)
+    with _lock_file(fs_out, urlpath_out):
+        if fs_in == fs_out:
+            if config.SETTINGS["io_delete_original"]:
+                fs_in.mv(urlpath_in, urlpath_out)
+            else:
+                fs_in.cp(urlpath_in, urlpath_out)
         else:
-            fs_in.cp(urlpath_in, urlpath_out)
-    else:
-        with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
-            urlpath_out, "wb"
-        ) as f_out:
-            utils.copy_buffered_file(f_in, f_out)
-        if config.SETTINGS["io_delete_original"]:
-            fs_in.rm(urlpath_in)
+            with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
+                urlpath_out, "wb"
+            ) as f_out:
+                utils.copy_buffered_file(f_in, f_out)
+            if config.SETTINGS["io_delete_original"]:
+                fs_in.rm(urlpath_in)
 
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
