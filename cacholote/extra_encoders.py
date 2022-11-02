@@ -152,11 +152,11 @@ def _lock_file(
 
 def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
     locked_file = urlpath + ".lock"
-    msg = f"can NOT proceed until {locked_file!r} is deleted."
+    warn_msg = f"can NOT proceed until {locked_file!r} is deleted."
     while fs.exists(locked_file):
-        if msg:
-            warnings.warn(msg, UserWarning)
-            msg = ""
+        if warn_msg:
+            warnings.warn(warn_msg, UserWarning)
+            warn_msg = ""
         time.sleep(1)
     return not fs.exists(urlpath)
 
@@ -199,7 +199,7 @@ def decode_io_object(
 def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
-    if not _store_file(fs, urlpath):
+    if _store_file(fs, urlpath):
         with _lock_file(fs, urlpath):
             if filetype == "application/vnd+zarr":
                 # Write directly on any filesystem
