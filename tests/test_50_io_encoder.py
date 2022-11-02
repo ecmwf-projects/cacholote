@@ -15,19 +15,21 @@ def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
 
 @pytest.mark.parametrize("io_delete_original", [True, False])
 def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> None:
+    # Define readonly dir
     readonly_dir = tmpdir / "readonly"
     fsspec.filesystem("file").mkdir(readonly_dir)
+    config.set(
+        io_delete_original=io_delete_original, cache_files_urlpath_readonly=readonly_dir
+    )
 
+    # Create file
     tmpfile = tmpdir / "test.txt"
     with open(tmpfile, "wb") as f:
         f.write(b"test")
     tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
 
-    with config.set(
-        io_delete_original=io_delete_original, cache_files_urlpath_readonly=readonly_dir
-    ):
-        actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
-
+    # Check dict and cached file
+    actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
     href = f"{readonly_dir}/{tmp_checksum}.txt"
     local_path = f"{tmpdir}/cache_files/{tmp_checksum}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
@@ -49,6 +51,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     assert actual == expected
     assert fsspec.filesystem("file").exists(tmpfile) is not io_delete_original
 
+    # Use href when local_path is missing or corrupted
     fsspec.filesystem("file").mv(local_path, href)
     assert decode.loads(encode.dumps(actual)).read() == b"test"
 
@@ -63,17 +66,19 @@ def test_copy_from_http_to_cache(
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
 
+    # cache-db to check
     con = sqlite3.connect(tmpdir / "cacholote.db")
     cur = con.cursor()
 
+    # http server
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
     cached_basename = str(fsspec.filesystem("http").checksum(url))
 
+    # cache http file
+    fs, dirname = utils.get_cache_files_fs_dirname()
     cfunc = cache.cacheable(open_url)
-    infos = []
     for expected_counter in (1, 2):
         result = cfunc(url)
 
@@ -81,28 +86,26 @@ def test_copy_from_http_to_cache(
         cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == [(expected_counter,)]
 
-        infos.append(fs.info(f"{dirname}/{cached_basename}"))
-
         # Check result
         assert result.read() == b"test"
 
         # Check file in cache
         assert result.path == f"{dirname}/{cached_basename}"
-
-    # Check cached file is not modified
-    assert infos[0] == infos[1]
+        assert fs.exists(result.path)
 
 
 def test_io_corrupted_files(
     tmpdir: pathlib.Path, httpserver: pytest_httpserver.HTTPServer
 ) -> None:
+
+    # http server
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
     cached_basename = str(fsspec.filesystem("http").checksum(url))
 
-    cfunc = cache.cacheable(open_url)
+    # cache file
     fs, dirname = utils.get_cache_files_fs_dirname()
-
+    cfunc = cache.cacheable(open_url)
     cfunc(url)
 
     # Warn if file is corrupted

@@ -54,6 +54,8 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
 def test_encode_errors(raise_all_encoding_errors: bool) -> None:
+    config.set(raise_all_encoding_errors=raise_all_encoding_errors)
+
     cfunc = cache.cacheable(func)
 
     class Dummy:
@@ -61,24 +63,23 @@ def test_encode_errors(raise_all_encoding_errors: bool) -> None:
 
     inst = Dummy()
 
-    with config.set(raise_all_encoding_errors=raise_all_encoding_errors):
-        if raise_all_encoding_errors:
-            with pytest.raises(AttributeError):
-                cfunc(inst)
-        else:
-            with pytest.warns(UserWarning, match="can NOT encode python call"):
-                res = cfunc(inst)
-            assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
-            assert cache.LAST_PRIMARY_KEYS == {}
+    if raise_all_encoding_errors:
+        with pytest.raises(AttributeError):
+            cfunc(inst)
+    else:
+        with pytest.warns(UserWarning, match="can NOT encode python call"):
+            res = cfunc(inst)
+        assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
+        assert cache.LAST_PRIMARY_KEYS == {}
 
-        if raise_all_encoding_errors:
-            with pytest.raises(AttributeError):
-                cfunc("test", b=1)
-        else:
-            with pytest.warns(UserWarning, match="can NOT encode output"):
-                res = cfunc("test", b=1)
-            assert res.__class__.__name__ == "LocalClass"
-            assert cache.LAST_PRIMARY_KEYS == {}
+    if raise_all_encoding_errors:
+        with pytest.raises(AttributeError):
+            cfunc("test", b=1)
+    else:
+        with pytest.warns(UserWarning, match="can NOT encode output"):
+            res = cfunc("test", b=1)
+        assert res.__class__.__name__ == "LocalClass"
+        assert cache.LAST_PRIMARY_KEYS == {}
 
 
 def test_hexdigestify_python_call() -> None:
@@ -91,16 +92,17 @@ def test_hexdigestify_python_call() -> None:
 
 @pytest.mark.parametrize("use_cache", [True, False])
 def test_use_cache(use_cache: bool) -> None:
-    with config.set(use_cache=use_cache):
-        if use_cache:
-            assert cached_now() == cached_now()
-            assert cache.LAST_PRIMARY_KEYS == {
-                "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
-                "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
-            }
-        else:
-            assert cached_now() < cached_now()
-            assert cache.LAST_PRIMARY_KEYS == {}
+    config.set(use_cache=use_cache)
+
+    if use_cache:
+        assert cached_now() == cached_now()
+        assert cache.LAST_PRIMARY_KEYS == {
+            "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+            "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
+        }
+    else:
+        assert cached_now() < cached_now()
+        assert cache.LAST_PRIMARY_KEYS == {}
 
 
 def test_expiration() -> None:
@@ -109,9 +111,9 @@ def test_expiration() -> None:
         "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
+
     with config.set(expiration=datetime.datetime(1908, 3, 9)):
-        second = cached_now()
-        assert second != first
+        assert cached_now() != first
         assert cache.LAST_PRIMARY_KEYS == {
             "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
             "expiration": datetime.datetime(1908, 3, 9),

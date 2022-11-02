@@ -1,3 +1,4 @@
+import os
 import pathlib
 import sqlite3
 
@@ -13,12 +14,12 @@ except ImportError:
 
 
 def get_grib_ds() -> "xr.Dataset":
-    url = "https://github.com/ecmwf/cfgrib/raw/master/tests/sample-data/era5-levels-members.grib"
-    with fsspec.open(f"simplecache::{url}", simplecache={"same_names": True}) as of:
-        fname = of.name
-    ds = xr.open_dataset(fname, engine="cfgrib")
+    pytest.importorskip("cfgrib")
+    eccodes = pytest.importorskip("eccodes")
+    filename = os.path.join(eccodes.codes_samples_path(), "GRIB2.tmpl")
+    ds = xr.open_dataset(filename, engine="cfgrib")
     del ds.attrs["history"]
-    return ds.sel(number=0)
+    return ds
 
 
 @pytest.mark.filterwarnings(
@@ -27,13 +28,16 @@ def get_grib_ds() -> "xr.Dataset":
 def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
+    # Define readonly dir
     readonly_dir = tmpdir / "readonly"
     fsspec.filesystem("file").mkdir(readonly_dir)
+    config.set(cache_files_urlpath_readonly=readonly_dir)
 
+    # Create sample dataset
     ds = xr.Dataset({"foo": [0]}, attrs={})
-    with config.set(cache_files_urlpath_readonly=readonly_dir):
-        actual = extra_encoders.dictify_xr_dataset(ds)
 
+    # Check dict
+    actual = extra_encoders.dictify_xr_dataset(ds)
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
     local_path = f"{tmpdir}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
@@ -53,6 +57,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     }
     assert actual == expected
 
+    # Use href when local_path is missing or corrupted
     fsspec.filesystem("file").mv(local_path, href)
     xr.testing.assert_identical(ds, decode.loads(encode.dumps(actual)))
 
@@ -81,23 +86,21 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
+    config.set(xarray_cache_type=xarray_cache_type)
+
+    # cache-db to check
     con = sqlite3.connect(str(tmpdir / "cacholote.db"))
     cur = con.cursor()
 
     expected = get_grib_ds()
     cfunc = cache.cacheable(get_grib_ds)
 
-    infos = []
-    for expected_counter in [1, 2]:
-        with config.set(xarray_cache_type=xarray_cache_type):
-            fs, dirname = utils.get_cache_files_fs_dirname()
-            actual = cfunc()
+    for expected_counter in (1, 2):
+        actual = cfunc()
 
         # Check hits
         cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == [(expected_counter,)]
-
-        infos.append(fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}"))
 
         # Check result
         if xarray_cache_type == "application/x-grib":
@@ -106,15 +109,7 @@ def test_xr_cacheable(
             xr.testing.assert_identical(actual, expected)
 
         # Check opened with dask (i.e., read from file)
-        assert dict(actual.chunks) == {
-            "time": (4,),
-            "isobaricInhPa": (2,),
-            "latitude": (61,),
-            "longitude": (120,),
-        }
-
-    # Check cached file is not modified
-    assert infos[0] == infos[1]
+        assert dict(actual.chunks) == {"longitude": (16,), "latitude": (31,)}
 
 
 @pytest.mark.parametrize(
@@ -131,28 +126,25 @@ def test_xr_corrupted_files(
 ) -> None:
     pytest.importorskip(importorskip)
 
+    config.set(xarray_cache_type=xarray_cache_type)
+
+    # Cache file
+    fs, dirname = utils.get_cache_files_fs_dirname()
     expected = get_grib_ds()
     cfunc = cache.cacheable(get_grib_ds)
-
-    with config.set(xarray_cache_type=xarray_cache_type):
-        fs, dirname = utils.get_cache_files_fs_dirname()
-        cfunc()
+    cfunc()
 
     # Warn if file is corrupted
-    fs.touch(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}", truncate=False)
-    touched_info = fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}")
-    with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
-        UserWarning, match="checksum mismatch"
-    ):
+    fs.touch(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}", truncate=False)
+    touched_info = fs.info(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}")
+    with pytest.warns(UserWarning, match="checksum mismatch"):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert fs.info(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}") != touched_info
+    assert fs.info(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}") != touched_info
 
     # Warn if file is deleted
-    fs.rm(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}", recursive=True)
-    with config.set(xarray_cache_type=xarray_cache_type), pytest.warns(
-        UserWarning, match="No such file or directory"
-    ):
+    fs.rm(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}", recursive=True)
+    with pytest.warns(UserWarning, match="No such file or directory"):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert fs.exists(f"{dirname}/71b1251a1f7f7ce64c1e1a436613c023{ext}")
+    assert fs.exists(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}")
