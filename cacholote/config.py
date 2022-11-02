@@ -25,6 +25,8 @@ import fsspec
 import sqlalchemy
 import sqlalchemy.orm
 
+from . import encode
+
 CACHE_DIR = os.path.join(tempfile.gettempdir(), "cacholote")
 CACHE_FILES_DIR = os.path.join(CACHE_DIR, "cache_files")
 os.makedirs(CACHE_FILES_DIR, exist_ok=True)
@@ -39,7 +41,7 @@ class CacheEntry(Base):
     expiration = sqlalchemy.Column(
         sqlalchemy.DateTime, default=datetime.datetime.max, primary_key=True
     )
-    result: str = sqlalchemy.Column(sqlalchemy.String, nullable=False)
+    result: str = sqlalchemy.Column(sqlalchemy.JSON, nullable=False)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
         default=datetime.datetime.utcnow,
@@ -92,8 +94,7 @@ _SETTINGS: Dict[str, Any] = {
 
 def _create_engine() -> None:
     _SETTINGS["engine"] = sqlalchemy.create_engine(
-        _SETTINGS["cache_db_urlpath"],
-        future=True,
+        _SETTINGS["cache_db_urlpath"], future=True, json_serializer=encode.dumps
     )
     Base.metadata.create_all(_SETTINGS["engine"])
 

@@ -17,6 +17,7 @@
 
 import datetime
 import functools
+import json
 import warnings
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
@@ -35,7 +36,7 @@ def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
         return cache_entry_or_result
 
     LAST_PRIMARY_KEYS.update(cache_entry_or_result._primary_keys)
-    return decode.loads(cache_entry_or_result.result)
+    return decode.loads(json.dumps(cache_entry_or_result.result))
 
 
 def hexdigestify_python_call(
@@ -76,8 +77,8 @@ def cacheable(func: F) -> F:
                 *args,
                 **kwargs,
             )
-        except encode.EncodeError:
-            warnings.warn("can NOT encode python call", UserWarning)
+        except encode.EncodeError as ex:
+            warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             result = func(*args, **kwargs)
             return _update_last_primary_keys_and_return(result)
 
@@ -115,13 +116,16 @@ def cacheable(func: F) -> F:
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
-                    result=encode.dumps(result),
+                    result=result,
                 )
                 session.add(cache_entry)
                 session.commit()
                 return _update_last_primary_keys_and_return(cache_entry)
-            except encode.EncodeError as ex:
-                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                return _update_last_primary_keys_and_return(result)
+            except sqlalchemy.exc.StatementError as ex:
+                try:
+                    raise ex.orig
+                except encode.EncodeError:
+                    warnings.warn(f"can NOT encode output: {ex.orig!r}", UserWarning)
+                    return _update_last_primary_keys_and_return(result)
 
     return cast(F, wrapper)
