@@ -17,7 +17,6 @@
 
 import datetime
 import functools
-import json
 import warnings
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
@@ -36,7 +35,7 @@ def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
         return cache_entry_or_result
 
     LAST_PRIMARY_KEYS.update(cache_entry_or_result._primary_keys)
-    return decode.loads(json.dumps(cache_entry_or_result.result))
+    return decode.loads(cache_entry_or_result._result_as_string)
 
 
 def hexdigestify_python_call(

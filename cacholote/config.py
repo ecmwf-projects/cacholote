@@ -52,6 +52,10 @@ class CacheEntry(Base):
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
     @property
+    def _result_as_string(self) -> str:
+        return json.dumps(self.result)
+
+    @property
     def _primary_keys(self) -> Dict[str, Any]:
         return {name: getattr(self, name) for name in ["key", "expiration"]}
 
