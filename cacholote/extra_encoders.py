@@ -1,4 +1,5 @@
 """Additional encoders that need optional dependencies."""
+
 # Copyright 2019, B-Open Solutions srl.
 # Copyright 2022, European Union.
 #
@@ -95,24 +96,6 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     }
 
     return file_dict
-
-
-def _are_file_args(*args: Any) -> bool:
-    try:
-        return (
-            len(args) <= 2
-            and all(isinstance(arg, dict) for arg in args)
-            and set(args[0])
-            == {
-                "type",
-                "href",
-                "file:checksum",
-                "file:size",
-                "file:local_path",
-            }
-        )
-    except TypeError:
-        return False
 
 
 def _get_fs_and_urlpath(

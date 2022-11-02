@@ -1,4 +1,5 @@
 import contextlib
+import json
 import os
 import pathlib
 import shlex
@@ -49,13 +50,13 @@ def set_cache(
     tmpdir: pathlib.Path,
     request: pytest.FixtureRequest,
 ) -> Generator[str, None, None]:
-    cache_db_urlpath = "sqlite:///" + str(tmpdir / "cacholote.db")
+    settings = json.loads(config.json_dumps())
+    config.set(cache_db_urlpath="sqlite:///" + str(tmpdir / "cacholote.db"))
     if not hasattr(request, "param") or request.param == "file":
-        with config.set(
-            cache_db_urlpath=cache_db_urlpath,
+        config.set(
             cache_files_urlpath=str(tmpdir / "cache_files"),
-        ):
-            yield "file"
+        )
+        yield "file"
     elif request.param == "s3":
         pytest.importorskip("s3fs")
         botocore_session = pytest.importorskip("botocore.session")
@@ -65,11 +66,13 @@ def set_cache(
             session = botocore_session.Session()
             client = session.create_client("s3", **client_kwargs)
             client.create_bucket(Bucket=test_bucket_name)
-            with config.set(
-                cache_db_urlpath=cache_db_urlpath,
+            config.set(
                 cache_files_urlpath=f"s3://{test_bucket_name}",
                 cache_files_storage_options=dict(client_kwargs=client_kwargs),
-            ):
-                yield request.param
+            )
+            yield request.param
     else:
+        config.set(**settings)
         raise ValueError
+
+    config.set(**settings)

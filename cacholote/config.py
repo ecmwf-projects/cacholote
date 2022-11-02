@@ -25,8 +25,6 @@ import fsspec
 import sqlalchemy
 import sqlalchemy.orm
 
-from . import decode, encode
-
 CACHE_DIR = os.path.join(tempfile.gettempdir(), "cacholote")
 CACHE_FILES_DIR = os.path.join(CACHE_DIR, "cache_files")
 os.makedirs(CACHE_FILES_DIR, exist_ok=True)
@@ -37,14 +35,38 @@ Base = sqlalchemy.orm.declarative_base()
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
-    key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True, unique=True)
-    result = sqlalchemy.Column(sqlalchemy.JSON)
+    key = sqlalchemy.Column(sqlalchemy.String(56), primary_key=True)
+    expiration = sqlalchemy.Column(
+        sqlalchemy.DateTime, default=datetime.datetime.max, primary_key=True
+    )
+    result: str = sqlalchemy.Column(sqlalchemy.String, nullable=False)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
-        default=datetime.datetime.now,
-        onupdate=datetime.datetime.now,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
     )
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
+
+    constraint = sqlalchemy.UniqueConstraint(key, expiration)
+
+    @property
+    def _primary_keys(self) -> Dict[str, Any]:
+        return {name: getattr(self, name) for name in ["key", "expiration"]}
+
+    def __repr__(self) -> str:
+        return str(self._primary_keys)
+
+
+@sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
+def set_epiration_to_max(
+    mapper: sqlalchemy.orm.Mapper,
+    connection: sqlalchemy.engine.Connection,
+    target: CacheEntry,
+) -> None:
+    expiration = target.expiration or datetime.datetime.max
+    if isinstance(expiration, str):
+        expiration = datetime.datetime.fromisoformat(expiration)
+    target.expiration = expiration
 
 
 _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
@@ -64,6 +86,7 @@ _SETTINGS: Dict[str, Any] = {
     "xarray_cache_type": "application/netcdf",
     "io_delete_original": False,
     "raise_all_encoding_errors": False,
+    "expiration": None,
 }
 
 
@@ -71,8 +94,6 @@ def _create_engine() -> None:
     _SETTINGS["engine"] = sqlalchemy.create_engine(
         _SETTINGS["cache_db_urlpath"],
         future=True,
-        json_serializer=encode.dumps,
-        json_deserializer=decode.loads,
     )
     Base.metadata.create_all(_SETTINGS["engine"])
 
@@ -115,6 +136,8 @@ class set:
         Whether to delete the original copy of cached files.
     raise_all_encoding_errors: bool, default: False
         Raise an error if an encoder does not work (i.e., do not return results).
+    expiration: datetime, optional, default: None
+        Expiration for cached results.
     engine:
         `sqlalchemy` Engine. Mutually exclusive with ``cache_db_urlpath``.
     """
@@ -131,6 +154,9 @@ class set:
                     "'engine' and 'cache_db_urlpath' are mutually exclusive"
                 )
             kwargs["cache_db_urlpath"] = None
+
+        if hasattr(kwargs.get("expiration"), "isoformat"):
+            kwargs["expiration"] = kwargs["expiration"].isoformat()
 
         try:
             self._old = {key: _SETTINGS[key] for key in kwargs}

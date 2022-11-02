@@ -1,4 +1,5 @@
 """Decode JSON data."""
+
 # Copyright 2019, B-Open Solutions srl.
 # Copyright 2022, European Union.
 #
@@ -60,14 +61,13 @@ FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
 
 def object_hook(obj: Dict[str, Any]) -> Any:
     """Decode deserialized JSON data (``dict``)."""
-    if isinstance(obj, dict):
-        for decoder in reversed(FILECACHE_DECODERS):
-            try:
-                result = decoder(obj)
-                if result is not None:
-                    return result
-            except Exception as ex:
-                raise DecodeError(ex)
+    for decoder in reversed(FILECACHE_DECODERS):
+        try:
+            result = decoder(obj)
+            if result is not None:
+                return result
+        except Exception as ex:
+            raise DecodeError(ex)
 
     return obj
 
