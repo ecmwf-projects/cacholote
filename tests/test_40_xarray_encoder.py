@@ -1,6 +1,8 @@
 import os
 import pathlib
 import sqlite3
+import threading
+from typing import List
 
 import fsspec
 import pytest
@@ -148,3 +150,36 @@ def test_xr_corrupted_files(
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
     assert fs.exists(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}")
+
+
+@pytest.mark.filterwarnings(
+    "ignore:distutils Version classes are deprecated. Use packaging.version instead."
+)
+def test_xr_lock_file() -> None:
+    pytest.importorskip("netCDF4")
+
+    # Create sample dataset
+    ds = xr.Dataset({"foo": [0]}, attrs={})
+
+    # Check if .lock exists
+    def lock_file_exists(results: List[bool]) -> None:
+        fs, dirname = utils.get_cache_files_fs_dirname()
+        for _ in range(1000):
+            results.append(
+                fs.exists(f"{dirname}/247fd17e087ae491996519c097e70e48.nc.lock")
+            )
+            if any(results) and results[-1] is False:
+                break
+
+    # Cached ds
+    cfunc = cache.cacheable(lambda ds: ds)
+
+    # Threading
+    results: List[bool] = []
+    t1 = threading.Thread(target=lock_file_exists, args=(results,))
+    t2 = threading.Thread(target=cfunc, args=(ds,))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    assert any(results) and results[0] is results[-1] is False

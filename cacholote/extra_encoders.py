@@ -142,12 +142,12 @@ def _get_fs_and_urlpath(
 def _lock_file(
     fs: fsspec.AbstractFileSystem, urlpath: str
 ) -> Generator[None, None, None]:
-    urlpath = urlpath + ".lock"
-    fs.touch(urlpath)
+    locked_file = urlpath + ".lock"
+    fs.touch(locked_file)
     try:
         yield
     finally:
-        fs.rm(urlpath)
+        fs.rm(locked_file)
 
 
 def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
