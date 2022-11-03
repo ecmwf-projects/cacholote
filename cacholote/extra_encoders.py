@@ -152,12 +152,13 @@ def _lock_file(
 
 def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
     locked_file = urlpath + ".lock"
-    warn = iter([True])
+    warned = False
     while fs.exists(locked_file):
-        if next(warn, False):
+        if not warned:
             warnings.warn(
                 f"can NOT proceed until file is unlocked: {locked_file!r}.", UserWarning
             )
+            warned = True
         time.sleep(1)
     return not fs.exists(urlpath)
 

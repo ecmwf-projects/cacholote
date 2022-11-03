@@ -103,13 +103,14 @@ def cacheable(func: F) -> F:
             ):
                 try:
                     # Wait until unlocked
-                    warn = iter([True])
+                    warned = False
                     while cache_entry.result == "__locked__":
                         session.refresh(cache_entry)
-                        if next(warn, False):
+                        if not warned:
                             warnings.warn(
                                 f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
                             )
+                            warned = True
                         time.sleep(1)
                     # Get result
                     result = _update_last_primary_keys_and_return(cache_entry)
