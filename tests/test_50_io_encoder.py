@@ -125,7 +125,7 @@ def test_io_corrupted_files(
 def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 1_000_000)
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 10_000_000)
 
     # Cached open
     cfunc = cache.cacheable(open)
