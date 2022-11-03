@@ -137,7 +137,7 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
         UserWarning, match="can NOT proceed until the cache entry is unlocked"
     ):
         t1.start()
-        time.sleep(0.001)
+        time.sleep(0.005)
         t2.start()
         t1.join()
         t2.join()
@@ -147,3 +147,8 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries")
     assert cur.fetchall() == [(2,)]
+
+    # Clean-up
+    fsspec.filesystem("file").rm(tmpfile)
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs.rm(dirname, recursive=True)
