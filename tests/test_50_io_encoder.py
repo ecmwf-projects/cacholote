@@ -121,11 +121,11 @@ def test_io_corrupted_files(
     assert result.read() == b"test"
     assert fs.exists(f"{dirname}/{cached_basename}")
 
+
 def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
-    with fsspec.filesystem("file").open(tmpfile, "wb") as f:
-        f.write(b"0" * 1_000)
+    fsspec.filesystem("file").touch(tmpfile)
 
     # Cached open
     cfunc = cache.cacheable(open)
@@ -133,7 +133,9 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Threading
     t1 = threading.Thread(target=cfunc, args=(tmpfile,))
     t2 = threading.Thread(target=cfunc, args=(tmpfile,))
-    with pytest.warns(UserWarning, match="can NOT proceed until"):
+    with pytest.warns(
+        UserWarning, match="can NOT proceed until the cache entry is unlocked"
+    ):
         t1.start()
         time.sleep(0.005)
         t2.start()

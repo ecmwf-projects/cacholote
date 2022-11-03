@@ -102,13 +102,17 @@ def cacheable(func: F) -> F:
                 .order_by(config.CacheEntry.timestamp.desc())
             ):
                 try:
-                    session.refresh(cache_entry)
+                    # Wait until unlocked
+                    warn = True
                     while cache_entry.result == "__locked__":
                         session.refresh(cache_entry)
-                        warnings.warn(
-                            f"can NOT proceed until {cache_entry!r} is unlocked."
-                        )
+                        if warn:
+                            warnings.warn(
+                                f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
+                            )
+                            warn = False
                         time.sleep(1)
+                    # Get result
                     result = _update_last_primary_keys_and_return(cache_entry)
                     cache_entry.counter += 1
                     session.commit()
