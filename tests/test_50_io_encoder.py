@@ -137,7 +137,7 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
         UserWarning, match="can NOT proceed until the cache entry is unlocked"
     ):
         t1.start()
-        time.sleep(0.005)
+        time.sleep(0.01)
         t2.start()
         t1.join()
         t2.join()
