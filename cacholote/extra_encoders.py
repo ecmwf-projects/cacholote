@@ -143,7 +143,7 @@ def _lock_file(
     fs: fsspec.AbstractFileSystem, urlpath: str
 ) -> Generator[None, None, None]:
     locked_file = urlpath + ".lock"
-    fs.touch(locked_file)
+    fs.touch(locked_file, refresh=True)
     try:
         yield
     finally:

@@ -123,5 +123,20 @@ def cacheable(func: F) -> F:
             except encode.EncodeError as ex:
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                 return _update_last_primary_keys_and_return(result)
+            except sqlalchemy.exc.IntegrityError:
+                # A concurrent job added this entry
+                session.rollback()
+                cache_entry = (
+                    session.query(config.CacheEntry)
+                    .filter(
+                        config.CacheEntry.key == hexdigest
+                        and config.CacheEntry.expiration
+                        == config.SETTINGS["expiration"]
+                    )
+                    .one()
+                )
+                cache_entry.counter += 1
+                session.commit()
+                return result
 
     return cast(F, wrapper)

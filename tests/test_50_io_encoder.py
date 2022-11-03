@@ -1,7 +1,6 @@
 import pathlib
 import sqlite3
 import threading
-from typing import List
 
 import fsspec
 import pytest
@@ -126,29 +125,25 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
-def test_io_lock_file(tmpdir: pathlib.Path) -> None:
+def test_io_concurrent_jobs(tmpdir: pathlib.Path) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
-    tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
-
-    # Check if .lock exists
-    def lock_file_exists(tmp_checksum: str, results: List[bool]) -> None:
-        fs, dirname = utils.get_cache_files_fs_dirname()
-        for _ in range(1000):
-            results.append(fs.exists(f"{dirname}/{tmp_checksum}.txt.lock"))
-            if any(results) and results[-1] is False:
-                break
 
     # Cached open
     cfunc = cache.cacheable(open)
 
     # Threading
-    results: List[bool] = []
-    t1 = threading.Thread(target=lock_file_exists, args=(tmp_checksum, results))
+    t1 = threading.Thread(target=cfunc, args=(tmpfile,))
     t2 = threading.Thread(target=cfunc, args=(tmpfile,))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-    assert any(results) and results[0] is results[-1] is False
+    with pytest.warns(UserWarning, match="can NOT proceed until"):
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+    # Check hits
+    con = sqlite3.connect(tmpdir / "cacholote.db")
+    cur = con.cursor()
+    cur.execute("SELECT counter FROM cache_entries")
+    assert cur.fetchall() == [(2,)]
