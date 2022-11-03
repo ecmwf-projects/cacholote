@@ -26,8 +26,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
 
     # Create file
     tmpfile = tmpdir / "test.txt"
-    with open(tmpfile, "wb") as f:
-        f.write(b"test")
+    fsspec.filesystem("file").pipe_file(tmpfile, b"test")
     tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
 
     # Check dict and cached file
@@ -122,10 +121,11 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").touch(tmpfile)
+    fsspec.filesystem("file").pipe_file(tmpfile, b"0" * 10)
 
     # Cached open
     cfunc = cache.cacheable(open)
@@ -137,7 +137,7 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
         UserWarning, match="can NOT proceed until the cache entry is unlocked"
     ):
         t1.start()
-        time.sleep(0.005)
+        time.sleep(0.001)
         t2.start()
         t1.join()
         t2.join()

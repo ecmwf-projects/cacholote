@@ -56,7 +56,13 @@ def delete_cache_file(
 
 
 def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
-    unknown_sizes = dict(sizes)
+    files_to_skip = []
+    for urlpath in sizes:
+        if urlpath.endswith(".lock"):
+            files_to_skip.append(urlpath)
+            files_to_skip.append(urlpath.replace(".lock", ""))
+
+    unknown_sizes = {k: v for k, v in sizes.items() if k not in files_to_skip}
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
         for cache_entry in session.query(config.CacheEntry):
             json.loads(
