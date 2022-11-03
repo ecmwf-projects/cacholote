@@ -66,7 +66,7 @@ def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
         for cache_entry in session.query(config.CacheEntry):
             json.loads(
-                cache_entry.result,
+                cache_entry._result_as_string,
                 object_hook=functools.partial(
                     delete_cache_file,
                     sizes=unknown_sizes,
@@ -84,7 +84,7 @@ def delete_cache_entry(
     session.commit()
 
     # Delete cache file
-    json.loads(cache_entry.result, object_hook=delete_cache_file)
+    json.loads(cache_entry._result_as_string, object_hook=delete_cache_file)
 
 
 def _stop_cleaning(maxsize: int, sizes: Dict[str, int], dirname: str) -> bool:
@@ -138,7 +138,7 @@ def clean_cache_files(
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
         for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
             json.loads(
-                cache_entry.result,
+                cache_entry._result_as_string,
                 object_hook=functools.partial(
                     delete_cache_file,
                     session=session,
