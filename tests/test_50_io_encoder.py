@@ -1,5 +1,7 @@
 import pathlib
 import sqlite3
+import threading
+import time
 
 import fsspec
 import pytest
@@ -56,11 +58,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     assert decode.loads(encode.dumps(actual)).read() == b"test"
 
 
-@pytest.mark.parametrize(
-    "set_cache",
-    ["file", "s3"],
-    indirect=True,
-)
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 def test_copy_from_http_to_cache(
     tmpdir: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
@@ -122,3 +120,28 @@ def test_io_corrupted_files(
         result = cfunc(url)
     assert result.read() == b"test"
     assert fs.exists(f"{dirname}/{cached_basename}")
+
+def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    with fsspec.filesystem("file").open(tmpfile, "wb") as f:
+        f.write(b"0" * 1_000)
+
+    # Cached open
+    cfunc = cache.cacheable(open)
+
+    # Threading
+    t1 = threading.Thread(target=cfunc, args=(tmpfile,))
+    t2 = threading.Thread(target=cfunc, args=(tmpfile,))
+    with pytest.warns(UserWarning, match="can NOT proceed until"):
+        t1.start()
+        time.sleep(0.005)
+        t2.start()
+        t1.join()
+        t2.join()
+
+    # Check hits
+    con = sqlite3.connect(tmpdir / "cacholote.db")
+    cur = con.cursor()
+    cur.execute("SELECT counter FROM cache_entries")
+    assert cur.fetchall() == [(2,)]

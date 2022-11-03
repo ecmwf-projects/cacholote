@@ -17,6 +17,8 @@
 
 import datetime
 import functools
+import json
+import time
 import warnings
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
@@ -100,6 +102,13 @@ def cacheable(func: F) -> F:
                 .order_by(config.CacheEntry.timestamp.desc())
             ):
                 try:
+                    session.refresh(cache_entry)
+                    while cache_entry.result == "__locked__":
+                        session.refresh(cache_entry)
+                        warnings.warn(
+                            f"can NOT proceed until {cache_entry!r} is unlocked."
+                        )
+                        time.sleep(1)
                     result = _update_last_primary_keys_and_return(cache_entry)
                     cache_entry.counter += 1
                     session.commit()
@@ -109,22 +118,27 @@ def cacheable(func: F) -> F:
                     warnings.warn(str(ex), UserWarning)
                     clean.delete_cache_entry(session, cache_entry)
 
-            # Not in the cache: Compute result
+            # Not in the cache: Lock
+            cache_entry = config.CacheEntry(
+                key=hexdigest,
+                expiration=config.SETTINGS["expiration"],
+                result="__locked__",
+            )
+            session.add(cache_entry)
+            session.commit()
+
+            # Compute result
             result = func(*args, **kwargs)
             try:
-                cache_entry = config.CacheEntry(
-                    key=hexdigest,
-                    expiration=config.SETTINGS["expiration"],
-                    result=result,
-                )
-                session.add(cache_entry)
+                cache_entry.result = json.loads(encode.dumps(result))
                 session.commit()
                 return _update_last_primary_keys_and_return(cache_entry)
-            except sqlalchemy.exc.StatementError as ex:
-                try:
-                    raise ex.orig
-                except encode.EncodeError:
-                    warnings.warn(f"can NOT encode output: {ex.orig!r}", UserWarning)
-                    return _update_last_primary_keys_and_return(result)
+            except Exception as ex:
+                session.delete(cache_entry)
+                session.commit()
+                if not isinstance(ex, encode.EncodeError):
+                    raise ex
+                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                return _update_last_primary_keys_and_return(result)
 
     return cast(F, wrapper)

@@ -42,7 +42,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
             (
                 "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
                 "9999-12-31 23:59:59.999999",
-                '{"a":"test","b":null,"args":[],"kwargs":{}}',
+                '{"a": "test", "b": null, "args": [], "kwargs": {}}',
                 counter,
             )
         ]
@@ -53,7 +53,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
-def test_encode_errors(raise_all_encoding_errors: bool) -> None:
+def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) -> None:
     config.set(raise_all_encoding_errors=raise_all_encoding_errors)
 
     cfunc = cache.cacheable(func)
@@ -80,6 +80,12 @@ def test_encode_errors(raise_all_encoding_errors: bool) -> None:
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
         assert cache.LAST_PRIMARY_KEYS == {}
+
+    # cache-db must be empty
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
+    cur.execute("SELECT * FROM cache_entries")
+    assert cur.fetchall() == []
 
 
 def test_hexdigestify_python_call() -> None:
