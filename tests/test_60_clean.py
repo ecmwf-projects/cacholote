@@ -52,9 +52,8 @@ def test_clean_cache_files(
     assert not fs.exists(f"{dirname}/{checksums[method]}.txt")
 
 
-@pytest.mark.parametrize(
-    "delete_unknown_files, add_lock", [(True, False), (True, False)]
-)
+@pytest.mark.parametrize("delete_unknown_files", [True, False])
+@pytest.mark.parametrize("add_lock", [True, False])
 def test_delete_unknown_files(
     tmpdir: pathlib.Path, delete_unknown_files: bool, add_lock: bool
 ) -> None:

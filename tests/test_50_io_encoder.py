@@ -1,7 +1,6 @@
 import pathlib
 import sqlite3
 import threading
-import time
 
 import fsspec
 import pytest
@@ -125,7 +124,7 @@ def test_io_corrupted_files(
 def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 10_000_000)
+    fsspec.filesystem("file").touch(tmpfile)
 
     # Cached open
     cfunc = cache.cacheable(open)
@@ -137,7 +136,6 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
         UserWarning, match="can NOT proceed until the cache entry is unlocked"
     ):
         t1.start()
-        time.sleep(0.01)
         t2.start()
         t1.join()
         t2.join()
@@ -147,8 +145,3 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries")
     assert cur.fetchall() == [(2,)]
-
-    # Clean-up
-    fsspec.filesystem("file").rm(tmpfile)
-    fs, dirname = utils.get_cache_files_fs_dirname()
-    fs.rm(dirname, recursive=True)

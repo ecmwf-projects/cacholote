@@ -45,7 +45,7 @@ class CacheEntry(Base):
         default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow,
     )
-    counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
+    counter = sqlalchemy.Column(sqlalchemy.Integer, default=0)
 
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
