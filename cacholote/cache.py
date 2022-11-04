@@ -53,6 +53,11 @@ def _update_last_primary_keys_and_return(
     return result
 
 
+def _clear_last_primary_keys_and_return(result: Any) -> Any:
+    LAST_PRIMARY_KEYS.clear()
+    return result
+
+
 def hexdigestify_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
@@ -83,8 +88,7 @@ def cacheable(func: F) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         # Cache opt-out
         if not config.SETTINGS["use_cache"]:
-            LAST_PRIMARY_KEYS.clear()
-            return func(*args, **kwargs)
+            return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
         # Key defining the function and its arguments
         try:
@@ -95,8 +99,7 @@ def cacheable(func: F) -> F:
             )
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
-            LAST_PRIMARY_KEYS.clear()
-            return func(*args, **kwargs)
+            return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
         # Filters for the database query
         filters = [
@@ -133,7 +136,7 @@ def cacheable(func: F) -> F:
                 session.add(cache_entry)
                 session.commit()
             except sqlalchemy.exc.IntegrityError:
-                # Concurrent job: There's already this cache entry.
+                # Concurrent job: This cache entry already exist.
                 filters = [
                     config.CacheEntry.key == cache_entry.key,
                     config.CacheEntry.expiration == cache_entry.expiration,
@@ -152,7 +155,6 @@ def cacheable(func: F) -> F:
                 if not isinstance(ex, encode.EncodeError):
                     raise ex
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                LAST_PRIMARY_KEYS.clear()
-                return result
+                return _clear_last_primary_keys_and_return(result)
 
     return cast(F, wrapper)
