@@ -60,7 +60,7 @@ def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
     for urlpath in sizes:
         if urlpath.endswith(".lock"):
             files_to_skip.append(urlpath)
-            files_to_skip.append(urlpath.replace(".lock", ""))
+            files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
 
     unknown_sizes = {k: v for k, v in sizes.items() if k not in files_to_skip}
     with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
