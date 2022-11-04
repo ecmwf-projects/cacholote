@@ -81,10 +81,12 @@ def cacheable(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Cache opt-out
         if not config.SETTINGS["use_cache"]:
             LAST_PRIMARY_KEYS.clear()
             return func(*args, **kwargs)
 
+        # Key defining the function and its arguments
         try:
             hexdigest = hexdigestify_python_call(
                 func,
@@ -96,7 +98,7 @@ def cacheable(func: F) -> F:
             LAST_PRIMARY_KEYS.clear()
             return func(*args, **kwargs)
 
-        # Filters
+        # Filters for the database query
         filters = [
             config.CacheEntry.key == hexdigest,
             config.CacheEntry.expiration > datetime.datetime.utcnow(),
@@ -107,7 +109,6 @@ def cacheable(func: F) -> F:
                 config.CacheEntry.expiration
                 == datetime.datetime.fromisoformat(config.SETTINGS["expiration"])
             )
-
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
             for cache_entry in (
                 session.query(config.CacheEntry)
@@ -121,8 +122,9 @@ def cacheable(func: F) -> F:
                     warnings.warn(str(ex), UserWarning)
                     clean.delete_cache_entry(session, cache_entry)
 
-            # Not in the cache: Lock
+            # Not in the cache
             try:
+                # Lock cache entry
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
@@ -131,7 +133,7 @@ def cacheable(func: F) -> F:
                 session.add(cache_entry)
                 session.commit()
             except sqlalchemy.exc.IntegrityError:
-                # There's a concurrent job
+                # Concurrent job: There's already this cache entry.
                 filters = [
                     config.CacheEntry.key == cache_entry.key,
                     config.CacheEntry.expiration == cache_entry.expiration,
@@ -140,14 +142,13 @@ def cacheable(func: F) -> F:
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
                 return _update_last_primary_keys_and_return(session, cache_entry)
 
-            # Compute result
+            # Compute result from scratch and unlock
             result = func(*args, **kwargs)
             try:
                 cache_entry.result = json.loads(encode.dumps(result))
                 return _update_last_primary_keys_and_return(session, cache_entry)
             except Exception as ex:
-                session.delete(cache_entry)
-                session.commit()
+                clean.delete_cache_entry(session, cache_entry)
                 if not isinstance(ex, encode.EncodeError):
                     raise ex
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
