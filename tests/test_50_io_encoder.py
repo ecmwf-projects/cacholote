@@ -121,7 +121,7 @@ def test_io_corrupted_files(
 
 
 @pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
-def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
+def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
@@ -145,3 +145,22 @@ def test_io_concurrent_jobs(tmpdir: pathlib.Path, set_cache: bool) -> None:
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries")
     assert cur.fetchall() == [(2,)]
+
+
+@pytest.mark.parametrize("set_cache", ["file"], indirect=True)
+def test_io_locked_files(tmpdir: pathlib.Path, set_cache: bool) -> None:
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 10_000_000)
+
+    # Cached open
+    cfunc = cache.cacheable(open)
+
+    # Threading
+    t1 = threading.Thread(target=cfunc, args=(tmpfile, "r"))
+    t2 = threading.Thread(target=cfunc, args=(tmpfile, "rb"))
+    with pytest.warns(UserWarning, match="can NOT proceed until"):
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()

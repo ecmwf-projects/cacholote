@@ -147,7 +147,8 @@ def _lock_file(
     try:
         yield
     finally:
-        fs.rm(locked_file)
+        if fs.exists(locked_file):
+            fs.rm(locked_file)
 
 
 def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
