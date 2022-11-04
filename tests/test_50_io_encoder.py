@@ -159,8 +159,14 @@ def test_io_locked_files(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Threading
     t1 = threading.Thread(target=cfunc, args=(tmpfile, "r"))
     t2 = threading.Thread(target=cfunc, args=(tmpfile, "rb"))
-    with pytest.warns(UserWarning, match="can NOT proceed until"):
+    with pytest.warns(UserWarning, match="can NOT proceed until file is unlocked"):
         t1.start()
         t2.start()
         t1.join()
         t2.join()
+
+    # Check hits
+    con = sqlite3.connect(tmpdir / "cacholote.db")
+    cur = con.cursor()
+    cur.execute("SELECT counter FROM cache_entries")
+    assert cur.fetchall() == [(1,), (1,)]
