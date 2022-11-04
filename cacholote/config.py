@@ -16,7 +16,7 @@
 
 import datetime
 import json
-import os
+import pathlib
 import tempfile
 from types import MappingProxyType, TracebackType
 from typing import Any, Dict, List, Optional, Type
@@ -25,9 +25,9 @@ import fsspec
 import sqlalchemy
 import sqlalchemy.orm
 
-CACHE_DIR = os.path.join(tempfile.gettempdir(), "cacholote")
-CACHE_FILES_DIR = os.path.join(CACHE_DIR, "cache_files")
-os.makedirs(CACHE_FILES_DIR, exist_ok=True)
+CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+CACHE_FILES_DIR = CACHE_DIR / "cache_files"
+CACHE_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -83,8 +83,8 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 
 _SETTINGS: Dict[str, Any] = {
     "use_cache": True,
-    "cache_db_urlpath": "sqlite:///" + os.path.join(CACHE_DIR, "cacholote.db"),
-    "cache_files_urlpath": CACHE_FILES_DIR,
+    "cache_db_urlpath": "sqlite:///" + str(CACHE_DIR / "cacholote.db"),
+    "cache_files_urlpath": str(CACHE_FILES_DIR),
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",

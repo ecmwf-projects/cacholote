@@ -21,7 +21,7 @@ import functools
 import inspect
 import io
 import mimetypes
-import os
+import pathlib
 import posixpath
 import tempfile
 import time
@@ -211,8 +211,9 @@ def _maybe_store_xr_dataset(
             else:
                 # Need a tmp local copy to write on a different filesystem
                 with tempfile.TemporaryDirectory() as tmpdirname:
-                    basename = os.path.basename(urlpath)
-                    tmpfilename = os.path.join(tmpdirname, basename)
+                    tmpfilename = str(
+                        pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name
+                    )
 
                     if filetype == "application/netcdf":
                         obj.to_netcdf(tmpfilename)
@@ -302,7 +303,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     urlpath_in = str(urlpath_in)
 
     root = fs_in.checksum(urlpath_in)
-    _, ext = os.path.splitext(urlpath_in)
+    ext = pathlib.Path(urlpath_in).suffix
     urlpath_out = posixpath.join(config.SETTINGS["cache_files_urlpath"], f"{root}{ext}")
 
     fs_out, _, _ = fsspec.get_fs_token_paths(
