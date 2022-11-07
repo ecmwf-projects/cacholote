@@ -142,22 +142,23 @@ def _get_fs_and_urlpath(
 def _lock_file(
     fs: fsspec.AbstractFileSystem, urlpath: str
 ) -> Generator[None, None, None]:
-    locked_file = urlpath + ".lock"
-    fs.touch(locked_file)
+    locking_file = urlpath + ".lock"
+    fs.touch(locking_file)
     try:
         yield
     finally:
-        if fs.exists(locked_file):
-            fs.rm(locked_file)
+        if fs.exists(locking_file):
+            fs.rm(locking_file)
 
 
 def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
-    locked_file = urlpath + ".lock"
+    locking_file = urlpath + ".lock"
     warned = False
-    while fs.exists(locked_file):
+    while fs.exists(locking_file):
         if not warned:
             warnings.warn(
-                f"can NOT proceed until file is unlocked: {locked_file!r}.", UserWarning
+                f"can NOT proceed until file is unlocked: {locking_file!r}.",
+                UserWarning,
             )
             warned = True
         time.sleep(1)
