@@ -31,13 +31,15 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 LAST_PRIMARY_KEYS: Dict[str, Any] = {}
 
+_LOCKER = "__locked__"
+
 
 def _update_last_primary_keys_and_return(
     session: sqlalchemy.orm.Session, cache_entry: Any
 ) -> Any:
     # Wait until unlocked
     warned = False
-    while cache_entry.result == "__locked__":
+    while cache_entry.result == _LOCKER:
         session.refresh(cache_entry)
         if not warned:
             warnings.warn(
@@ -131,7 +133,7 @@ def cacheable(func: F) -> F:
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
-                    result="__locked__",
+                    result=_LOCKER,
                 )
                 session.add(cache_entry)
                 session.commit()
