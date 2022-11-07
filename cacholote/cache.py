@@ -60,6 +60,16 @@ def _clear_last_primary_keys_and_return(result: Any) -> Any:
     return result
 
 
+def _delete_cache_entry(
+    session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
+) -> None:
+    session.delete(cache_entry)
+    session.commit()
+
+    # Delete cache file
+    json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
+
+
 def hexdigestify_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
@@ -125,7 +135,7 @@ def cacheable(func: F) -> F:
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
-                    clean.delete_cache_entry(session, cache_entry)
+                    _delete_cache_entry(session, cache_entry)
 
             # Not in the cache
             try:
@@ -153,7 +163,7 @@ def cacheable(func: F) -> F:
                 cache_entry.result = json.loads(encode.dumps(result))
                 return _update_last_primary_keys_and_return(session, cache_entry)
             except Exception as ex:
-                clean.delete_cache_entry(session, cache_entry)
+                _delete_cache_entry(session, cache_entry)
                 if not isinstance(ex, encode.EncodeError):
                     raise ex
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)

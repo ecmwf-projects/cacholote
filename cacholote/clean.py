@@ -25,7 +25,7 @@ import sqlalchemy.orm
 from . import config, extra_encoders, utils
 
 
-def delete_cache_file(
+def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sqlalchemy.orm.Session] = None,
     cache_entry: Optional[config.CacheEntry] = None,
@@ -68,23 +68,12 @@ def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
             json.loads(
                 cache_entry._result_as_string,
                 object_hook=functools.partial(
-                    delete_cache_file,
+                    _delete_cache_file,
                     sizes=unknown_sizes,
                     dry_run=True,
                 ),
             )
     return set(unknown_sizes)
-
-
-def delete_cache_entry(
-    session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
-) -> None:
-    logging.info(f"Deleting cache entry: {cache_entry!r}")
-    session.delete(cache_entry)
-    session.commit()
-
-    # Delete cache file
-    json.loads(cache_entry._result_as_string, object_hook=delete_cache_file)
 
 
 def _stop_cleaning(maxsize: int, sizes: Dict[str, int], dirname: str) -> bool:
@@ -140,7 +129,7 @@ def clean_cache_files(
             json.loads(
                 cache_entry._result_as_string,
                 object_hook=functools.partial(
-                    delete_cache_file,
+                    _delete_cache_file,
                     session=session,
                     cache_entry=cache_entry,
                     sizes=sizes,
