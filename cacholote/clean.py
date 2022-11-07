@@ -63,16 +63,17 @@ def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
             files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
 
     unknown_sizes = {k: v for k, v in sizes.items() if k not in files_to_skip}
-    with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        for cache_entry in session.query(config.CacheEntry):
-            json.loads(
-                cache_entry._result_as_string,
-                object_hook=functools.partial(
-                    _delete_cache_file,
-                    sizes=unknown_sizes,
-                    dry_run=True,
-                ),
-            )
+    if unknown_sizes:
+        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+            for cache_entry in session.query(config.CacheEntry):
+                json.loads(
+                    cache_entry._result_as_string,
+                    object_hook=functools.partial(
+                        _delete_cache_file,
+                        sizes=unknown_sizes,
+                        dry_run=True,
+                    ),
+                )
     return set(unknown_sizes)
 
 
