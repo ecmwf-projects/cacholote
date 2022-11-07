@@ -285,7 +285,7 @@ def _maybe_store_io_object(
                     urlpath_out, "wb"
                 ) as f_out:
                     utils.copy_buffered_file(f_in, f_out)
-                if config.SETTINGS["io_delete_original"]:
+                if config.SETTINGS["io_delete_original"] and fs_in.exists(urlpath_in):
                     fs_in.rm(urlpath_in)
 
 

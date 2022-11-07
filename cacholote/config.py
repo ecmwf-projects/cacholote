@@ -25,9 +25,9 @@ import fsspec
 import sqlalchemy
 import sqlalchemy.orm
 
-CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
-CACHE_FILES_DIR = CACHE_DIR / "cache_files"
-CACHE_FILES_DIR.mkdir(parents=True, exist_ok=True)
+_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_CACHE_FILES_DIR = _CACHE_DIR / "cache_files"
+_CACHE_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -83,8 +83,8 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 
 _SETTINGS: Dict[str, Any] = {
     "use_cache": True,
-    "cache_db_urlpath": "sqlite:///" + str(CACHE_DIR / "cacholote.db"),
-    "cache_files_urlpath": str(CACHE_FILES_DIR),
+    "cache_db_urlpath": "sqlite:///" + str(_CACHE_DIR / "cacholote.db"),
+    "cache_files_urlpath": str(_CACHE_FILES_DIR),
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
