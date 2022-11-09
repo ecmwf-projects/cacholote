@@ -1,6 +1,6 @@
 import datetime
 import json
-import os
+import pathlib
 
 import pytest
 import sqlalchemy
@@ -8,8 +8,8 @@ import sqlalchemy
 from cacholote import config
 
 
-def test_set_engine(tmpdir: str) -> None:
-    new_db = "sqlite:///" + os.path.join(tmpdir, "dummy.db")
+def test_set_engine(tmpdir: pathlib.Path) -> None:
+    new_db = "sqlite:///" + str(tmpdir / "dummy.db")
     old_engine = config.SETTINGS["engine"]
     new_engine = sqlalchemy.create_engine(new_db, echo=True, future=True)
     assert old_engine is not new_engine
@@ -18,8 +18,8 @@ def test_set_engine(tmpdir: str) -> None:
         assert config.SETTINGS["engine"] is new_engine
         assert config.SETTINGS["cache_db_urlpath"] is None
     assert config.SETTINGS["engine"] is old_engine
-    assert config.SETTINGS["cache_db_urlpath"] == "sqlite:///" + os.path.join(
-        tmpdir, "cacholote.db"
+    assert config.SETTINGS["cache_db_urlpath"] == "sqlite:///" + str(
+        tmpdir / "cacholote.db"
     )
 
     config.set(engine=new_engine)
@@ -39,13 +39,13 @@ def test_set_engine(tmpdir: str) -> None:
         config.json_dumps()
 
 
-def test_change_settings(tmpdir: str) -> None:
-    new_db = "sqlite:///" + os.path.join(tmpdir, "dummy.db")
+def test_change_settings(tmpdir: pathlib.Path) -> None:
+    new_db = "sqlite:///" + str(tmpdir / "dummy.db")
 
     with config.set(cache_db_urlpath=new_db):
         assert str(config.SETTINGS["engine"].url) == new_db
-    assert str(config.SETTINGS["engine"].url) == "sqlite:///" + os.path.join(
-        tmpdir, "cacholote.db"
+    assert str(config.SETTINGS["engine"].url) == "sqlite:///" + str(
+        tmpdir / "cacholote.db"
     )
 
     config.set(cache_db_urlpath=new_db)

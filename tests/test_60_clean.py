@@ -30,8 +30,7 @@ def test_clean_cache_files(
     checksums = {}
     for algorithm in ("LRU", "LFU"):
         filename = tmpdir / f"{algorithm}.txt"
-        with open(filename, "w") as f:
-            f.write("0")
+        fsspec.filesystem("file").pipe_file(filename, b"1")
         cachedname = f"{dirname}/{fsspec.filesystem('file').checksum(filename)}.txt"
         checksums[algorithm] = cachedname
 
@@ -54,23 +53,33 @@ def test_clean_cache_files(
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
-def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
+@pytest.mark.parametrize("add_lock", [True, False])
+def test_delete_unknown_files(
+    tmpdir: pathlib.Path, delete_unknown_files: bool, add_lock: bool
+) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create file
     tmpfile = tmpdir / "test.txt"
-    with open(tmpfile, "w") as f:
-        f.write("0")
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
 
     # Copy to cache
     open_url(tmpfile)
 
     # Add unknown
     fs.put(str(tmpfile), f"{dirname}/unknown.txt")
+    if add_lock:
+        fs.touch(f"{dirname}/unknown.txt.lock")
 
     # Clean one file
     clean.clean_cache_files(1, delete_unknown_files=delete_unknown_files)
-    if delete_unknown_files:
+    if delete_unknown_files and not add_lock:
         assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpfile)}.txt"]
     else:
-        assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
+        if add_lock:
+            assert fs.ls(dirname) == [
+                f"{dirname}/unknown.txt",
+                f"{dirname}/unknown.txt.lock",
+            ]
+        else:
+            assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]

@@ -17,10 +17,13 @@
 
 import datetime
 import functools
+import json
+import time
 import warnings
 from typing import Any, Callable, Dict, TypeVar, Union, cast
 
 import sqlalchemy
+import sqlalchemy.orm
 
 from . import clean, config, decode, encode, utils
 
@@ -28,14 +31,43 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 LAST_PRIMARY_KEYS: Dict[str, Any] = {}
 
+_LOCKER = "__locked__"
 
-def _update_last_primary_keys_and_return(cache_entry_or_result: Any) -> Any:
-    if not isinstance(cache_entry_or_result, config.CacheEntry):
-        LAST_PRIMARY_KEYS.clear()
-        return cache_entry_or_result
 
-    LAST_PRIMARY_KEYS.update(cache_entry_or_result._primary_keys)
-    return decode.loads(cache_entry_or_result._result_as_string)
+def _update_last_primary_keys_and_return(
+    session: sqlalchemy.orm.Session, cache_entry: Any
+) -> Any:
+    # Wait until unlocked
+    warned = False
+    while cache_entry.result == _LOCKER:
+        session.refresh(cache_entry)
+        if not warned:
+            warnings.warn(
+                f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
+            )
+            warned = True
+        time.sleep(1)
+    # Get result
+    result = decode.loads(cache_entry._result_as_string)
+    cache_entry.counter += 1
+    session.commit()
+    LAST_PRIMARY_KEYS.update(cache_entry._primary_keys)
+    return result
+
+
+def _clear_last_primary_keys_and_return(result: Any) -> Any:
+    LAST_PRIMARY_KEYS.clear()
+    return result
+
+
+def _delete_cache_entry(
+    session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
+) -> None:
+    session.delete(cache_entry)
+    session.commit()
+
+    # Delete cache file
+    json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
 
 def hexdigestify_python_call(
@@ -66,10 +98,11 @@ def cacheable(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Cache opt-out
         if not config.SETTINGS["use_cache"]:
-            result = func(*args, **kwargs)
-            return _update_last_primary_keys_and_return(result)
+            return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
+        # Key defining the function and its arguments
         try:
             hexdigest = hexdigestify_python_call(
                 func,
@@ -78,10 +111,9 @@ def cacheable(func: F) -> F:
             )
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
-            result = func(*args, **kwargs)
-            return _update_last_primary_keys_and_return(result)
+            return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
-        # Filters
+        # Filters for the database query
         filters = [
             config.CacheEntry.key == hexdigest,
             config.CacheEntry.expiration > datetime.datetime.utcnow(),
@@ -92,7 +124,6 @@ def cacheable(func: F) -> F:
                 config.CacheEntry.expiration
                 == datetime.datetime.fromisoformat(config.SETTINGS["expiration"])
             )
-
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
             for cache_entry in (
                 session.query(config.CacheEntry)
@@ -100,31 +131,42 @@ def cacheable(func: F) -> F:
                 .order_by(config.CacheEntry.timestamp.desc())
             ):
                 try:
-                    result = _update_last_primary_keys_and_return(cache_entry)
-                    cache_entry.counter += 1
-                    session.commit()
-                    return result
+                    return _update_last_primary_keys_and_return(session, cache_entry)
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
-                    clean.delete_cache_entry(session, cache_entry)
+                    _delete_cache_entry(session, cache_entry)
 
-            # Not in the cache: Compute result
-            result = func(*args, **kwargs)
+            # Not in the cache
             try:
+                # Lock cache entry
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
-                    result=result,
+                    result=_LOCKER,
                 )
                 session.add(cache_entry)
                 session.commit()
-                return _update_last_primary_keys_and_return(cache_entry)
-            except sqlalchemy.exc.StatementError as ex:
-                try:
-                    raise ex.orig
-                except encode.EncodeError:
-                    warnings.warn(f"can NOT encode output: {ex.orig!r}", UserWarning)
-                    return _update_last_primary_keys_and_return(result)
+            except sqlalchemy.exc.IntegrityError:
+                # Concurrent job: This cache entry already exist.
+                filters = [
+                    config.CacheEntry.key == cache_entry.key,
+                    config.CacheEntry.expiration == cache_entry.expiration,
+                ]
+                session.rollback()
+                cache_entry = session.query(config.CacheEntry).filter(*filters).one()
+                return _update_last_primary_keys_and_return(session, cache_entry)
+
+            # Compute result from scratch and unlock
+            result = func(*args, **kwargs)
+            try:
+                cache_entry.result = json.loads(encode.dumps(result))
+                return _update_last_primary_keys_and_return(session, cache_entry)
+            except Exception as ex:
+                _delete_cache_entry(session, cache_entry)
+                if not isinstance(ex, encode.EncodeError):
+                    raise ex
+                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                return _clear_last_primary_keys_and_return(result)
 
     return cast(F, wrapper)

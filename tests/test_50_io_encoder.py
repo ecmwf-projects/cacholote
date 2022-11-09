@@ -1,5 +1,6 @@
 import pathlib
 import sqlite3
+import threading
 
 import fsspec
 import pytest
@@ -24,8 +25,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
 
     # Create file
     tmpfile = tmpdir / "test.txt"
-    with open(tmpfile, "wb") as f:
-        f.write(b"test")
+    fsspec.filesystem("file").pipe_file(tmpfile, b"test")
     tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
 
     # Check dict and cached file
@@ -56,11 +56,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     assert decode.loads(encode.dumps(actual)).read() == b"test"
 
 
-@pytest.mark.parametrize(
-    "set_cache",
-    ["file", "s3"],
-    indirect=True,
-)
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 def test_copy_from_http_to_cache(
     tmpdir: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
@@ -122,3 +118,55 @@ def test_io_corrupted_files(
         result = cfunc(url)
     assert result.read() == b"test"
     assert fs.exists(f"{dirname}/{cached_basename}")
+
+
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").touch(tmpfile)
+
+    # Cached open
+    cfunc = cache.cacheable(open)
+
+    # Threading
+    t1 = threading.Thread(target=cfunc, args=(tmpfile,))
+    t2 = threading.Thread(target=cfunc, args=(tmpfile,))
+    with pytest.warns(
+        UserWarning, match="can NOT proceed until the cache entry is unlocked"
+    ):
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+    # Check hits
+    con = sqlite3.connect(tmpdir / "cacholote.db")
+    cur = con.cursor()
+    cur.execute("SELECT counter FROM cache_entries")
+    assert cur.fetchall() == [(2,)]
+
+
+@pytest.mark.parametrize("set_cache", ["file"], indirect=True)
+def test_io_locked_files(tmpdir: pathlib.Path, set_cache: bool) -> None:
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 10_000_000)
+
+    # Cached open
+    cfunc = cache.cacheable(open)
+
+    # Threading
+    t1 = threading.Thread(target=cfunc, args=(tmpfile, "r"))
+    t2 = threading.Thread(target=cfunc, args=(tmpfile, "rb"))
+    with pytest.warns(UserWarning, match="can NOT proceed until file is unlocked"):
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+    # Check hits
+    con = sqlite3.connect(tmpdir / "cacholote.db")
+    cur = con.cursor()
+    cur.execute("SELECT counter FROM cache_entries")
+    assert cur.fetchall() == [(1,), (1,)]

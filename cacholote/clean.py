@@ -25,7 +25,7 @@ import sqlalchemy.orm
 from . import config, extra_encoders, utils
 
 
-def delete_cache_file(
+def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sqlalchemy.orm.Session] = None,
     cache_entry: Optional[config.CacheEntry] = None,
@@ -56,29 +56,25 @@ def delete_cache_file(
 
 
 def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
-    unknown_sizes = dict(sizes)
-    with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        for cache_entry in session.query(config.CacheEntry):
-            json.loads(
-                cache_entry._result_as_string,
-                object_hook=functools.partial(
-                    delete_cache_file,
-                    sizes=unknown_sizes,
-                    dry_run=True,
-                ),
-            )
+    files_to_skip = []
+    for urlpath in sizes:
+        if urlpath.endswith(".lock"):
+            files_to_skip.append(urlpath)
+            files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
+
+    unknown_sizes = {k: v for k, v in sizes.items() if k not in files_to_skip}
+    if unknown_sizes:
+        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+            for cache_entry in session.query(config.CacheEntry):
+                json.loads(
+                    cache_entry._result_as_string,
+                    object_hook=functools.partial(
+                        _delete_cache_file,
+                        sizes=unknown_sizes,
+                        dry_run=True,
+                    ),
+                )
     return set(unknown_sizes)
-
-
-def delete_cache_entry(
-    session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
-) -> None:
-    logging.info(f"Deleting cache entry: {cache_entry!r}")
-    session.delete(cache_entry)
-    session.commit()
-
-    # Delete cache file
-    json.loads(cache_entry._result_as_string, object_hook=delete_cache_file)
 
 
 def _stop_cleaning(maxsize: int, sizes: Dict[str, int], dirname: str) -> bool:
@@ -134,7 +130,7 @@ def clean_cache_files(
             json.loads(
                 cache_entry._result_as_string,
                 object_hook=functools.partial(
-                    delete_cache_file,
+                    _delete_cache_file,
                     session=session,
                     cache_entry=cache_entry,
                     sizes=sizes,

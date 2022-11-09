@@ -16,7 +16,7 @@
 
 import datetime
 import json
-import os
+import pathlib
 import tempfile
 from types import MappingProxyType, TracebackType
 from typing import Any, Dict, List, Optional, Type
@@ -25,11 +25,9 @@ import fsspec
 import sqlalchemy
 import sqlalchemy.orm
 
-from . import encode
-
-CACHE_DIR = os.path.join(tempfile.gettempdir(), "cacholote")
-CACHE_FILES_DIR = os.path.join(CACHE_DIR, "cache_files")
-os.makedirs(CACHE_FILES_DIR, exist_ok=True)
+_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_CACHE_FILES_DIR = _CACHE_DIR / "cache_files"
+_CACHE_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -41,13 +39,13 @@ class CacheEntry(Base):
     expiration = sqlalchemy.Column(
         sqlalchemy.DateTime, default=datetime.datetime.max, primary_key=True
     )
-    result: str = sqlalchemy.Column(sqlalchemy.JSON, nullable=False)
+    result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
         default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow,
     )
-    counter = sqlalchemy.Column(sqlalchemy.Integer, default=1)
+    counter = sqlalchemy.Column(sqlalchemy.Integer, default=0)
 
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
@@ -85,8 +83,8 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 
 _SETTINGS: Dict[str, Any] = {
     "use_cache": True,
-    "cache_db_urlpath": "sqlite:///" + os.path.join(CACHE_DIR, "cacholote.db"),
-    "cache_files_urlpath": CACHE_FILES_DIR,
+    "cache_db_urlpath": "sqlite:///" + str(_CACHE_DIR / "cacholote.db"),
+    "cache_files_urlpath": str(_CACHE_FILES_DIR),
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
@@ -98,7 +96,7 @@ _SETTINGS: Dict[str, Any] = {
 
 def _create_engine() -> None:
     _SETTINGS["engine"] = sqlalchemy.create_engine(
-        _SETTINGS["cache_db_urlpath"], future=True, json_serializer=encode.dumps
+        _SETTINGS["cache_db_urlpath"], future=True
     )
     Base.metadata.create_all(_SETTINGS["engine"])
 

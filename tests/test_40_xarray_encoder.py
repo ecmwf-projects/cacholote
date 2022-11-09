@@ -1,4 +1,3 @@
-import os
 import pathlib
 import sqlite3
 
@@ -16,7 +15,7 @@ except ImportError:
 def get_grib_ds() -> "xr.Dataset":
     pytest.importorskip("cfgrib")
     eccodes = pytest.importorskip("eccodes")
-    filename = os.path.join(eccodes.codes_samples_path(), "GRIB2.tmpl")
+    filename = pathlib.Path(eccodes.codes_samples_path()) / "GRIB2.tmpl"
     ds = xr.open_dataset(filename, engine="cfgrib")
     del ds.attrs["history"]
     return ds
