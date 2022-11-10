@@ -17,7 +17,10 @@
 
 import hashlib
 import io
-from typing import Optional, Tuple
+import time
+import warnings
+from types import TracebackType
+from typing import Optional, Tuple, Type
 
 import fsspec
 
@@ -61,3 +64,45 @@ def copy_buffered_file(
         if not data:
             break
         f_out.write(data)
+
+
+class _Locker:
+    def __init__(self, fs: fsspec.AbstractFileSystem, urlpath: str) -> None:
+        self.fs = fs
+        self.urlpath = urlpath
+        self.locker = urlpath + ".lock"
+
+    @property
+    def file_exists(self) -> bool:
+        return bool(self.fs.exists(self.urlpath))
+
+    def lock(self) -> None:
+        self.fs.touch(self.locker)
+
+    def unlock(self) -> None:
+        if self.fs.exists(self.locker):
+            self.fs.rm(self.locker)
+
+    def wait_until_unlocked(self) -> None:
+        warned = False
+        while self.fs.exists(self.locker):
+            if not warned:
+                warnings.warn(
+                    f"can NOT proceed until file is unlocked: {self.locker!r}.",
+                    UserWarning,
+                )
+                warned = True
+            time.sleep(1)
+
+    def __enter__(self) -> bool:
+        self.wait_until_unlocked()
+        self.lock()
+        return self.file_exists
+
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
+        self.unlock()
