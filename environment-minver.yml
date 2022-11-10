@@ -9,6 +9,7 @@ dependencies:
 - aiohttp
 - moto
 - pytest-httpserver
+- pytest-rerunfailures
 - requests
 - s3fs
 - sqlalchemy

@@ -18,6 +18,7 @@ dependencies:
 - moto
 - netCDF4
 - pytest-httpserver
+- pytest-rerunfailures
 - python-magic
 - requests
 - s3fs

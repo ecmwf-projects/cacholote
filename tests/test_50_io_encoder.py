@@ -120,6 +120,7 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
+@pytest.mark.flaky(reruns=2)
 @pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
@@ -147,8 +148,7 @@ def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
     assert cur.fetchall() == [(2,)]
 
 
-@pytest.mark.parametrize("set_cache", ["file"], indirect=True)
-def test_io_locked_files(tmpdir: pathlib.Path, set_cache: bool) -> None:
+def test_io_locked_files(tmpdir: pathlib.Path) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 10_000_000)
