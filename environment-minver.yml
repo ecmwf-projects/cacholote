@@ -7,7 +7,6 @@ dependencies:
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - aiohttp
-- fsspec
 - moto
 - pytest-httpserver
 - requests
