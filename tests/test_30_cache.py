@@ -136,19 +136,23 @@ def test_tag(tmpdir: pathlib.Path) -> None:
     con = sqlite3.connect(str(tmpdir / "cacholote.db"))
     cur = con.cursor()
 
-    with config.set(tag=None):
-        cached_now()
-    cur.execute("SELECT tag FROM cache_entries")
-    assert cur.fetchall() == [(None,)]
+    cached_now()
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [(None, 1)]
 
-    with config.set(tag="test"):
-        # Override
+    with config.set(tag="1"):
         cached_now()
-    cur.execute("SELECT tag FROM cache_entries")
-    assert cur.fetchall() == [("test",)]
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [("1", 2)]
+
+    with config.set(tag="2"):
+        # Overwrite
+        cached_now()
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [("2", 3)]
 
     with config.set(tag=None):
-        # Do not override if None
+        # Do not overwrite if None
         cached_now()
-    cur.execute("SELECT tag FROM cache_entries")
-    assert cur.fetchall() == [("test",)]
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [("2", 4)]
