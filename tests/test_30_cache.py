@@ -130,3 +130,25 @@ def test_expiration() -> None:
         "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
+
+
+def test_tag(tmpdir: pathlib.Path) -> None:
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
+
+    with config.set(tag=None):
+        cached_now()
+    cur.execute("SELECT tag FROM cache_entries")
+    assert cur.fetchall() == [(None,)]
+
+    with config.set(tag="test"):
+        # Override
+        cached_now()
+    cur.execute("SELECT tag FROM cache_entries")
+    assert cur.fetchall() == [("test",)]
+
+    with config.set(tag=None):
+        # Do not override if None
+        cached_now()
+    cur.execute("SELECT tag FROM cache_entries")
+    assert cur.fetchall() == [("test",)]

@@ -50,6 +50,8 @@ def _update_last_primary_keys_and_return(
     # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
+    if config.SETTINGS["tag"] is not None:
+        cache_entry.tag = config.SETTINGS["tag"]
     session.commit()
     LAST_PRIMARY_KEYS.update(cache_entry._primary_keys)
     return result
@@ -144,6 +146,7 @@ def cacheable(func: F) -> F:
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
                     result=_LOCKER,
+                    tag=config.SETTINGS["tag"],
                 )
                 session.add(cache_entry)
                 session.commit()

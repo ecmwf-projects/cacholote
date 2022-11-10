@@ -5,7 +5,7 @@ from typing import Literal
 import fsspec
 import pytest
 
-from cacholote import cache, clean, utils
+from cacholote import cache, clean, config, utils
 
 
 @cache.cacheable
@@ -83,3 +83,23 @@ def test_delete_unknown_files(
             ]
         else:
             assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
+
+
+def test_clean_tagged_files(tmpdir: pathlib.Path) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
+    for tag in [None, "1", "2", "3"]:
+        tmpfile = tmpdir / f"test_{tag}.txt"
+        fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+        with config.set(tag=tag):
+            open_url(tmpfile)
+
+    clean.clean_cache_files(3, tags=["1"])
+    assert set(fs.ls(dirname)) == {
+        f"{dirname}/{fs.checksum(tmpdir / f'test_None.txt')}.txt",
+        f"{dirname}/{fs.checksum(tmpdir / f'test_2.txt')}.txt",
+        f"{dirname}/{fs.checksum(tmpdir / f'test_3.txt')}.txt",
+    }
+
+    clean.clean_cache_files(1, tags=[None, "2"])
+    assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpdir / f'test_3.txt')}.txt"]

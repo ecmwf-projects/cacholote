@@ -18,8 +18,9 @@ import functools
 import json
 import logging
 import posixpath
-from typing import Any, Dict, Literal, Optional, Set
+from typing import Any, Dict, Literal, Optional, Sequence, Set
 
+import sqlalchemy
 import sqlalchemy.orm
 
 from . import config, extra_encoders, utils
@@ -106,7 +107,10 @@ class _Cleaner:
                     self.fs.rm(urlpath)
 
     def delete_cache_files(
-        self, maxsize: int, method: Literal["LRU", "LFU"] = "LRU"
+        self,
+        maxsize: int,
+        method: Literal["LRU", "LFU"],
+        tags: Optional[Sequence[Optional[str]]],
     ) -> None:
         if method == "LRU":
             sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
@@ -116,12 +120,26 @@ class _Cleaner:
             raise ValueError("`method` must be 'LRU' or 'LFU'.")
         sorters.append(config.CacheEntry.expiration)
 
+        filters = []
+        if tags is not None:
+            if not isinstance(tags, (list, tuple, set)) or not all(
+                tag is None or isinstance(tag, str) for tag in tags
+            ):
+                raise TypeError("`tags` must be None or a sequence of strings/None")
+
+            filter = config.CacheEntry.tag.in_(tags)
+            if None in tags:
+                filter = sqlalchemy.or_(config.CacheEntry.tag.is_(None), filter)
+            filters.append(filter)
+
         if self.stop_cleaning(maxsize):
             return
 
         # Clean database files
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-            for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
+            for cache_entry in (
+                session.query(config.CacheEntry).filter(*filters).order_by(*sorters)
+            ):
                 json.loads(
                     cache_entry._result_as_string,
                     object_hook=functools.partial(
@@ -143,6 +161,7 @@ def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
+    tags: Optional[Sequence[Optional[str]]] = None,
 ) -> None:
     """Clean cache files.
 
@@ -150,15 +169,18 @@ def clean_cache_files(
     ----------
     maxsize: int
         Maximum total size of cache files (bytes).
-    method: str, default="LRU"
+    method: str, default: "LRU"
         * LRU: Last Recently Used
         * LFU: Least Frequently Used
-    delete_unknown_files: bool, default=False
+    delete_unknown_files: bool, default: False
         Delete all files that are not registered in the cache database.
+    tags: sequence of strings/None, optional, default: None
+        Tags to delete. If None, delete all cache entries.
+        To delete untagged entries, add None in the sequence (e.g., [None, 'tag1', ...])
     """
     cleaner = _Cleaner()
 
     if delete_unknown_files:
         cleaner.delete_unknown_files()
 
-    cleaner.delete_cache_files(maxsize=maxsize, method=method)
+    cleaner.delete_cache_files(maxsize=maxsize, method=method, tags=tags)
