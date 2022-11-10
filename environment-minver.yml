@@ -7,9 +7,9 @@ dependencies:
 - pytest-cov
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - aiohttp
-- fsspec
 - moto
 - pytest-httpserver
+- pytest-rerunfailures
 - requests
 - s3fs
 - sqlalchemy

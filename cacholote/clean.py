@@ -55,32 +55,85 @@ def _delete_cache_file(
     return obj
 
 
-def _get_unknown_files(sizes: Dict[str, Any]) -> Set[str]:
-    files_to_skip = []
-    for urlpath in sizes:
-        if urlpath.endswith(".lock"):
-            files_to_skip.append(urlpath)
-            files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
+class _Cleaner:
+    def __init__(self) -> None:
+        fs, dirname = utils.get_cache_files_fs_dirname()
+        sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
 
-    unknown_sizes = {k: v for k, v in sizes.items() if k not in files_to_skip}
-    if unknown_sizes:
+        self.fs = fs
+        self.dirname = dirname
+        self.sizes = sizes
+
+    @property
+    def size(self) -> int:
+        return sum(self.sizes.values())
+
+    def stop_cleaning(self, maxsize: int) -> bool:
+        size = self.size
+        logging.info(f"Size of {self.dirname!r}: {size!r}")
+        return size <= maxsize
+
+    @property
+    def unknown_files(self) -> Set[str]:
+        files_to_skip = []
+        for urlpath in self.sizes:
+            if urlpath.endswith(".lock"):
+                files_to_skip.append(urlpath)
+                files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
+
+        unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
+        if unknown_sizes:
+            with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+                for cache_entry in session.query(config.CacheEntry):
+                    json.loads(
+                        cache_entry._result_as_string,
+                        object_hook=functools.partial(
+                            _delete_cache_file,
+                            sizes=unknown_sizes,
+                            dry_run=True,
+                        ),
+                    )
+        return set(unknown_sizes)
+
+    def delete_unknown_files(self) -> None:
+        for urlpath in self.unknown_files:
+            self.sizes.pop(urlpath)
+            if self.fs.exists(urlpath):
+                logging.info(f"Deleting {urlpath!r}")
+                self.fs.rm(urlpath)
+
+    def delete_cache_files(
+        self, maxsize: int, method: Literal["LRU", "LFU"] = "LRU"
+    ) -> None:
+        if method == "LRU":
+            sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
+        elif method == "LFU":
+            sorters = [config.CacheEntry.counter, config.CacheEntry.timestamp]
+        else:
+            raise ValueError("`method` must be 'LRU' or 'LFU'.")
+        sorters.append(config.CacheEntry.expiration)
+
+        if self.stop_cleaning(maxsize):
+            return
+
+        # Clean database files
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-            for cache_entry in session.query(config.CacheEntry):
+            for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
                 json.loads(
                     cache_entry._result_as_string,
                     object_hook=functools.partial(
                         _delete_cache_file,
-                        sizes=unknown_sizes,
-                        dry_run=True,
+                        session=session,
+                        cache_entry=cache_entry,
+                        sizes=self.sizes,
                     ),
                 )
-    return set(unknown_sizes)
+                if self.stop_cleaning(maxsize):
+                    return
 
-
-def _stop_cleaning(maxsize: int, sizes: Dict[str, int], dirname: str) -> bool:
-    size = sum(sizes.values())
-    logging.info(f"Size of {dirname!r}: {size!r}")
-    return size <= maxsize
+        raise ValueError(
+            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}."
+        )
 
 
 def clean_cache_files(
@@ -98,47 +151,11 @@ def clean_cache_files(
         * LRU: Last Recently Used
         * LFU: Least Frequently Used
     delete_unknown_files: bool, default=False
-        Delete files that are not present in the database before
-        deleting files in the database.
+        Delete all files that are not registered in the cache database.
     """
-    if method == "LRU":
-        sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
-    elif method == "LFU":
-        sorters = [config.CacheEntry.counter, config.CacheEntry.timestamp]
-    else:
-        raise ValueError("`method` must be 'LRU' or 'LFU'.")
-    sorters.append(config.CacheEntry.expiration)
-
-    # Freeze directory content
-    fs, dirname = utils.get_cache_files_fs_dirname()
-    sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
-    if _stop_cleaning(maxsize, sizes, dirname):
-        return
+    cleaner = _Cleaner()
 
     if delete_unknown_files:
-        for urlpath in _get_unknown_files(sizes):
-            sizes.pop(urlpath)
-            if fs.exists(urlpath):
-                logging.info(f"Deleting {urlpath!r}")
-                fs.rm(urlpath)
-            if _stop_cleaning(maxsize, sizes, dirname):
-                return
+        cleaner.delete_unknown_files()
 
-    # Clean files in database
-    with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-        for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
-            json.loads(
-                cache_entry._result_as_string,
-                object_hook=functools.partial(
-                    _delete_cache_file,
-                    session=session,
-                    cache_entry=cache_entry,
-                    sizes=sizes,
-                ),
-            )
-            if _stop_cleaning(maxsize, sizes, dirname):
-                return
-
-    raise ValueError(
-        f"Unable to clean {dirname!r}. Final size: {sum(sizes.values())!r}."
-    )
+    cleaner.delete_cache_files(maxsize=maxsize, method=method)

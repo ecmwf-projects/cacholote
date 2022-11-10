@@ -15,10 +15,10 @@ dependencies:
 - aiohttp
 - cfgrib
 - dask
-- fsspec
 - moto
 - netCDF4
 - pytest-httpserver
+- pytest-rerunfailures
 - python-magic
 - requests
 - s3fs
