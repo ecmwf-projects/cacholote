@@ -16,7 +16,6 @@
 # limitations under the License.
 
 
-import contextlib
 import functools
 import inspect
 import io
@@ -24,9 +23,7 @@ import mimetypes
 import pathlib
 import posixpath
 import tempfile
-import time
-import warnings
-from typing import Any, Callable, Dict, Generator, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
@@ -138,33 +135,6 @@ def _get_fs_and_urlpath(
     )
 
 
-@contextlib.contextmanager
-def _lock_file(
-    fs: fsspec.AbstractFileSystem, urlpath: str
-) -> Generator[None, None, None]:
-    locking_file = urlpath + ".lock"
-    fs.touch(locking_file)
-    try:
-        yield
-    finally:
-        if fs.exists(locking_file):
-            fs.rm(locking_file)
-
-
-def _store_file(fs: fsspec.AbstractFileSystem, urlpath: str) -> bool:
-    locking_file = urlpath + ".lock"
-    warned = False
-    while fs.exists(locking_file):
-        if not warned:
-            warnings.warn(
-                f"can NOT proceed until file is unlocked: {locking_file!r}.",
-                UserWarning,
-            )
-            warned = True
-        time.sleep(1)
-    return not fs.exists(urlpath)
-
-
 @_requires_xarray_and_dask
 def decode_xr_dataset(
     file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
@@ -203,8 +173,8 @@ def decode_io_object(
 def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
-    if _store_file(fs, urlpath):
-        with _lock_file(fs, urlpath):
+    with utils._Locker(fs, urlpath) as file_exists:
+        if not file_exists:
             if filetype == "application/vnd+zarr":
                 # Write directly on any filesystem
                 mapper = fs.get_mapper(urlpath)
@@ -274,8 +244,8 @@ def _maybe_store_io_object(
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
 ) -> None:
-    if _store_file(fs_out, urlpath_out):
-        with _lock_file(fs_out, urlpath_out):
+    with utils._Locker(fs_out, urlpath_out) as file_exists:
+        if not file_exists:
             if fs_in == fs_out:
                 if config.SETTINGS["io_delete_original"]:
                     fs_in.mv(urlpath_in, urlpath_out)

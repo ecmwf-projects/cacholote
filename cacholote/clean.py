@@ -48,9 +48,11 @@ def _delete_cache_file(
                 logging.info(f"Deleting cache entry: {cache_entry!r}")
                 session.delete(cache_entry)
                 session.commit()
-            if fs.exists(urlpath) and not dry_run:
-                logging.info(f"Deleting {urlpath!r}")
-                fs.rm(urlpath, recursive=True)
+            if not dry_run:
+                with utils._Locker(fs, urlpath) as file_exists:
+                    if file_exists:
+                        logging.info(f"Deleting {urlpath!r}")
+                        fs.rm(urlpath, recursive=True)
 
     return obj
 
@@ -98,9 +100,10 @@ class _Cleaner:
     def delete_unknown_files(self) -> None:
         for urlpath in self.unknown_files:
             self.sizes.pop(urlpath)
-            if self.fs.exists(urlpath):
-                logging.info(f"Deleting {urlpath!r}")
-                self.fs.rm(urlpath)
+            with utils._Locker(self.fs, urlpath) as file_exists:
+                if file_exists:
+                    logging.info(f"Deleting {urlpath!r}")
+                    self.fs.rm(urlpath)
 
     def delete_cache_files(
         self, maxsize: int, method: Literal["LRU", "LFU"] = "LRU"
