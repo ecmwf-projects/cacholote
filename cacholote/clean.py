@@ -113,9 +113,20 @@ class _Cleaner:
         tags_to_clean: Optional[Sequence[Optional[str]]] = None,
         tags_to_keep: Optional[Sequence[Optional[str]]] = None,
     ) -> None:
-        # Filters
+
+        # Check tags
         if None not in (tags_to_clean, tags_to_keep):
             raise ValueError("tags_to_clean/keep are mutually exclusive.")
+        for tags in (tags_to_clean, tags_to_keep):
+            if tags is not None and (
+                not isinstance(tags, (list, set, tuple))
+                or not all(tag is None or isinstance(tag, str) for tag in tags)
+            ):
+                raise TypeError(
+                    "tags_to_clean/keep must be None or a sequence of str/None"
+                )
+
+        # Filters
         filters = []
         if tags_to_keep is not None:
             filters.append(
