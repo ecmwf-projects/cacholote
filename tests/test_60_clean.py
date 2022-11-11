@@ -1,6 +1,6 @@
 import pathlib
 import sqlite3
-from typing import Literal, Optional, Sequence
+from typing import Any, Literal, Optional, Sequence
 
 import fsspec
 import pytest
@@ -114,3 +114,25 @@ def test_clean_tagged_files(
     assert fs.ls(dirname) == [
         f"{dirname}/{fs.checksum(tmpdir / f'test_{expected}.txt')}.txt"
     ]
+
+
+def test_clean_tagged_files_wrong_args() -> None:
+    with pytest.raises(
+        ValueError,
+        match="tags_to_clean/keep are mutually exclusive.",
+    ):
+        clean.clean_cache_files(1, tags_to_keep=[], tags_to_clean=[])
+
+
+@pytest.mark.parametrize("wrong_type", ["1", [1]])
+def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
+    with pytest.raises(
+        TypeError,
+        match="tags_to_clean/keep must be None or a sequence of str/None.",
+    ):
+        clean.clean_cache_files(1, tags_to_keep=wrong_type)
+    with pytest.raises(
+        TypeError,
+        match="tags_to_clean/keep must be None or a sequence of str/None.",
+    ):
+        clean.clean_cache_files(1, tags_to_clean=wrong_type)

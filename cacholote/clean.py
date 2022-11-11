@@ -115,18 +115,18 @@ class _Cleaner:
     ) -> None:
 
         # Check tags
-        if None not in (tags_to_clean, tags_to_keep):
-            raise ValueError("tags_to_clean/keep are mutually exclusive.")
         for tags in (tags_to_clean, tags_to_keep):
             if tags is not None and (
                 not isinstance(tags, (list, set, tuple))
                 or not all(tag is None or isinstance(tag, str) for tag in tags)
             ):
                 raise TypeError(
-                    "tags_to_clean/keep must be None or a sequence of str/None"
+                    "tags_to_clean/keep must be None or a sequence of str/None."
                 )
 
         # Filters
+        if None not in (tags_to_clean, tags_to_keep):
+            raise ValueError("tags_to_clean/keep are mutually exclusive.")
         filters = []
         if tags_to_keep is not None:
             filters.append(
