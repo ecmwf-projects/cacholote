@@ -114,26 +114,27 @@ class _Cleaner:
         tags_to_keep: Optional[Sequence[Optional[str]]] = None,
     ) -> None:
         # Filters
-        if tags_to_clean is not None and tags_to_keep is not None:
+        if None not in (tags_to_clean, tags_to_keep):
             raise ValueError("tags_to_clean/keep are mutually exclusive.")
-        tags = tags_to_keep if tags_to_keep is not None else tags_to_clean
         filters = []
-        if tags is not None:
-            if tags_to_keep is not None:
-                filter = sqlalchemy.or_(
-                    config.CacheEntry.tag.not_in(tags),
+        if tags_to_keep is not None:
+            filters.append(
+                sqlalchemy.or_(
+                    config.CacheEntry.tag.not_in(tags_to_keep),
                     config.CacheEntry.tag.is_not(None)
-                    if None in tags
+                    if None in tags_to_keep
                     else config.CacheEntry.tag.is_(None),
                 )
-            else:
-                filter = sqlalchemy.or_(
-                    config.CacheEntry.tag.in_(tags),
+            )
+        elif tags_to_clean is not None:
+            filters.append(
+                sqlalchemy.or_(
+                    config.CacheEntry.tag.in_(tags_to_clean),
                     config.CacheEntry.tag.is_(None)
-                    if None in tags
+                    if None in tags_to_clean
                     else config.CacheEntry.tag.is_not(None),
                 )
-            filters.append(filter)
+            )
 
         # Sorters
         if method == "LRU":
