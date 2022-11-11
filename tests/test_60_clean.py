@@ -1,6 +1,6 @@
 import pathlib
 import sqlite3
-from typing import Literal
+from typing import Literal, Optional, Sequence
 
 import fsspec
 import pytest
@@ -85,7 +85,14 @@ def test_delete_unknown_files(
             assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
 
 
-def test_clean_tagged_files(tmpdir: pathlib.Path) -> None:
+@pytest.mark.parametrize(
+    "tags_to_clean, tags_to_keep", [([None, "2"], None), (None, ["1"])]
+)
+def test_clean_tagged_files(
+    tmpdir: pathlib.Path,
+    tags_to_clean: Optional[Sequence[Optional[str]]],
+    tags_to_keep: Optional[Sequence[Optional[str]]],
+) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     for tag in [None, "1", "2"]:
@@ -94,5 +101,5 @@ def test_clean_tagged_files(tmpdir: pathlib.Path) -> None:
         with config.set(tag=tag):
             open_url(tmpfile)
 
-    clean.clean_cache_files(1, tags=[None, "2"])
+    clean.clean_cache_files(1, tags_to_clean=tags_to_clean, tags_to_keep=tags_to_keep)
     assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpdir / f'test_1.txt')}.txt"]

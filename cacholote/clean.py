@@ -110,8 +110,32 @@ class _Cleaner:
         self,
         maxsize: int,
         method: Literal["LRU", "LFU"],
-        tags: Optional[Sequence[Optional[str]]],
+        tags_to_clean: Optional[Sequence[Optional[str]]] = None,
+        tags_to_keep: Optional[Sequence[Optional[str]]] = None,
     ) -> None:
+        # Filters
+        if tags_to_clean is not None and tags_to_keep is not None:
+            raise ValueError("tags_to_clean/keep are mutually exclusive.")
+        tags = tags_to_keep if tags_to_keep is not None else tags_to_clean
+        filters = []
+        if tags is not None:
+            if tags_to_keep is not None:
+                filter = sqlalchemy.or_(
+                    config.CacheEntry.tag.not_in(tags),
+                    config.CacheEntry.tag.is_not(None)
+                    if None in tags
+                    else config.CacheEntry.tag.is_(None),
+                )
+            else:
+                filter = sqlalchemy.or_(
+                    config.CacheEntry.tag.in_(tags),
+                    config.CacheEntry.tag.is_(None)
+                    if None in tags
+                    else config.CacheEntry.tag.is_not(None),
+                )
+            filters.append(filter)
+
+        # Sorters
         if method == "LRU":
             sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
         elif method == "LFU":
@@ -119,18 +143,6 @@ class _Cleaner:
         else:
             raise ValueError("`method` must be 'LRU' or 'LFU'.")
         sorters.append(config.CacheEntry.expiration)
-
-        filters = []
-        if tags is not None:
-            if not isinstance(tags, (list, tuple, set)) or not all(
-                tag is None or isinstance(tag, str) for tag in tags
-            ):
-                raise TypeError("`tags` must be None or a sequence of strings/None")
-
-            filter = config.CacheEntry.tag.in_(tags)
-            if None in tags:
-                filter = sqlalchemy.or_(config.CacheEntry.tag.is_(None), filter)
-            filters.append(filter)
 
         if self.stop_cleaning(maxsize):
             return
@@ -161,7 +173,8 @@ def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
-    tags: Optional[Sequence[Optional[str]]] = None,
+    tags_to_clean: Optional[Sequence[Optional[str]]] = None,
+    tags_to_keep: Optional[Sequence[Optional[str]]] = None,
 ) -> None:
     """Clean cache files.
 
@@ -174,13 +187,19 @@ def clean_cache_files(
         * LFU: Least Frequently Used
     delete_unknown_files: bool, default: False
         Delete all files that are not registered in the cache database.
-    tags: sequence of strings/None, optional, default: None
-        Tags to delete. If None, delete all cache entries.
-        To delete untagged entries, add None in the sequence (e.g., [None, 'tag1', ...])
+    tags_to_clean, tags_to_keep: sequence of strings/None, optional, default: None
+        Tags to clean/keep. If None, delete all cache entries.
+        To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
+        tags_to_clean and tags_to_keep are mutually exclusive.
     """
     cleaner = _Cleaner()
 
     if delete_unknown_files:
         cleaner.delete_unknown_files()
 
-    cleaner.delete_cache_files(maxsize=maxsize, method=method, tags=tags)
+    cleaner.delete_cache_files(
+        maxsize=maxsize,
+        method=method,
+        tags_to_clean=tags_to_clean,
+        tags_to_keep=tags_to_keep,
+    )
