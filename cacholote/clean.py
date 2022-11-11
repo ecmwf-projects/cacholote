@@ -18,8 +18,9 @@ import functools
 import json
 import logging
 import posixpath
-from typing import Any, Dict, Literal, Optional, Set
+from typing import Any, Dict, Literal, Optional, Sequence, Set
 
+import sqlalchemy
 import sqlalchemy.orm
 
 from . import config, extra_encoders, utils
@@ -105,9 +106,51 @@ class _Cleaner:
                     logging.info(f"Deleting {urlpath!r}")
                     self.fs.rm(urlpath)
 
+    @staticmethod
+    def check_tags(*args: Any) -> None:
+        if None not in args:
+            raise ValueError("tags_to_clean/keep are mutually exclusive.")
+        for tags in args:
+            if tags is not None and (
+                not isinstance(tags, (list, set, tuple))
+                or not all(tag is None or isinstance(tag, str) for tag in tags)
+            ):
+                raise TypeError(
+                    "tags_to_clean/keep must be None or a sequence of str/None."
+                )
+
     def delete_cache_files(
-        self, maxsize: int, method: Literal["LRU", "LFU"] = "LRU"
+        self,
+        maxsize: int,
+        method: Literal["LRU", "LFU"],
+        tags_to_clean: Optional[Sequence[Optional[str]]],
+        tags_to_keep: Optional[Sequence[Optional[str]]],
     ) -> None:
+
+        self.check_tags(tags_to_clean, tags_to_keep)
+
+        # Filters
+        filters = []
+        if tags_to_keep is not None:
+            filters.append(
+                sqlalchemy.or_(
+                    config.CacheEntry.tag.not_in(tags_to_keep),
+                    config.CacheEntry.tag.is_not(None)
+                    if None in tags_to_keep
+                    else config.CacheEntry.tag.is_(None),
+                )
+            )
+        elif tags_to_clean is not None:
+            filters.append(
+                sqlalchemy.or_(
+                    config.CacheEntry.tag.in_(tags_to_clean),
+                    config.CacheEntry.tag.is_(None)
+                    if None in tags_to_clean
+                    else config.CacheEntry.tag.is_not(None),
+                )
+            )
+
+        # Sorters
         if method == "LRU":
             sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
         elif method == "LFU":
@@ -116,12 +159,13 @@ class _Cleaner:
             raise ValueError("`method` must be 'LRU' or 'LFU'.")
         sorters.append(config.CacheEntry.expiration)
 
+        # Clean database files
         if self.stop_cleaning(maxsize):
             return
-
-        # Clean database files
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
-            for cache_entry in session.query(config.CacheEntry).order_by(*sorters):
+            for cache_entry in (
+                session.query(config.CacheEntry).filter(*filters).order_by(*sorters)
+            ):
                 json.loads(
                     cache_entry._result_as_string,
                     object_hook=functools.partial(
@@ -143,6 +187,8 @@ def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
+    tags_to_clean: Optional[Sequence[Optional[str]]] = None,
+    tags_to_keep: Optional[Sequence[Optional[str]]] = None,
 ) -> None:
     """Clean cache files.
 
@@ -150,15 +196,24 @@ def clean_cache_files(
     ----------
     maxsize: int
         Maximum total size of cache files (bytes).
-    method: str, default="LRU"
+    method: str, default: "LRU"
         * LRU: Last Recently Used
         * LFU: Least Frequently Used
-    delete_unknown_files: bool, default=False
+    delete_unknown_files: bool, default: False
         Delete all files that are not registered in the cache database.
+    tags_to_clean, tags_to_keep: sequence of strings/None, optional, default: None
+        Tags to clean/keep. If None, delete all cache entries.
+        To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
+        tags_to_clean and tags_to_keep are mutually exclusive.
     """
     cleaner = _Cleaner()
 
     if delete_unknown_files:
         cleaner.delete_unknown_files()
 
-    cleaner.delete_cache_files(maxsize=maxsize, method=method)
+    cleaner.delete_cache_files(
+        maxsize=maxsize,
+        method=method,
+        tags_to_clean=tags_to_clean,
+        tags_to_keep=tags_to_keep,
+    )

@@ -46,6 +46,7 @@ class CacheEntry(Base):
         onupdate=datetime.datetime.utcnow,
     )
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=0)
+    tag = sqlalchemy.Column(sqlalchemy.String)
 
     constraint = sqlalchemy.UniqueConstraint(key, expiration)
 
@@ -91,6 +92,7 @@ _SETTINGS: Dict[str, Any] = {
     "io_delete_original": False,
     "raise_all_encoding_errors": False,
     "expiration": None,
+    "tag": None,
 }
 
 
@@ -141,6 +143,9 @@ class set:
         Raise an error if an encoder does not work (i.e., do not return results).
     expiration: datetime, optional, default: None
         Expiration for cached results.
+    tag: str, optional, default: None
+        Tag for the cache entry. If None, do NOT tag.
+        Note that existing tags are overwritten.
     engine:
         `sqlalchemy` Engine. Mutually exclusive with ``cache_db_urlpath``.
     """

@@ -130,3 +130,29 @@ def test_expiration() -> None:
         "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
+
+
+def test_tag(tmpdir: pathlib.Path) -> None:
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    cur = con.cursor()
+
+    cached_now()
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [(None, 1)]
+
+    with config.set(tag="1"):
+        cached_now()
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [("1", 2)]
+
+    with config.set(tag="2"):
+        # Overwrite
+        cached_now()
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [("2", 3)]
+
+    with config.set(tag=None):
+        # Do not overwrite if None
+        cached_now()
+    cur.execute("SELECT tag, counter FROM cache_entries")
+    assert cur.fetchall() == [("2", 4)]
