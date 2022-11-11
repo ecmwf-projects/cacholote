@@ -106,16 +106,11 @@ class _Cleaner:
                     logging.info(f"Deleting {urlpath!r}")
                     self.fs.rm(urlpath)
 
-    def delete_cache_files(
-        self,
-        maxsize: int,
-        method: Literal["LRU", "LFU"],
-        tags_to_clean: Optional[Sequence[Optional[str]]] = None,
-        tags_to_keep: Optional[Sequence[Optional[str]]] = None,
-    ) -> None:
-
-        # Check tags
-        for tags in (tags_to_clean, tags_to_keep):
+    @staticmethod
+    def check_tags(*args: Any) -> None:
+        if None not in args:
+            raise ValueError("tags_to_clean/keep are mutually exclusive.")
+        for tags in args:
             if tags is not None and (
                 not isinstance(tags, (list, set, tuple))
                 or not all(tag is None or isinstance(tag, str) for tag in tags)
@@ -124,9 +119,17 @@ class _Cleaner:
                     "tags_to_clean/keep must be None or a sequence of str/None."
                 )
 
+    def delete_cache_files(
+        self,
+        maxsize: int,
+        method: Literal["LRU", "LFU"],
+        tags_to_clean: Optional[Sequence[Optional[str]]] = None,
+        tags_to_keep: Optional[Sequence[Optional[str]]] = None,
+    ) -> None:
+
+        self.check_tags(tags_to_clean, tags_to_keep)
+
         # Filters
-        if None not in (tags_to_clean, tags_to_keep):
-            raise ValueError("tags_to_clean/keep are mutually exclusive.")
         filters = []
         if tags_to_keep is not None:
             filters.append(
@@ -156,10 +159,9 @@ class _Cleaner:
             raise ValueError("`method` must be 'LRU' or 'LFU'.")
         sorters.append(config.CacheEntry.expiration)
 
+        # Clean database files
         if self.stop_cleaning(maxsize):
             return
-
-        # Clean database files
         with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
             for cache_entry in (
                 session.query(config.CacheEntry).filter(*filters).order_by(*sorters)
