@@ -86,12 +86,21 @@ def test_delete_unknown_files(
 
 
 @pytest.mark.parametrize(
-    "tags_to_clean, tags_to_keep", [([None, "2"], None), (None, ["1"])]
+    "tags_to_clean, tags_to_keep, expected",
+    [
+        ({None, "1"}, None, "2"),
+        ({None, "2"}, None, "1"),
+        ({"1", "2"}, None, None),
+        (None, {None}, None),
+        (None, {"1"}, "1"),
+        (None, {"2"}, "2"),
+    ],
 )
 def test_clean_tagged_files(
     tmpdir: pathlib.Path,
     tags_to_clean: Optional[Sequence[Optional[str]]],
     tags_to_keep: Optional[Sequence[Optional[str]]],
+    expected: Optional[str],
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -102,4 +111,6 @@ def test_clean_tagged_files(
             open_url(tmpfile)
 
     clean.clean_cache_files(1, tags_to_clean=tags_to_clean, tags_to_keep=tags_to_keep)
-    assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpdir / f'test_1.txt')}.txt"]
+    assert fs.ls(dirname) == [
+        f"{dirname}/{fs.checksum(tmpdir / f'test_{expected}.txt')}.txt"
+    ]
