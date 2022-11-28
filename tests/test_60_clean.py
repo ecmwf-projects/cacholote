@@ -77,10 +77,10 @@ def test_delete_unknown_files(
         assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpfile)}.txt"]
     else:
         if add_lock:
-            assert fs.ls(dirname) == [
+            assert set(fs.ls(dirname)) == {
                 f"{dirname}/unknown.txt",
                 f"{dirname}/unknown.txt.lock",
-            ]
+            }
         else:
             assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
 
