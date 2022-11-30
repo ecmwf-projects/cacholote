@@ -86,7 +86,9 @@ class _Cleaner:
 
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
-            with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+            with sqlalchemy.orm.Session(
+                config.SETTINGS["engine"], autoflush=False
+            ) as session:
                 for cache_entry in session.query(config.CacheEntry):
                     json.loads(
                         cache_entry._result_as_string,
@@ -162,7 +164,9 @@ class _Cleaner:
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
-        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+        with sqlalchemy.orm.Session(
+            config.SETTINGS["engine"], autoflush=False
+        ) as session:
             for cache_entry in (
                 session.query(config.CacheEntry).filter(*filters).order_by(*sorters)
             ):

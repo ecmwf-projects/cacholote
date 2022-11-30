@@ -126,7 +126,9 @@ def cacheable(func: F) -> F:
                 config.CacheEntry.expiration
                 == datetime.datetime.fromisoformat(config.SETTINGS["expiration"])
             )
-        with sqlalchemy.orm.Session(config.SETTINGS["engine"]) as session:
+        with sqlalchemy.orm.Session(
+            config.SETTINGS["engine"], autoflush=False
+        ) as session:
             for cache_entry in (
                 session.query(config.CacheEntry)
                 .filter(*filters)
