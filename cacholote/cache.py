@@ -37,16 +37,17 @@ _LOCKER = None
 def _update_last_primary_keys_and_return(
     session: sqlalchemy.orm.Session, cache_entry: Any
 ) -> Any:
-    # Wait until unlocked
-    warned = False
-    while cache_entry.result == _LOCKER:
-        session.refresh(cache_entry)
-        if not warned:
-            warnings.warn(
-                f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
-            )
-            warned = True
-        time.sleep(1)
+    if _LOCKER:
+        # Wait until unlocked
+        warned = False
+        while cache_entry.result == _LOCKER:
+            session.refresh(cache_entry)
+            if not warned:
+                warnings.warn(
+                    f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
+                )
+                warned = True
+            time.sleep(1)
     # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
