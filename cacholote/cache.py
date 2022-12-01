@@ -169,6 +169,7 @@ def cacheable(func: F) -> F:
                 return _clear_last_primary_keys_and_return(result)
             finally:
                 if cache_entry.result == _LOCKER:
+                    # Unlock
                     _delete_cache_entry(session, cache_entry)
 
     return cast(F, wrapper)
