@@ -31,23 +31,22 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 LAST_PRIMARY_KEYS: Dict[str, Any] = {}
 
-_LOCKER = None
+_LOCKER = "__locked__"
 
 
 def _update_last_primary_keys_and_return(
     session: sqlalchemy.orm.Session, cache_entry: Any
 ) -> Any:
-    if _LOCKER:
-        # Wait until unlocked
-        warned = False
-        while cache_entry.result == _LOCKER:
-            session.refresh(cache_entry)
-            if not warned:
-                warnings.warn(
-                    f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
-                )
-                warned = True
-            time.sleep(1)
+    # Wait until unlocked
+    warned = False
+    while cache_entry.result == _LOCKER:
+        session.refresh(cache_entry)
+        if not warned:
+            warnings.warn(
+                f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
+            )
+            warned = True
+        time.sleep(1)
     # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
@@ -144,16 +143,15 @@ def cacheable(func: F) -> F:
 
             # Not in the cache
             try:
-                if _LOCKER:
-                    # Lock cache entry
-                    cache_entry = config.CacheEntry(
-                        key=hexdigest,
-                        expiration=config.SETTINGS["expiration"],
-                        result=_LOCKER,
-                        tag=config.SETTINGS["tag"],
-                    )
-                    session.add(cache_entry)
-                    session.commit()
+                # Lock cache entry
+                cache_entry = config.CacheEntry(
+                    key=hexdigest,
+                    expiration=config.SETTINGS["expiration"],
+                    result=_LOCKER,
+                    tag=config.SETTINGS["tag"],
+                )
+                session.add(cache_entry)
+                session.commit()
             except sqlalchemy.exc.IntegrityError:
                 # Concurrent job: This cache entry already exist.
                 filters = [
@@ -168,22 +166,10 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             try:
                 json_result = json.loads(encode.dumps(result))
-                if _LOCKER:
-                    cache_entry.result = json_result
-                else:
-                    cache_entry = config.CacheEntry(
-                        key=hexdigest,
-                        expiration=config.SETTINGS["expiration"],
-                        result=json_result,
-                        tag=config.SETTINGS["tag"],
-                        counter=0,
-                    )
-                    session.add(cache_entry)
-                    session.commit()
+                cache_entry.result = json_result
                 return _update_last_primary_keys_and_return(session, cache_entry)
             except Exception as ex:
-                if _LOCKER:
-                    _delete_cache_entry(session, cache_entry)
+                _delete_cache_entry(session, cache_entry)
                 if not isinstance(ex, encode.EncodeError):
                     raise ex
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)

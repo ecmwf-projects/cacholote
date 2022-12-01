@@ -1,5 +1,4 @@
 import pathlib
-import sqlite3
 import threading
 
 import fsspec
@@ -56,7 +55,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     assert decode.loads(encode.dumps(actual)).read() == b"test"
 
 
-@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_copy_from_http_to_cache(
     tmpdir: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
@@ -64,7 +63,7 @@ def test_copy_from_http_to_cache(
 ) -> None:
 
     # cache-db to check
-    con = sqlite3.connect(tmpdir / "cacholote.db")
+    con = config.SETTINGS["engine"].raw_connection()
     cur = con.cursor()
 
     # http server
@@ -120,9 +119,8 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
-@pytest.mark.skip(reason="locker is disbled")
 @pytest.mark.flaky(reruns=2)
-@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"
@@ -143,7 +141,7 @@ def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
         t2.join()
 
     # Check hits
-    con = sqlite3.connect(tmpdir / "cacholote.db")
+    con = config.SETTINGS["engine"].raw_connection()
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries")
     assert cur.fetchall() == [(2,)]
@@ -167,7 +165,7 @@ def test_io_locked_files(tmpdir: pathlib.Path) -> None:
         t2.join()
 
     # Check hits
-    con = sqlite3.connect(tmpdir / "cacholote.db")
+    con = config.SETTINGS["engine"].raw_connection()
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries")
     assert cur.fetchall() == [(1,), (1,)]

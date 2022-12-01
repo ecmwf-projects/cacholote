@@ -1,5 +1,4 @@
 import pathlib
-import sqlite3
 
 import fsspec
 import pytest
@@ -69,7 +68,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 @pytest.mark.filterwarnings(
     "ignore:GRIB write support is experimental, DO NOT RELY ON IT!"
 )
@@ -88,7 +87,7 @@ def test_xr_cacheable(
     config.set(xarray_cache_type=xarray_cache_type)
 
     # cache-db to check
-    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    con = config.SETTINGS["engine"].raw_connection()
     cur = con.cursor()
 
     expected = get_grib_ds()

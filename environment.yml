@@ -17,7 +17,10 @@ dependencies:
 - dask
 - moto
 - netCDF4
+- postgresql
+- psycopg
 - pytest-httpserver
+- pytest-postgresql
 - pytest-rerunfailures
 - python-magic
 - requests
