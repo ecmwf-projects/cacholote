@@ -53,14 +53,9 @@ def set_cache(
     request: pytest.FixtureRequest,
 ) -> Generator[str, None, None]:
     settings = json.loads(config.json_dumps())
-    config.set(
-        cache_db_urlpath=(
-            f"postgresql+psycopg2://{postgresql.info.user}:@{postgresql.info.host}:"
-            f"{postgresql.info.port}/{postgresql.info.dbname}"
-        ),
-    )
     if not hasattr(request, "param") or request.param == "file":
         config.set(
+            cache_db_urlpath="sqlite:///" + str(tmpdir / "cacholote.db"),
             cache_files_urlpath=str(tmpdir / "cache_files"),
         )
         yield "file"
@@ -74,6 +69,10 @@ def set_cache(
             client = session.create_client("s3", **client_kwargs)
             client.create_bucket(Bucket=test_bucket_name)
             config.set(
+                cache_db_urlpath=(
+                    f"postgresql+psycopg2://{postgresql.info.user}:@{postgresql.info.host}:"
+                    f"{postgresql.info.port}/{postgresql.info.dbname}"
+                ),
                 cache_files_urlpath=f"s3://{test_bucket_name}",
                 cache_files_storage_options=dict(client_kwargs=client_kwargs),
             )

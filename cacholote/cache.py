@@ -162,13 +162,21 @@ def cacheable(func: F) -> F:
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
                 return _update_last_primary_keys_and_return(session, cache_entry)
 
-            # Compute result from scratch and unlock
-            result = func(*args, **kwargs)
             try:
+                # Compute result from scratch
+                result = func(*args, **kwargs)
+            except Exception as ex:
+                # Unlock
+                _delete_cache_entry(session, cache_entry)
+                raise ex
+
+            try:
+                # Cache result
                 json_result = json.loads(encode.dumps(result))
                 cache_entry.result = json_result
                 return _update_last_primary_keys_and_return(session, cache_entry)
             except Exception as ex:
+                # Unlock
                 _delete_cache_entry(session, cache_entry)
                 if not isinstance(ex, encode.EncodeError):
                     raise ex

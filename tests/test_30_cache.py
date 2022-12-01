@@ -23,6 +23,11 @@ def cached_now() -> datetime.datetime:
     return datetime.datetime.now()
 
 
+@cache.cacheable
+def cached_error() -> None:
+    raise ValueError("test error")
+
+
 def test_cacheable(tmpdir: pathlib.Path) -> None:
 
     con = config.SETTINGS["engine"].raw_connection()
@@ -40,15 +45,15 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
         assert cur.fetchall() == [
             (
                 "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
-                datetime.datetime.max,
-                {"a": "test", "b": None, "args": [], "kwargs": {}},
+                "9999-12-31 23:59:59.999999",
+                '{"a": "test", "b": null, "args": [], "kwargs": {}}',
                 counter,
             )
         ]
 
         cur.execute("SELECT timestamp FROM cache_entries")
         (timestamp,) = cur.fetchone()
-        assert before < timestamp < after
+        assert before < datetime.datetime.fromisoformat(timestamp) < after
 
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
@@ -155,3 +160,14 @@ def test_tag(tmpdir: pathlib.Path) -> None:
         cached_now()
     cur.execute("SELECT tag, counter FROM cache_entries")
     assert cur.fetchall() == [("2", 4)]
+
+
+def test_cached_error() -> None:
+    con = config.SETTINGS["engine"].raw_connection()
+    cur = con.cursor()
+
+    with pytest.raises(ValueError, match="test error"):
+        cached_error()
+
+    cur.execute("SELECT * FROM cache_entries")
+    assert cur.fetchall() == []
