@@ -106,11 +106,7 @@ def cacheable(func: F) -> F:
 
         # Key defining the function and its arguments
         try:
-            hexdigest = hexdigestify_python_call(
-                func,
-                *args,
-                **kwargs,
-            )
+            hexdigest = hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
@@ -134,6 +130,7 @@ def cacheable(func: F) -> F:
                 .filter(*filters)
                 .order_by(config.CacheEntry.timestamp.desc())
             ):
+                # Attempt all valid cache entries
                 try:
                     return _update_last_primary_keys_and_return(session, cache_entry)
                 except decode.DecodeError as ex:
@@ -165,15 +162,13 @@ def cacheable(func: F) -> F:
             try:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
-                # Cache result
                 cache_entry.result = json.loads(encode.dumps(result))
                 return _update_last_primary_keys_and_return(session, cache_entry)
-            except Exception as ex:
-                # Unlock
-                _delete_cache_entry(session, cache_entry)
-                if not isinstance(ex, encode.EncodeError):
-                    raise ex
+            except encode.EncodeError as ex:
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                 return _clear_last_primary_keys_and_return(result)
+            finally:
+                if cache_entry.result == _LOCKER:
+                    _delete_cache_entry(session, cache_entry)
 
     return cast(F, wrapper)
