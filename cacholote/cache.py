@@ -163,7 +163,8 @@ def cacheable(func: F) -> F:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
                 cache_entry.result = json.loads(encode.dumps(result))
-                return _update_last_primary_keys_and_return(session, cache_entry)
+                result = _update_last_primary_keys_and_return(session, cache_entry)
+                return result
             except encode.EncodeError as ex:
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                 return _clear_last_primary_keys_and_return(result)
