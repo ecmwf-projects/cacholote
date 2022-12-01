@@ -31,7 +31,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 LAST_PRIMARY_KEYS: Dict[str, Any] = {}
 
-_LOCKER = "__locked__"
+_LOCKER = None
 
 
 def _update_last_primary_keys_and_return(
@@ -143,15 +143,16 @@ def cacheable(func: F) -> F:
 
             # Not in the cache
             try:
-                # Lock cache entry
-                cache_entry = config.CacheEntry(
-                    key=hexdigest,
-                    expiration=config.SETTINGS["expiration"],
-                    result=_LOCKER,
-                    tag=config.SETTINGS["tag"],
-                )
-                session.add(cache_entry)
-                session.commit()
+                if _LOCKER:
+                    # Lock cache entry
+                    cache_entry = config.CacheEntry(
+                        key=hexdigest,
+                        expiration=config.SETTINGS["expiration"],
+                        result=_LOCKER,
+                        tag=config.SETTINGS["tag"],
+                    )
+                    session.add(cache_entry)
+                    session.commit()
             except sqlalchemy.exc.IntegrityError:
                 # Concurrent job: This cache entry already exist.
                 filters = [
@@ -165,10 +166,23 @@ def cacheable(func: F) -> F:
             # Compute result from scratch and unlock
             result = func(*args, **kwargs)
             try:
-                cache_entry.result = json.loads(encode.dumps(result))
+                json_result = json.loads(encode.dumps(result))
+                if _LOCKER:
+                    cache_entry.result = json_result
+                else:
+                    cache_entry = config.CacheEntry(
+                        key=hexdigest,
+                        expiration=config.SETTINGS["expiration"],
+                        result=json_result,
+                        tag=config.SETTINGS["tag"],
+                        counter=0,
+                    )
+                    session.add(cache_entry)
+                    session.commit()
                 return _update_last_primary_keys_and_return(session, cache_entry)
             except Exception as ex:
-                _delete_cache_entry(session, cache_entry)
+                if _LOCKER:
+                    _delete_cache_entry(session, cache_entry)
                 if not isinstance(ex, encode.EncodeError):
                     raise ex
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
