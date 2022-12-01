@@ -67,7 +67,6 @@ def _delete_cache_entry(
 ) -> None:
     session.delete(cache_entry)
     session.commit()
-
     # Delete cache file
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
@@ -100,12 +99,12 @@ def cacheable(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        # Cache opt-out
         if not config.SETTINGS["use_cache"]:
+            # Cache opt-out
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
-        # Key defining the function and its arguments
         try:
+            # Get key
             hexdigest = hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
@@ -150,7 +149,7 @@ def cacheable(func: F) -> F:
                 session.add(cache_entry)
                 session.commit()
             except sqlalchemy.exc.IntegrityError:
-                # Concurrent job: This cache entry already exist.
+                # Concurrent job: This cache entry already exists.
                 filters = [
                     config.CacheEntry.key == cache_entry.key,
                     config.CacheEntry.expiration == cache_entry.expiration,
@@ -163,9 +162,9 @@ def cacheable(func: F) -> F:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
                 cache_entry.result = json.loads(encode.dumps(result))
-                result = _update_last_primary_keys_and_return(session, cache_entry)
-                return result
+                return _update_last_primary_keys_and_return(session, cache_entry)
             except encode.EncodeError as ex:
+                # Enconding error, return result without caching
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                 return _clear_last_primary_keys_and_return(result)
             finally:
