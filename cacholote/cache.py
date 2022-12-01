@@ -166,13 +166,14 @@ def cacheable(func: F) -> F:
             # Compute result from scratch and unlock
             result = func(*args, **kwargs)
             try:
+                json_result = json.loads(encode.dumps(result))
                 if _LOCKER:
-                    cache_entry.result = json.loads(encode.dumps(result))
+                    cache_entry.result = json_result
                 else:
                     cache_entry = config.CacheEntry(
                         key=hexdigest,
                         expiration=config.SETTINGS["expiration"],
-                        result=json.loads(encode.dumps(result)),
+                        result=json_result,
                         tag=config.SETTINGS["tag"],
                         counter=0,
                     )
