@@ -10,6 +10,7 @@ dependencies:
 - moto
 - postgresql
 - psycopg
+- psycopg2
 - pytest-httpserver
 - pytest-postgresql
 - pytest-rerunfailures
