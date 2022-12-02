@@ -20,7 +20,7 @@ import io
 import time
 import warnings
 from types import TracebackType
-from typing import Optional, Tuple, Type
+from typing import Any, Optional, Tuple, Type
 
 import fsspec
 
@@ -43,7 +43,7 @@ def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
 
 
 def copy_buffered_file(
-    f_in: fsspec.spec.AbstractBufferedFile,
+    f_in: Any,
     f_out: fsspec.spec.AbstractBufferedFile,
     buffer_size: Optional[int] = None,
 ) -> None:
@@ -63,7 +63,7 @@ def copy_buffered_file(
         data = f_in.read(buffer_size)
         if not data:
             break
-        f_out.write(data)
+        f_out.write(data if isinstance(data, bytes) else data.encode())
 
 
 class _Locker:
