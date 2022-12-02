@@ -1,3 +1,4 @@
+import importlib
 import io
 import pathlib
 import sqlite3
@@ -67,7 +68,7 @@ def test_dictify_bytes_io_object(
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected: Tuple[Dict[str, Any], ...] = (
         {
-            "type": "text/plain",
+            "type": "text/plain" if importlib.util.find_spec("magic") else "unknown",
             "href": local_path,
             "file:checksum": checksum,
             "file:size": 4,
