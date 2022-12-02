@@ -50,7 +50,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 _UNION_IO_TYPES = Union[
     io.RawIOBase,
     io.BufferedIOBase,
-    io.TextIOWrapper,
+    io.TextIOBase,
     fsspec.spec.AbstractBufferedFile,
     fsspec.implementations.local.LocalFileOpener,
 ]
@@ -308,7 +308,7 @@ def register_all() -> None:
     for type_ in (
         io.RawIOBase,
         io.BufferedIOBase,
-        io.TextIOWrapper,
+        io.TextIOBase,
         fsspec.spec.AbstractBufferedFile,
         fsspec.implementations.local.LocalFileOpener,
     ):
