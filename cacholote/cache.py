@@ -138,6 +138,7 @@ def cacheable(func: F) -> F:
                     _delete_cache_entry(session, cache_entry)
 
             # Not in the cache
+            cache_entry = None
             try:
                 # Lock cache entry
                 cache_entry = config.CacheEntry(
@@ -157,19 +158,20 @@ def cacheable(func: F) -> F:
                 session.rollback()
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
                 return _update_last_primary_keys_and_return(session, cache_entry)
-
-            try:
+            else:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
-                cache_entry.result = json.loads(encode.dumps(result))
-                return _update_last_primary_keys_and_return(session, cache_entry)
-            except encode.EncodeError as ex:
-                # Enconding error, return result without caching
-                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                return _clear_last_primary_keys_and_return(result)
+                try:
+                    # Update cache
+                    cache_entry.result = json.loads(encode.dumps(result))
+                    return _update_last_primary_keys_and_return(session, cache_entry)
+                except encode.EncodeError as ex:
+                    # Enconding error, return result without caching
+                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                    return _clear_last_primary_keys_and_return(result)
             finally:
-                if cache_entry.result == _LOCKER:
-                    # Unlock
+                # Unlock
+                if cache_entry and cache_entry.result == _LOCKER:
                     _delete_cache_entry(session, cache_entry)
 
     return cast(F, wrapper)
