@@ -48,7 +48,8 @@ except ImportError:
 F = TypeVar("F", bound=Callable[..., Any])
 
 _UNION_IO_TYPES = Union[
-    io.BufferedReader,
+    io.RawIOBase,
+    io.BufferedIOBase,
     io.TextIOWrapper,
     fsspec.spec.AbstractBufferedFile,
     fsspec.implementations.local.LocalFileOpener,
@@ -238,7 +239,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     )
 
 
-def _maybe_store_io_object(
+def _maybe_store_file_object(
     fs_in: fsspec.AbstractFileSystem,
     urlpath_in: str,
     fs_out: fsspec.AbstractFileSystem,
@@ -260,27 +261,35 @@ def _maybe_store_io_object(
                     fs_in.rm(urlpath_in)
 
 
+def _maybe_store_io_object(
+    f_in: _UNION_IO_TYPES,
+    fs_out: fsspec.AbstractFileSystem,
+    urlpath_out: str,
+) -> None:
+    with utils._Locker(fs_out, urlpath_out) as file_exists:
+        if not file_exists:
+            f_out = fs_out.open(urlpath_out, "wb")
+            utils.copy_buffered_file(f_in, f_out)
+
+
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
-    if "w" in obj.mode:
-        raise ValueError("write-mode objects can NOT be cached.")
-
-    if isinstance(obj, (io.BufferedReader, io.TextIOWrapper)):
-        urlpath_in = obj.name
-        fs_in = fsspec.filesystem("file")
-    else:
-        urlpath_in = obj.path
-        fs_in = obj.fs
-    urlpath_in = str(urlpath_in)
-
-    root = fs_in.checksum(urlpath_in)
-    ext = pathlib.Path(urlpath_in).suffix
-    urlpath_out = posixpath.join(config.SETTINGS["cache_files_urlpath"], f"{root}{ext}")
-
+    cache_files_urlpath = config.SETTINGS["cache_files_urlpath"]
     fs_out, _, _ = fsspec.get_fs_token_paths(
-        urlpath_out, storage_options=config.SETTINGS["cache_files_storage_options"]
+        cache_files_urlpath,
+        storage_options=config.SETTINGS["cache_files_storage_options"],
     )
-    _maybe_store_io_object(fs_in, urlpath_in, fs_out, urlpath_out)
+
+    if hasattr(obj, "path") or hasattr(obj, "name"):
+        urlpath_in = obj.path if hasattr(obj, "path") else obj.name  # type: ignore[union-attr]
+        fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
+        root = fs_in.checksum(urlpath_in)
+        ext = pathlib.Path(urlpath_in).suffix
+        urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
+        _maybe_store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
+    else:
+        urlpath_out = posixpath.join(cache_files_urlpath, f"{hash(obj)}")
+        _maybe_store_io_object(obj, fs_out, urlpath_out)
 
     file_json = _dictify_file(fs_out, urlpath_out)
     params = inspect.signature(open).parameters
@@ -297,7 +306,8 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
 def register_all() -> None:
     """Register extra encoders if optional dependencies are installed."""
     for type_ in (
-        io.BufferedReader,
+        io.RawIOBase,
+        io.BufferedIOBase,
         io.TextIOWrapper,
         fsspec.spec.AbstractBufferedFile,
         fsspec.implementations.local.LocalFileOpener,

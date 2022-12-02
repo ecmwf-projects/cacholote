@@ -1,3 +1,4 @@
+import io
 import pathlib
 import sqlite3
 import threading
@@ -54,6 +55,29 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     # Use href when local_path is missing or corrupted
     fsspec.filesystem("file").mv(local_path, href)
     assert decode.loads(encode.dumps(actual)).read() == b"test"
+
+
+def test_dictify_bytes_io_object(tmpdir: pathlib.Path) -> None:
+    bytes_io = io.BytesIO(b"test")
+
+    actual = extra_encoders.dictify_io_object(bytes_io)
+    local_path = f"{tmpdir}/cache_files/{hash(bytes_io)}"
+    checksum = fsspec.filesystem("file").checksum(local_path)
+    expected = {
+        "type": "python_call",
+        "callable": "cacholote.extra_encoders:decode_io_object",
+        "args": (
+            {
+                "type": "text/plain",
+                "href": local_path,
+                "file:checksum": checksum,
+                "file:size": 4,
+                "file:local_path": local_path,
+            },
+            {},
+        ),
+    }
+    assert actual == expected
 
 
 @pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
