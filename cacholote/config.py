@@ -126,9 +126,9 @@ class set:
     use_cache: bool, default: True
         Enable/disable cache.
     cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
-        URL for cache database.
+        URL for cache database (driver://user:pass@host/database).
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
-        URL for cache files.
+        URL for cache files (protocol://location).
     cache_files_storage_options: dict, default: {}
         ``fsspec`` storage options for storing cache files.
     cache_files_urlpath_readonly: str, None, default: None
