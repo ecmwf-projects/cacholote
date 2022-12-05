@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextvars
 import datetime
 import functools
 import json
@@ -29,7 +30,9 @@ from . import clean, config, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-LAST_PRIMARY_KEYS: Dict[str, Any] = {}
+LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
+    "last_primary_keys"
+)
 
 _LOCKER = None
 
@@ -54,12 +57,12 @@ def _update_last_primary_keys_and_return(
     if config.SETTINGS["tag"] is not None:
         cache_entry.tag = config.SETTINGS["tag"]
     session.commit()
-    LAST_PRIMARY_KEYS.update(cache_entry._primary_keys)
+    LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
     return result
 
 
 def _clear_last_primary_keys_and_return(result: Any) -> Any:
-    LAST_PRIMARY_KEYS.clear()
+    LAST_PRIMARY_KEYS.set({})
     return result
 
 
