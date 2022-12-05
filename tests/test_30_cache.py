@@ -160,13 +160,12 @@ def test_tag(tmpdir: pathlib.Path) -> None:
 
 
 def test_contextvar() -> None:
-    cfunc = cache.cacheable(func)
     cache.LAST_PRIMARY_KEYS.set({})
 
     ctx = contextvars.copy_context()
-    ctx.run(cfunc, 1)
+    ctx.run(cached_now)
     assert ctx[cache.LAST_PRIMARY_KEYS] == {
-        "key": "54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c",
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
 
