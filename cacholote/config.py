@@ -155,7 +155,7 @@ class set:
         # Cache DB
         if kwargs.get("engine") and kwargs.get("cache_db_urlpath"):
             raise ValueError("'engine' and 'cache_db_urlpath' are mutually exclusive")
-        elif kwargs.get("engine"):
+        if kwargs.get("engine"):
             kwargs["cache_db_urlpath"] = None
         elif kwargs.get("cache_db_urlpath"):
             engine = sqlalchemy.create_engine(kwargs["cache_db_urlpath"], future=True)
@@ -163,7 +163,7 @@ class set:
             kwargs["engine"] = engine
 
         # Update
-        self._old = dict(_SETTINGS)
+        self._old = dict(SETTINGS)
         _SETTINGS.update(kwargs)
 
         # Create cache files directory
