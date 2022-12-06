@@ -141,7 +141,7 @@ class set:
         extra_settings = builtins.set(kwargs) - builtins.set(_DEFAULTS)
         if extra_settings:
             raise ValueError(
-                f"Wrong settings: {extra_settings}. Available settings: {list(_SETTINGS)}"
+                f"Wrong settings: {extra_settings!r}. Available settings: {list(_SETTINGS)!r}"
             )
 
         for k in builtins.set(_ALLOWED_SETTINGS) & builtins.set(kwargs):
@@ -185,6 +185,13 @@ class set:
         _SETTINGS.update(self._old)
 
 
+def json_dumps() -> str:
+    """Serialize configuration to a JSON formatted string."""
+    if SETTINGS["cache_db_urlpath"] is None:
+        raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
+    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})
+
+
 def _initialize_settings() -> None:
 
     settings = {}
@@ -197,10 +204,3 @@ def _initialize_settings() -> None:
 
 
 _initialize_settings()
-
-
-def json_dumps() -> str:
-    """Serialize configuration to a JSON formatted string."""
-    if SETTINGS["cache_db_urlpath"] is None:
-        raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
-    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})

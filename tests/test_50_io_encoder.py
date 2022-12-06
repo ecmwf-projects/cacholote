@@ -2,6 +2,7 @@ import importlib
 import io
 import pathlib
 import sqlite3
+import tempfile
 import threading
 from typing import Any, Dict, Tuple, Union
 
@@ -173,26 +174,25 @@ def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
     assert cur.fetchall() == [(2,)]
 
 
-@pytest.mark.flaky(reruns=2)
 def test_io_locked_files(tmpdir: pathlib.Path) -> None:
     # Create file
-    tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 10_000_000)
+    with tempfile.NamedTemporaryFile(suffix=".txt") as tmpfile:
+        fsspec.filesystem("file").pipe_file(tmpfile.name, b"1" * 100_000_000)
 
-    # Cached open
-    cfunc = cache.cacheable(open)
+        # Cached open
+        cfunc = cache.cacheable(open)
 
-    # Threading
-    t1 = threading.Thread(target=cfunc, args=(tmpfile, "r"))
-    t2 = threading.Thread(target=cfunc, args=(tmpfile, "rb"))
-    with pytest.warns(UserWarning, match="can NOT proceed until file is unlocked"):
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+        # Threading
+        t1 = threading.Thread(target=cfunc, args=(tmpfile.name, "r"))
+        t2 = threading.Thread(target=cfunc, args=(tmpfile.name, "rb"))
+        with pytest.warns(UserWarning, match="can NOT proceed until file is unlocked"):
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
 
-    # Check hits
-    con = sqlite3.connect(tmpdir / "cacholote.db")
-    cur = con.cursor()
-    cur.execute("SELECT counter FROM cache_entries")
-    assert cur.fetchall() == [(1,), (1,)]
+        # Check hits
+        con = sqlite3.connect(tmpdir / "cacholote.db")
+        cur = con.cursor()
+        cur.execute("SELECT counter FROM cache_entries")
+        assert cur.fetchall() == [(1,), (1,)]
