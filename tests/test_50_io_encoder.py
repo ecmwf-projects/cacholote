@@ -147,8 +147,8 @@ def test_io_corrupted_files(
 @pytest.mark.parametrize(
     "wait,size, mode1,mode2,warning,expected,set_cache",
     [
-        (0.1, 0, "r", "r", "cache entry", [(2,)], "file"),
-        (0.1, 0, "r", "r", "cache entry", [(2,)], "cads"),
+        (0.2, 0, "r", "r", "cache entry", [(2,)], "file"),
+        (0.2, 0, "r", "r", "cache entry", [(2,)], "cads"),
         (0, 10_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
     ],
     indirect=["set_cache"],
