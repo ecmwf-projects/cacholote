@@ -177,7 +177,7 @@ def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
 def test_io_locked_files(tmpdir: pathlib.Path) -> None:
     # Create file
     with tempfile.NamedTemporaryFile(suffix=".txt") as tmpfile:
-        fsspec.filesystem("file").pipe_file(tmpfile.name, b"1" * 100_000_000)
+        tmpfile.write(b"1" * 100_000_000)
 
         # Cached open
         cfunc = cache.cacheable(open)
