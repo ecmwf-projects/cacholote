@@ -173,6 +173,7 @@ def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
     assert cur.fetchall() == [(2,)]
 
 
+@pytest.mark.flaky(reruns=2)
 def test_io_locked_files(tmpdir: pathlib.Path) -> None:
     # Create file
     tmpfile = tmpdir / "test.txt"

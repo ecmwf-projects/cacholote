@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 import pathlib
 
 import pytest
@@ -73,3 +74,20 @@ def test_expiration() -> None:
 
     with config.set(expiration="1492-10-12T00:00:00"):
         assert config.SETTINGS["expiration"] == "1492-10-12T00:00:00"
+
+
+def test_env_variables() -> None:
+    old_environ = dict(os.environ)
+    os.environ.update(
+        {
+            "CACHOLOTE_CACHE_DB_URLPATH": "test",
+            "CACHOLOTE_IO_DELETE_ORIGINAL": "TRUE",
+        }
+    )
+    config._initialize_settings()
+    try:
+        assert config.SETTINGS["cache_db_urlpath"] == "test"
+        assert config.SETTINGS["io_delete_original"] is True
+    finally:
+        os.environ.clear()
+        os.environ.update(old_environ)
