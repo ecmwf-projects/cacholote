@@ -14,8 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import builtins
 import datetime
+import distutils.util
 import json
+import os
 import pathlib
 import tempfile
 from types import MappingProxyType, TracebackType
@@ -24,10 +27,6 @@ from typing import Any, Dict, List, Optional, Type
 import fsspec
 import sqlalchemy
 import sqlalchemy.orm
-
-_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
-_CACHE_FILES_DIR = _CACHE_DIR / "cache_files"
-_CACHE_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -82,10 +81,12 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
     ]
 }
 
-_SETTINGS: Dict[str, Any] = {
+_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_DEFAULTS: Dict[str, Any] = {
     "use_cache": True,
-    "cache_db_urlpath": "sqlite:///" + str(_CACHE_DIR / "cacholote.db"),
-    "cache_files_urlpath": str(_CACHE_FILES_DIR),
+    "cache_db_urlpath": f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}",
+    "cache_files_urlpath": f"{_DEFAULT_CACHE_DIR / 'cache_files'}",
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
@@ -93,27 +94,12 @@ _SETTINGS: Dict[str, Any] = {
     "raise_all_encoding_errors": False,
     "expiration": None,
     "tag": None,
+    "engine": None,
 }
 
-
-def _create_engine() -> None:
-    _SETTINGS["engine"] = sqlalchemy.create_engine(
-        _SETTINGS["cache_db_urlpath"], future=True
-    )
-    Base.metadata.create_all(_SETTINGS["engine"])
-
-
-_create_engine()
-
-# Immutable settings to be used by other modules
+# Private and public (immutable) settings
+_SETTINGS: Dict[str, Any] = {}
 SETTINGS = MappingProxyType(_SETTINGS)
-
-
-def json_dumps() -> str:
-    """Serialize configuration to a JSON formatted string."""
-    if SETTINGS["cache_db_urlpath"] is None:
-        raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
-    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})
 
 
 class set:
@@ -126,9 +112,9 @@ class set:
     use_cache: bool, default: True
         Enable/disable cache.
     cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
-        URL for cache database.
+        URL for cache database (driver://user:pass@host/database).
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
-        URL for cache files.
+        URL for cache files (protocol://location).
     cache_files_storage_options: dict, default: {}
         ``fsspec`` storage options for storing cache files.
     cache_files_urlpath_readonly: str, None, default: None
@@ -152,33 +138,33 @@ class set:
 
     def __init__(self, **kwargs: Any):
 
-        for k, v in kwargs.items():
-            if k in _ALLOWED_SETTINGS and v not in _ALLOWED_SETTINGS[k]:
+        extra_settings = builtins.set(kwargs) - builtins.set(_DEFAULTS)
+        if extra_settings:
+            raise ValueError(
+                f"Wrong settings: {extra_settings!r}. Available settings: {list(_SETTINGS)!r}"
+            )
+
+        for k in builtins.set(_ALLOWED_SETTINGS) & builtins.set(kwargs):
+            if kwargs[k] not in _ALLOWED_SETTINGS[k]:
                 raise ValueError(f"{k!r} must be one of {_ALLOWED_SETTINGS[k]!r}")
 
-        if "engine" in kwargs:
-            if "cache_db_urlpath" in kwargs:
-                raise ValueError(
-                    "'engine' and 'cache_db_urlpath' are mutually exclusive"
-                )
-            kwargs["cache_db_urlpath"] = None
-
         if hasattr(kwargs.get("expiration"), "isoformat"):
+            # Store datetime as string
             kwargs["expiration"] = kwargs["expiration"].isoformat()
 
-        try:
-            self._old = {key: _SETTINGS[key] for key in kwargs}
-        except KeyError as ex:
-            raise ValueError(
-                f"Wrong settings. Available settings: {list(_SETTINGS)}"
-            ) from ex
+        # Cache DB
+        if kwargs.get("engine") and kwargs.get("cache_db_urlpath"):
+            raise ValueError("'engine' and 'cache_db_urlpath' are mutually exclusive")
+        if kwargs.get("engine"):
+            kwargs["cache_db_urlpath"] = None
+        elif kwargs.get("cache_db_urlpath"):
+            engine = sqlalchemy.create_engine(kwargs["cache_db_urlpath"], future=True)
+            Base.metadata.create_all(engine)
+            kwargs["engine"] = engine
 
+        # Update
+        self._old = dict(SETTINGS)
         _SETTINGS.update(kwargs)
-
-        # Create engine
-        if kwargs.get("cache_db_urlpath") is not None:
-            self._old["engine"] = _SETTINGS["engine"]
-            _create_engine()
 
         # Create cache files directory
         fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
@@ -197,3 +183,24 @@ class set:
         exc_tb: Optional[TracebackType],
     ) -> None:
         _SETTINGS.update(self._old)
+
+
+def json_dumps() -> str:
+    """Serialize configuration to a JSON formatted string."""
+    if SETTINGS["cache_db_urlpath"] is None:
+        raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
+    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})
+
+
+def _initialize_settings() -> None:
+
+    settings = {}
+    for key, default in _DEFAULTS.items():
+        value = os.getenv(f"CACHOLOTE_{key.upper()}", default)
+        if isinstance(default, bool):
+            value = bool(distutils.util.strtobool(str(value)))
+        settings[key] = value
+    set(**settings)
+
+
+_initialize_settings()
