@@ -52,7 +52,9 @@ def test_change_settings(tmpdir: pathlib.Path) -> None:
     config.set(cache_db_urlpath=new_db)
     assert str(config.SETTINGS["engine"].url) == new_db
 
-    with pytest.raises(ValueError, match="Wrong settings. Available settings: "):
+    with pytest.raises(
+        ValueError, match="Wrong settings: {'dummy'}. Available settings: "
+    ):
         config.set(dummy="dummy")
 
 
@@ -80,14 +82,15 @@ def test_env_variables() -> None:
     old_environ = dict(os.environ)
     os.environ.update(
         {
-            "CACHOLOTE_CACHE_DB_URLPATH": "test",
+            "CACHOLOTE_CACHE_DB_URLPATH": "sqlite://",
             "CACHOLOTE_IO_DELETE_ORIGINAL": "TRUE",
         }
     )
     config._initialize_settings()
     try:
-        assert config.SETTINGS["cache_db_urlpath"] == "test"
+        assert config.SETTINGS["cache_db_urlpath"] == "sqlite://"
         assert config.SETTINGS["io_delete_original"] is True
+        assert str(config.SETTINGS["engine"].url) == "sqlite://"
     finally:
         os.environ.clear()
         os.environ.update(old_environ)
