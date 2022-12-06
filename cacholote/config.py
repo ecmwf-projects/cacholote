@@ -16,6 +16,7 @@
 
 import datetime
 import json
+import os
 import pathlib
 import tempfile
 from types import MappingProxyType, TracebackType
@@ -82,7 +83,7 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
     ]
 }
 
-_SETTINGS: Dict[str, Any] = {
+_DEFAULTS: Dict[str, Any] = {
     "use_cache": True,
     "cache_db_urlpath": "sqlite:///" + str(_CACHE_DIR / "cacholote.db"),
     "cache_files_urlpath": str(_CACHE_FILES_DIR),
@@ -94,6 +95,20 @@ _SETTINGS: Dict[str, Any] = {
     "expiration": None,
     "tag": None,
 }
+
+_SETTINGS: Dict[str, Any] = {}
+
+
+def _initialize_settings() -> None:
+
+    for key, default in _DEFAULTS.items():
+        value = os.getenv(f"CACHOLOTE_{key.upper()}", default)
+        if isinstance(default, bool):
+            value = str(value).lower() in ("true", "t", "on", "1")
+        _SETTINGS[key] = value
+
+
+_initialize_settings()
 
 
 def _create_engine() -> None:
