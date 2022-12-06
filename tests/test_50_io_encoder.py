@@ -165,7 +165,7 @@ def test_io_concurrent_calls(
 ) -> None:
     @cache.cacheable
     def wait_and_open(*args: Any) -> fsspec.spec.AbstractBufferedFile:
-        time.sleep(wait * 2)
+        time.sleep(wait)
         with fsspec.open(*args) as f:
             return f
 
@@ -176,7 +176,7 @@ def test_io_concurrent_calls(
     try:
         # Threading
         t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1))
-        t2 = threading.Timer(wait, wait_and_open, args=(tmpfile, mode2))
+        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2))
         with pytest.warns(UserWarning, match=warning):
             t1.start()
             t2.start()
