@@ -31,7 +31,7 @@ from . import clean, config, decode, encode, utils
 F = TypeVar("F", bound=Callable[..., Any])
 
 LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
-    "last_primary_keys"
+    "cacholote_last_primary_keys"
 )
 
 _LOCKER = None

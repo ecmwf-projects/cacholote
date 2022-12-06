@@ -99,7 +99,7 @@ _DEFAULTS: Dict[str, Any] = {
 
 
 SETTINGS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
-    "settings", default={}
+    "cacholote_settings", default={}
 )
 
 
