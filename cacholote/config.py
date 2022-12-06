@@ -82,8 +82,8 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
 
 _DEFAULTS: Dict[str, Any] = {
     "use_cache": True,
-    "cache_db_urlpath": f"sqlite:///{tempfile.gettempdir()}/cacholote.db",
-    "cache_files_urlpath": f"{tempfile.gettempdir()}/cache_files",
+    "cache_db_urlpath": f"sqlite:///{tempfile.gettempdir()}/cacholote/cacholote.db",
+    "cache_files_urlpath": f"{tempfile.gettempdir()}/cacholote/cache_files",
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
@@ -94,11 +94,9 @@ _DEFAULTS: Dict[str, Any] = {
     "engine": None,
 }
 
-
 # Private and public (immutable) settings
 _SETTINGS: Dict[str, Any] = {}
 SETTINGS = MappingProxyType(_SETTINGS)
-
 
 class set:
     """Customize cacholote settings.
