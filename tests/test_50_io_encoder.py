@@ -2,7 +2,6 @@ import importlib
 import io
 import pathlib
 import sqlite3
-import tempfile
 import threading
 from typing import Any, Dict, Tuple, Union
 
@@ -176,15 +175,16 @@ def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
 
 def test_io_locked_files(tmpdir: pathlib.Path) -> None:
     # Create file
-    with tempfile.NamedTemporaryFile(suffix=".txt") as tmpfile:
-        tmpfile.write(b"1" * 100_000_000)
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * 100_000_000)
 
+    try:
         # Cached open
         cfunc = cache.cacheable(open)
 
         # Threading
-        t1 = threading.Thread(target=cfunc, args=(tmpfile.name, "r"))
-        t2 = threading.Thread(target=cfunc, args=(tmpfile.name, "rb"))
+        t1 = threading.Thread(target=cfunc, args=(tmpfile, "r"))
+        t2 = threading.Thread(target=cfunc, args=(tmpfile, "rb"))
         with pytest.warns(UserWarning, match="can NOT proceed until file is unlocked"):
             t1.start()
             t2.start()
@@ -196,3 +196,5 @@ def test_io_locked_files(tmpdir: pathlib.Path) -> None:
         cur = con.cursor()
         cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == [(1,), (1,)]
+    finally:
+        fsspec.filesystem("file").rm(tmpfile)
