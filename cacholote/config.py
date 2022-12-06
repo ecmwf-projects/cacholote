@@ -16,7 +16,6 @@
 
 import builtins
 import datetime
-import distutils.util
 import json
 import os
 import pathlib
@@ -196,9 +195,15 @@ def _initialize_settings() -> None:
 
     settings = {}
     for key, default in _DEFAULTS.items():
-        value = os.getenv(f"CACHOLOTE_{key.upper()}", default)
+        env_key = f"CACHOLOTE_{key.upper()}"
+        value = os.getenv(env_key, default)
         if isinstance(default, bool):
-            value = bool(distutils.util.strtobool(str(value)))
+            if str(value).lower() in ("y", "yes", "t", "true", "on", "1"):
+                value = True
+            elif str(value).lower() in ("n", "no", "f", "false", "off", "0"):
+                value = False
+            else:
+                raise ValueError(f"{env_key}={value!r} is not a valid bool.")
         settings[key] = value
     set(**settings)
 
