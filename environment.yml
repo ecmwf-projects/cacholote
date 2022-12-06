@@ -22,7 +22,6 @@ dependencies:
 - psycopg2
 - pytest-httpserver
 - pytest-postgresql
-- pytest-rerunfailures
 - python-magic
 - requests
 - s3fs

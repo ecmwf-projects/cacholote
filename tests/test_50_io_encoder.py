@@ -2,7 +2,8 @@ import importlib
 import io
 import pathlib
 import threading
-from typing import Any, Dict, Tuple, Union
+import time
+from typing import Any, Dict, List, Tuple, Union
 
 import fsspec
 import pytest
@@ -143,53 +144,52 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
-@pytest.mark.flaky(reruns=2)
-@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
-def test_io_concurrent_calls(tmpdir: pathlib.Path, set_cache: bool) -> None:
+@pytest.mark.parametrize(
+    "wait,size, mode1,mode2,warning,expected,set_cache",
+    [
+        (0.1, 0, "r", "r", "cache entry", [(2,)], "file"),
+        (0.1, 0, "r", "r", "cache entry", [(2,)], "cads"),
+        (0, 10_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
+    ],
+    indirect=["set_cache"],
+)
+def test_io_concurrent_calls(
+    tmpdir: pathlib.Path,
+    wait: float,
+    size: int,
+    mode1: str,
+    mode2: str,
+    warning: str,
+    expected: List[Any],
+    set_cache: str,
+) -> None:
+    @cache.cacheable
+    def wait_and_open(*args: Any) -> fsspec.spec.AbstractBufferedFile:
+        time.sleep(wait * 2)
+        with fsspec.open(*args) as f:
+            return f
+
     # Create file
     tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").touch(tmpfile)
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * size)
 
-    # Cached open
-    cfunc = cache.cacheable(open)
+    try:
+        # Threading
+        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1))
+        t2 = threading.Timer(wait, wait_and_open, args=(tmpfile, mode2))
+        with pytest.warns(UserWarning, match=warning):
+            t1.start()
+            t2.start()
+            t1.join()
+            t2.join()
 
-    # Threading
-    t1 = threading.Thread(target=cfunc, args=(tmpfile,))
-    t2 = threading.Thread(target=cfunc, args=(tmpfile,))
-    with pytest.warns(
-        UserWarning, match="can NOT proceed until the cache entry is unlocked"
-    ):
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
-
-    # Check hits
-    con = config.SETTINGS["engine"].raw_connection()
-    cur = con.cursor()
-    cur.execute("SELECT counter FROM cache_entries")
-    assert cur.fetchall() == [(2,)]
-
-
-def test_io_locked_files(tmpdir: pathlib.Path) -> None:
-    # Create file
-    tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").touch(tmpfile)
-
-    # Cached open
-    cfunc = cache.cacheable(open)
-
-    # Threading
-    t1 = threading.Timer(0, cfunc, args=(tmpfile, "r"))
-    t2 = threading.Timer(0.001, cfunc, args=(tmpfile, "rb"))
-    with pytest.warns(UserWarning, match="can NOT proceed until file is unlocked"):
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
-
-    # Check hits
-    con = config.SETTINGS["engine"].raw_connection()
-    cur = con.cursor()
-    cur.execute("SELECT counter FROM cache_entries")
-    assert cur.fetchall() == [(1,), (1,)]
+        # Check hits
+        con = config.SETTINGS["engine"].raw_connection()
+        cur = con.cursor()
+        cur.execute("SELECT counter FROM cache_entries")
+        assert cur.fetchall() == expected
+    finally:
+        # Cleanup
+        fsspec.filesystem("file").rm(tmpfile)
+        fs, dirname = utils.get_cache_files_fs_dirname()
+        fs.rm(dirname, recursive=True)

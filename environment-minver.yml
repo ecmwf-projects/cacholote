@@ -13,7 +13,6 @@ dependencies:
 - psycopg2
 - pytest-httpserver
 - pytest-postgresql
-- pytest-rerunfailures
 - requests
 - s3fs
 - sqlalchemy
