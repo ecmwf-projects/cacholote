@@ -19,6 +19,7 @@ import datetime
 import distutils.util
 import json
 import os
+import pathlib
 import tempfile
 from types import MappingProxyType, TracebackType
 from typing import Any, Dict, List, Optional, Type
@@ -80,10 +81,12 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
     ]
 }
 
+_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _DEFAULTS: Dict[str, Any] = {
     "use_cache": True,
-    "cache_db_urlpath": f"sqlite:///{tempfile.gettempdir()}/cacholote/cacholote.db",
-    "cache_files_urlpath": f"{tempfile.gettempdir()}/cacholote/cache_files",
+    "cache_db_urlpath": f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}",
+    "cache_files_urlpath": f"{_DEFAULT_CACHE_DIR / 'cache_files'}",
     "cache_files_urlpath_readonly": None,
     "cache_files_storage_options": {},
     "xarray_cache_type": "application/netcdf",
@@ -97,6 +100,7 @@ _DEFAULTS: Dict[str, Any] = {
 # Private and public (immutable) settings
 _SETTINGS: Dict[str, Any] = {}
 SETTINGS = MappingProxyType(_SETTINGS)
+
 
 class set:
     """Customize cacholote settings.
