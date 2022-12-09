@@ -5,8 +5,9 @@ import pathlib
 import shlex
 import subprocess
 import time
-from typing import Dict, Generator
+from typing import Any, Dict, Generator
 
+import psycopg
 import pytest
 
 from cacholote import config
@@ -48,16 +49,17 @@ def initialize_s3() -> Generator[Dict[str, str], None, None]:
 @pytest.fixture(autouse=True)
 def set_cache(
     tmpdir: pathlib.Path,
+    postgresql: psycopg.Connection[Any],
     request: pytest.FixtureRequest,
 ) -> Generator[str, None, None]:
     settings = json.loads(config.json_dumps())
-    config.set(cache_db_urlpath="sqlite:///" + str(tmpdir / "cacholote.db"))
     if not hasattr(request, "param") or request.param == "file":
         config.set(
+            cache_db_urlpath="sqlite:///" + str(tmpdir / "cacholote.db"),
             cache_files_urlpath=str(tmpdir / "cache_files"),
         )
         yield "file"
-    elif request.param == "s3":
+    elif request.param == "cads":
         pytest.importorskip("s3fs")
         botocore_session = pytest.importorskip("botocore.session")
 
@@ -67,6 +69,10 @@ def set_cache(
             client = session.create_client("s3", **client_kwargs)
             client.create_bucket(Bucket=test_bucket_name)
             config.set(
+                cache_db_urlpath=(
+                    f"postgresql+psycopg2://{postgresql.info.user}:@{postgresql.info.host}:"
+                    f"{postgresql.info.port}/{postgresql.info.dbname}"
+                ),
                 cache_files_urlpath=f"s3://{test_bucket_name}",
                 cache_files_storage_options=dict(client_kwargs=client_kwargs),
             )
