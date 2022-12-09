@@ -88,7 +88,7 @@ def test_copy_from_http_to_cache(
 ) -> None:
 
     # cache-db to check
-    con = config.SETTINGS["engine"].raw_connection()
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
 
     # http server
@@ -168,28 +168,3 @@ def test_io_concurrent_calls(
         time.sleep(wait)
         with fsspec.open(*args) as f:
             return f
-
-    # Create file
-    tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * size)
-
-    try:
-        # Threading
-        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1))
-        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2))
-        with pytest.warns(UserWarning, match=warning):
-            t1.start()
-            t2.start()
-            t1.join()
-            t2.join()
-
-        # Check hits
-        con = config.SETTINGS["engine"].raw_connection()
-        cur = con.cursor()
-        cur.execute("SELECT counter FROM cache_entries")
-        assert cur.fetchall() == expected
-    finally:
-        # Cleanup
-        fsspec.filesystem("file").rm(tmpfile)
-        fs, dirname = utils.get_cache_files_fs_dirname()
-        fs.rm(dirname, recursive=True)

@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextvars
 import datetime
 import functools
 import json
@@ -29,7 +30,9 @@ from . import clean, config, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-LAST_PRIMARY_KEYS: Dict[str, Any] = {}
+LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
+    "cacholote_last_primary_keys"
+)
 
 _LOCKER = "__locked__"
 
@@ -50,15 +53,15 @@ def _update_last_primary_keys_and_return(
     # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
-    if config.SETTINGS["tag"] is not None:
-        cache_entry.tag = config.SETTINGS["tag"]
+    if config.SETTINGS.get()["tag"] is not None:
+        cache_entry.tag = config.SETTINGS.get()["tag"]
     session.commit()
-    LAST_PRIMARY_KEYS.update(cache_entry._primary_keys)
+    LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
     return result
 
 
 def _clear_last_primary_keys_and_return(result: Any) -> Any:
-    LAST_PRIMARY_KEYS.clear()
+    LAST_PRIMARY_KEYS.set({})
     return result
 
 
@@ -99,8 +102,8 @@ def cacheable(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
-        if not config.SETTINGS["use_cache"]:
-            # Cache opt-out
+        # Cache opt-out
+        if not config.SETTINGS.get()["use_cache"]:
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
         try:
@@ -115,14 +118,14 @@ def cacheable(func: F) -> F:
             config.CacheEntry.key == hexdigest,
             config.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
-        if config.SETTINGS["expiration"]:
+        if config.SETTINGS.get()["expiration"]:
             # If expiration is provided, only get entries with matching expiration
             filters.append(
                 config.CacheEntry.expiration
-                == datetime.datetime.fromisoformat(config.SETTINGS["expiration"])
+                == datetime.datetime.fromisoformat(config.SETTINGS.get()["expiration"])
             )
         with sqlalchemy.orm.Session(
-            config.SETTINGS["engine"], autoflush=False
+            config.SETTINGS.get()["engine"], autoflush=False
         ) as session:
             for cache_entry in (
                 session.query(config.CacheEntry)
@@ -145,7 +148,7 @@ def cacheable(func: F) -> F:
                     key=hexdigest,
                     expiration=config.SETTINGS["expiration"],
                     result=_LOCKER,
-                    tag=config.SETTINGS["tag"],
+                    tag=config.SETTINGS.get()["tag"],
                 )
                 session.add(cache_entry)
                 session.commit()

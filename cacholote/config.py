@@ -15,12 +15,13 @@
 # limitations under the License.
 
 import builtins
+import contextvars
 import datetime
 import json
 import os
 import pathlib
 import tempfile
-from types import MappingProxyType, TracebackType
+from types import TracebackType
 from typing import Any, Dict, List, Optional, Type
 
 import fsspec
@@ -79,7 +80,6 @@ _ALLOWED_SETTINGS: Dict[str, List[Any]] = {
         "application/vnd+zarr",
     ]
 }
-
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _DEFAULTS: Dict[str, Any] = {
@@ -96,9 +96,10 @@ _DEFAULTS: Dict[str, Any] = {
     "engine": None,
 }
 
-# Private and public (immutable) settings
-_SETTINGS: Dict[str, Any] = {}
-SETTINGS = MappingProxyType(_SETTINGS)
+
+SETTINGS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
+    "cacholote_settings", default={}
+)
 
 
 class set:
@@ -140,7 +141,7 @@ class set:
         extra_settings = builtins.set(kwargs) - builtins.set(_DEFAULTS)
         if extra_settings:
             raise ValueError(
-                f"Wrong settings: {extra_settings!r}. Available settings: {list(_SETTINGS)!r}"
+                f"Wrong settings: {extra_settings!r}. Available settings: {list(_DEFAULTS)!r}"
             )
 
         for k in builtins.set(_ALLOWED_SETTINGS) & builtins.set(kwargs):
@@ -162,13 +163,13 @@ class set:
             kwargs["engine"] = engine
 
         # Update
-        self._old = dict(SETTINGS)
-        _SETTINGS.update(kwargs)
+        settings = {**SETTINGS.get(), **kwargs}
+        self._token = SETTINGS.set(settings)
 
         # Create cache files directory
         fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
-            SETTINGS["cache_files_urlpath"],
-            storage_options=SETTINGS["cache_files_storage_options"],
+            settings["cache_files_urlpath"],
+            storage_options=settings["cache_files_storage_options"],
         )
         fs.mkdirs(urlpath, exist_ok=True)
 
@@ -181,14 +182,14 @@ class set:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        _SETTINGS.update(self._old)
+        SETTINGS.reset(self._token)
 
 
 def json_dumps() -> str:
     """Serialize configuration to a JSON formatted string."""
-    if SETTINGS["cache_db_urlpath"] is None:
+    if SETTINGS.get()["cache_db_urlpath"] is None:
         raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
-    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})
+    return json.dumps({k: v for k, v in SETTINGS.get().items() if k != "engine"})
 
 
 def _initialize_settings() -> None:

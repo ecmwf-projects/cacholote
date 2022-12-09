@@ -1,3 +1,4 @@
+import contextvars
 import datetime
 import pathlib
 from typing import Any
@@ -30,7 +31,7 @@ def cached_error() -> None:
 
 def test_cacheable(tmpdir: pathlib.Path) -> None:
 
-    con = config.SETTINGS["engine"].raw_connection()
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
 
     cfunc = cache.cacheable(func)
@@ -74,7 +75,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.warns(UserWarning, match="can NOT encode python call"):
             res = cfunc(inst)
         assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
-        assert cache.LAST_PRIMARY_KEYS == {}
+        assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     if raise_all_encoding_errors:
         with pytest.raises(AttributeError):
@@ -83,10 +84,10 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.warns(UserWarning, match="can NOT encode output"):
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
-        assert cache.LAST_PRIMARY_KEYS == {}
+        assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     # cache-db must be empty
-    con = config.SETTINGS["engine"].raw_connection()
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
     cur.execute("SELECT * FROM cache_entries")
     assert cur.fetchall() == []
@@ -106,31 +107,31 @@ def test_use_cache(use_cache: bool) -> None:
 
     if use_cache:
         assert cached_now() == cached_now()
-        assert cache.LAST_PRIMARY_KEYS == {
+        assert cache.LAST_PRIMARY_KEYS.get() == {
             "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
             "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
         }
     else:
         assert cached_now() < cached_now()
-        assert cache.LAST_PRIMARY_KEYS == {}
+        assert cache.LAST_PRIMARY_KEYS.get() == {}
 
 
 def test_expiration() -> None:
     first = cached_now()
-    assert cache.LAST_PRIMARY_KEYS == {
+    assert cache.LAST_PRIMARY_KEYS.get() == {
         "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
 
     with config.set(expiration=datetime.datetime(1908, 3, 9)):
         assert cached_now() != first
-        assert cache.LAST_PRIMARY_KEYS == {
+        assert cache.LAST_PRIMARY_KEYS.get() == {
             "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
             "expiration": datetime.datetime(1908, 3, 9),
         }
 
     assert first == cached_now()
-    assert cache.LAST_PRIMARY_KEYS == {
+    assert cache.LAST_PRIMARY_KEYS.get() == {
         "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
@@ -162,8 +163,21 @@ def test_tag(tmpdir: pathlib.Path) -> None:
     assert cur.fetchall() == [("2", 4)]
 
 
+def test_contextvar() -> None:
+    cache.LAST_PRIMARY_KEYS.set({})
+
+    ctx = contextvars.copy_context()
+    ctx.run(cached_now)
+    assert ctx[cache.LAST_PRIMARY_KEYS] == {
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+        "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
+    }
+
+    assert cache.LAST_PRIMARY_KEYS.get() == {}
+
+
 def test_cached_error() -> None:
-    con = config.SETTINGS["engine"].raw_connection()
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
 
     with pytest.raises(ValueError, match="test error"):
