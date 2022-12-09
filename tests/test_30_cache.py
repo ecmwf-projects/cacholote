@@ -138,7 +138,7 @@ def test_expiration() -> None:
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
-    con = config.SETTINGS["engine"].raw_connection()
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
 
     cached_now()

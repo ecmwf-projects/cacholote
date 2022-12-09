@@ -146,7 +146,7 @@ def cacheable(func: F) -> F:
                 # Lock cache entry
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
-                    expiration=config.SETTINGS["expiration"],
+                    expiration=config.SETTINGS.get()["expiration"],
                     result=_LOCKER,
                     tag=config.SETTINGS.get()["tag"],
                 )

@@ -21,7 +21,7 @@ def test_clean_cache_files(
     method: Literal["LRU", "LFU"],
 ) -> None:
 
-    con = config.SETTINGS["engine"].raw_connection()
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()
 

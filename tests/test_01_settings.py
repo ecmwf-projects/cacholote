@@ -11,7 +11,7 @@ from cacholote import config
 
 
 def test_set_engine(tmpdir: pathlib.Path) -> None:
-    old_db = config.SETTINGS["cache_db_urlpath"]
+    old_db = config.SETTINGS.get()["cache_db_urlpath"]
     new_db = "sqlite:///" + str(tmpdir / "dummy.db")
     old_engine = config.SETTINGS.get()["engine"]
     new_engine = sqlalchemy.create_engine(new_db, echo=True, future=True)
@@ -41,7 +41,7 @@ def test_set_engine(tmpdir: pathlib.Path) -> None:
 
 
 def test_change_settings(tmpdir: pathlib.Path) -> None:
-    old_db = config.SETTINGS["cache_db_urlpath"]
+    old_db = config.SETTINGS.get()["cache_db_urlpath"]
     new_db = "sqlite:///" + str(tmpdir / "dummy.db")
 
     with config.set(cache_db_urlpath=new_db):

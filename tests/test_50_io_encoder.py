@@ -173,10 +173,11 @@ def test_io_concurrent_calls(
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"1" * size)
 
+    settings = config.SETTINGS
     try:
         # Threading
-        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1))
-        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2))
+        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1, settings))
+        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2, settings))
         with pytest.warns(UserWarning, match=warning):
             t1.start()
             t2.start()
@@ -184,7 +185,7 @@ def test_io_concurrent_calls(
             t2.join()
 
         # Check hits
-        con = config.SETTINGS["engine"].raw_connection()
+        con = config.SETTINGS.get()["engine"].raw_connection()
         cur = con.cursor()
         cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == expected
