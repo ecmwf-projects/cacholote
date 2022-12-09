@@ -1,7 +1,6 @@
 import contextvars
 import datetime
 import pathlib
-import sqlite3
 from typing import Any
 
 import pytest
@@ -25,9 +24,14 @@ def cached_now() -> datetime.datetime:
     return datetime.datetime.now()
 
 
+@cache.cacheable
+def cached_error() -> None:
+    raise ValueError("test error")
+
+
 def test_cacheable(tmpdir: pathlib.Path) -> None:
 
-    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
 
     cfunc = cache.cacheable(func)
@@ -83,7 +87,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     # cache-db must be empty
-    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    con = config.SETTINGS.get()["engine"].raw_connection()
     cur = con.cursor()
     cur.execute("SELECT * FROM cache_entries")
     assert cur.fetchall() == []
@@ -134,7 +138,7 @@ def test_expiration() -> None:
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
-    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
+    con = config.SETTINGS["engine"].raw_connection()
     cur = con.cursor()
 
     cached_now()
@@ -170,3 +174,14 @@ def test_contextvar() -> None:
     }
 
     assert cache.LAST_PRIMARY_KEYS.get() == {}
+
+
+def test_cached_error() -> None:
+    con = config.SETTINGS.get()["engine"].raw_connection()
+    cur = con.cursor()
+
+    with pytest.raises(ValueError, match="test error"):
+        cached_error()
+
+    cur.execute("SELECT * FROM cache_entries")
+    assert cur.fetchall() == []

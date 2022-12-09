@@ -34,23 +34,22 @@ LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
     "cacholote_last_primary_keys"
 )
 
-_LOCKER = None
+_LOCKER = "__locked__"
 
 
 def _update_last_primary_keys_and_return(
     session: sqlalchemy.orm.Session, cache_entry: Any
 ) -> Any:
-    if _LOCKER:
-        # Wait until unlocked
-        warned = False
-        while cache_entry.result == _LOCKER:
-            session.refresh(cache_entry)
-            if not warned:
-                warnings.warn(
-                    f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
-                )
-                warned = True
-            time.sleep(1)
+    # Wait until unlocked
+    warned = False
+    while cache_entry.result == _LOCKER:
+        session.refresh(cache_entry)
+        if not warned:
+            warnings.warn(
+                f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
+            )
+            warned = True
+        time.sleep(1)
     # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
@@ -71,7 +70,6 @@ def _delete_cache_entry(
 ) -> None:
     session.delete(cache_entry)
     session.commit()
-
     # Delete cache file
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
@@ -108,13 +106,9 @@ def cacheable(func: F) -> F:
         if not config.SETTINGS.get()["use_cache"]:
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
-        # Key defining the function and its arguments
         try:
-            hexdigest = hexdigestify_python_call(
-                func,
-                *args,
-                **kwargs,
-            )
+            # Get key
+            hexdigest = hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
@@ -138,6 +132,7 @@ def cacheable(func: F) -> F:
                 .filter(*filters)
                 .order_by(config.CacheEntry.timestamp.desc())
             ):
+                # Attempt all valid cache entries
                 try:
                     return _update_last_primary_keys_and_return(session, cache_entry)
                 except decode.DecodeError as ex:
@@ -146,19 +141,19 @@ def cacheable(func: F) -> F:
                     _delete_cache_entry(session, cache_entry)
 
             # Not in the cache
+            cache_entry = None
             try:
-                if _LOCKER:
-                    # Lock cache entry
-                    cache_entry = config.CacheEntry(
-                        key=hexdigest,
-                        expiration=config.SETTINGS.get()["expiration"],
-                        result=_LOCKER,
-                        tag=config.SETTINGS.get()["tag"],
-                    )
-                    session.add(cache_entry)
-                    session.commit()
+                # Lock cache entry
+                cache_entry = config.CacheEntry(
+                    key=hexdigest,
+                    expiration=config.SETTINGS["expiration"],
+                    result=_LOCKER,
+                    tag=config.SETTINGS.get()["tag"],
+                )
+                session.add(cache_entry)
+                session.commit()
             except sqlalchemy.exc.IntegrityError:
-                # Concurrent job: This cache entry already exist.
+                # Concurrent job: This cache entry already exists.
                 filters = [
                     config.CacheEntry.key == cache_entry.key,
                     config.CacheEntry.expiration == cache_entry.expiration,
@@ -166,30 +161,20 @@ def cacheable(func: F) -> F:
                 session.rollback()
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
                 return _update_last_primary_keys_and_return(session, cache_entry)
-
-            # Compute result from scratch and unlock
-            result = func(*args, **kwargs)
-            try:
-                json_result = json.loads(encode.dumps(result))
-                if _LOCKER:
-                    cache_entry.result = json_result
-                else:
-                    cache_entry = config.CacheEntry(
-                        key=hexdigest,
-                        expiration=config.SETTINGS.get()["expiration"],
-                        result=json_result,
-                        tag=config.SETTINGS.get()["tag"],
-                        counter=0,
-                    )
-                    session.add(cache_entry)
-                    session.commit()
-                return _update_last_primary_keys_and_return(session, cache_entry)
-            except Exception as ex:
-                if _LOCKER:
+            else:
+                # Compute result from scratch
+                result = func(*args, **kwargs)
+                try:
+                    # Update cache
+                    cache_entry.result = json.loads(encode.dumps(result))
+                    return _update_last_primary_keys_and_return(session, cache_entry)
+                except encode.EncodeError as ex:
+                    # Enconding error, return result without caching
+                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                    return _clear_last_primary_keys_and_return(result)
+            finally:
+                # Unlock
+                if cache_entry and cache_entry.result == _LOCKER:
                     _delete_cache_entry(session, cache_entry)
-                if not isinstance(ex, encode.EncodeError):
-                    raise ex
-                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                return _clear_last_primary_keys_and_return(result)
 
     return cast(F, wrapper)

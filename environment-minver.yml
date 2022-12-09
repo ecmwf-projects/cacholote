@@ -8,8 +8,11 @@ dependencies:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - aiohttp
 - moto
+- postgresql
+- psycopg
+- psycopg2
 - pytest-httpserver
-- pytest-rerunfailures
+- pytest-postgresql
 - requests
 - s3fs
 - sqlalchemy
