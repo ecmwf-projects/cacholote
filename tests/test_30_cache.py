@@ -185,3 +185,8 @@ def test_cached_error() -> None:
 
     cur.execute("SELECT * FROM cache_entries")
     assert cur.fetchall() == []
+
+
+def test_context_argument() -> None:
+    ctx = contextvars.copy_context()
+    assert cached_now() == cached_now(ctx) == cached_now(ctx=ctx)  # type: ignore[call-arg]

@@ -1,3 +1,4 @@
+import contextvars
 import importlib
 import io
 import pathlib
@@ -164,20 +165,20 @@ def test_io_concurrent_calls(
     set_cache: str,
 ) -> None:
     @cache.cacheable
-    def wait_and_open(*args: Any) -> fsspec.spec.AbstractBufferedFile:
+    def wait_and_open(urlpath: str, mode: str) -> fsspec.spec.AbstractBufferedFile:
         time.sleep(wait)
-        with fsspec.open(*args) as f:
+        with fsspec.open(urlpath, mode) as f:
             return f
 
     # Create file
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"1" * size)
 
-    settings = config.SETTINGS
+    ctx = contextvars.copy_context()
     try:
         # Threading
-        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1, settings))
-        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2, settings))
+        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1, ctx))
+        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2, ctx))
         with pytest.warns(UserWarning, match=warning):
             t1.start()
             t2.start()

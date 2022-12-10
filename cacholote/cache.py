@@ -21,7 +21,7 @@ import functools
 import json
 import time
 import warnings
-from typing import Any, Callable, Dict, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Tuple, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -74,6 +74,30 @@ def _delete_cache_entry(
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
 
+def _set_context(context: contextvars.Context) -> None:
+    for key, value in context.items():
+        key.set(value)
+
+
+def _apply_and_pop_context(
+    args: Tuple[Any, ...], kwargs: Dict[str, Any]
+) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+    for arg in args:
+        if isinstance(arg, contextvars.Context):
+            _set_context(arg)
+            argslist = list(args)
+            argslist.remove(arg)
+            return tuple(argslist), kwargs
+
+    for key, value in kwargs.items():
+        if isinstance(value, contextvars.Context):
+            _set_context(value)
+            kwargs.pop(key)
+            return args, kwargs
+
+    return args, kwargs
+
+
 def hexdigestify_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
@@ -102,6 +126,8 @@ def cacheable(func: F) -> F:
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        args, kwargs = _apply_and_pop_context(args, kwargs)
+
         # Cache opt-out
         if not config.SETTINGS.get()["use_cache"]:
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
