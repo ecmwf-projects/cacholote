@@ -70,33 +70,33 @@ class _Locker:
     def __init__(self, fs: fsspec.AbstractFileSystem, urlpath: str) -> None:
         self.fs = fs
         self.urlpath = urlpath
-        self.locker = urlpath + ".lock"
+        self.lockfile = urlpath + ".lock"
 
     @property
     def file_exists(self) -> bool:
         return bool(self.fs.exists(self.urlpath))
 
-    def lock(self) -> None:
-        self.fs.touch(self.locker)
+    def acquire(self) -> None:
+        self.fs.touch(self.lockfile)
 
-    def unlock(self) -> None:
-        if self.fs.exists(self.locker):
-            self.fs.rm(self.locker)
+    def release(self) -> None:
+        if self.fs.exists(self.lockfile):
+            self.fs.rm(self.lockfile)
 
-    def wait_until_unlocked(self) -> None:
+    def wait_until_released(self) -> None:
         warned = False
-        while self.fs.exists(self.locker):
+        while self.fs.exists(self.lockfile):
             if not warned:
                 warnings.warn(
-                    f"can NOT proceed until file is unlocked: {self.locker!r}.",
+                    f"can NOT proceed until file is released: {self.lockfile!r}.",
                     UserWarning,
                 )
                 warned = True
             time.sleep(1)
 
     def __enter__(self) -> bool:
-        self.wait_until_unlocked()
-        self.lock()
+        self.wait_until_released()
+        self.acquire()
         return self.file_exists
 
     def __exit__(
@@ -105,4 +105,4 @@ class _Locker:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        self.unlock()
+        self.release()
