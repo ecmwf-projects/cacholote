@@ -27,7 +27,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
     # Define readonly dir
-    readonly_dir = tmpdir / "readonly"
+    readonly_dir = str(tmpdir / "readonly")
     fsspec.filesystem("file").mkdir(readonly_dir)
     config.set(cache_files_urlpath_readonly=readonly_dir)
 

@@ -21,7 +21,7 @@ def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
 @pytest.mark.parametrize("io_delete_original", [True, False])
 def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> None:
     # Define readonly dir
-    readonly_dir = tmpdir / "readonly"
+    readonly_dir = str(tmpdir / "readonly")
     fsspec.filesystem("file").mkdir(readonly_dir)
     config.set(
         io_delete_original=io_delete_original, cache_files_urlpath_readonly=readonly_dir

@@ -137,21 +137,26 @@ class set:
     """
 
     def __init__(self, **kwargs: Any):
+        old_settings = SETTINGS.get()
+
+        self._reset_engine = False
+        cache_db_urlpath = kwargs.get("cache_db_urlpath")
+        if (
+            cache_db_urlpath
+            and old_settings.get("cache_db_urlpath") != cache_db_urlpath
+        ):
+            # Create engine
+            engine = sqlalchemy.create_engine(cache_db_urlpath, future=True)
+            Base.metadata.create_all(engine)
+            self._engine_token = ENGINE.set(engine)
+            self._reset_engine = True
 
         if hasattr(kwargs.get("expiration"), "isoformat"):
             # Store datetime as string
             kwargs["expiration"] = kwargs["expiration"].isoformat()
 
-        # Cache DB
-        self._reset_engine = False
-        if "cache_db_urlpath" in kwargs:
-            engine = sqlalchemy.create_engine(kwargs["cache_db_urlpath"], future=True)
-            Base.metadata.create_all(engine)
-            self._reset_engine = True
-            self._engine_token = ENGINE.set(engine)
-
-        # Update
-        settings = {**SETTINGS.get(), **kwargs}
+        # Update settings
+        settings = Settings(**{**old_settings, **kwargs}).dict()
         self._settings_token = SETTINGS.set(settings)
 
         # Create cache files directory
