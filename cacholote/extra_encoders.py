@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import functools
 import inspect
 import io
@@ -27,6 +26,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
+import pydantic
 
 from . import config, encode, utils
 
@@ -55,11 +55,16 @@ _UNION_IO_TYPES = Union[
     fsspec.implementations.local.LocalFileOpener,
 ]
 
-# Add netcdf, grib, and zarr to mimetypes
-mimetypes.add_type("application/netcdf", ".nc", strict=True)
-for ext in (".grib", ".grb", ".grb1", ".grb2"):
-    mimetypes.add_type("application/x-grib", ext, strict=False)
-mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
+
+def _add_ext_to_mimetypes() -> None:
+    """Add netcdf, grib, and zarr to mimetypes."""
+    mimetypes.add_type("application/netcdf", ".nc", strict=True)
+    for ext in (".grib", ".grb", ".grb1", ".grb2"):
+        mimetypes.add_type("application/x-grib", ext, strict=False)
+    mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
+
+
+_add_ext_to_mimetypes()
 
 
 def _requires_xarray_and_dask(func: F) -> F:
@@ -72,6 +77,14 @@ def _requires_xarray_and_dask(func: F) -> F:
         return func(*args, **kwargs)
 
     return cast(F, wrapper)
+
+
+class FileInfoModel(pydantic.BaseModel):
+    type: str
+    href: str
+    file_checksum: int = pydantic.Field(..., alias="file:checksum")
+    file_size: int = pydantic.Field(..., alias="file:size")
+    file_local_path: str = pydantic.Field(..., alias="file:local_path")
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
@@ -96,7 +109,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
         "file:local_path": local_path,
     }
 
-    return file_dict
+    return FileInfoModel(**file_dict).dict(by_alias=True)
 
 
 def _get_fs_and_urlpath(
