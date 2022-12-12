@@ -21,7 +21,7 @@ import functools
 import json
 import time
 import warnings
-from typing import Any, Callable, Dict, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -74,30 +74,6 @@ def _delete_cache_entry(
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
 
-def _set_context(context: contextvars.Context) -> None:
-    for key, value in context.items():
-        key.set(value)
-
-
-def _apply_and_pop_context(
-    args: Tuple[Any, ...], kwargs: Dict[str, Any]
-) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
-    for arg in args:
-        if isinstance(arg, contextvars.Context):
-            _set_context(arg)
-            argslist = list(args)
-            argslist.remove(arg)
-            return tuple(argslist), kwargs
-
-    for key, value in kwargs.items():
-        if isinstance(value, contextvars.Context):
-            _set_context(value)
-            kwargs.pop(key)
-            return args, kwargs
-
-    return args, kwargs
-
-
 def hexdigestify_python_call(
     func: Union[str, Callable[..., Any]],
     *args: Any,
@@ -122,11 +98,19 @@ def hexdigestify_python_call(
 
 
 def cacheable(func: F) -> F:
-    """Make a function cacheable."""
+    """Make a function cacheable.
+
+    The __context__ argument allows to set the `contextvars.Context`.
+    __context__ is not passed to the wrapped function.
+    """
 
     @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        args, kwargs = _apply_and_pop_context(args, kwargs)
+    def wrapper(
+        *args: Any, __context__: Optional[contextvars.Context] = None, **kwargs: Any
+    ) -> Any:
+        if __context__:
+            for key, value in __context__.items():
+                key.set(value)
 
         # Cache opt-out
         if not config.SETTINGS.get()["use_cache"]:

@@ -177,8 +177,12 @@ def test_io_concurrent_calls(
     ctx = contextvars.copy_context()
     try:
         # Threading
-        t1 = threading.Timer(0, wait_and_open, args=(tmpfile, mode1, ctx))
-        t2 = threading.Timer(wait / 2, wait_and_open, args=(tmpfile, mode2, ctx))
+        t1 = threading.Timer(
+            0, wait_and_open, args=(tmpfile, mode1), kwargs={"__context__": ctx}
+        )
+        t2 = threading.Timer(
+            wait / 2, wait_and_open, args=(tmpfile, mode2), kwargs={"__context__": ctx}
+        )
         with pytest.warns(UserWarning, match=warning):
             t1.start()
             t2.start()

@@ -189,4 +189,4 @@ def test_cached_error() -> None:
 
 def test_context_argument() -> None:
     ctx = contextvars.copy_context()
-    assert cached_now() == cached_now(ctx) == cached_now(ctx=ctx)  # type: ignore[call-arg]
+    assert cached_now() == cached_now(__context__=ctx)  # type: ignore[call-arg]
