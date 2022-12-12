@@ -150,7 +150,7 @@ def test_io_corrupted_files(
     [
         (0.2, 0, 0, "r", "r", "cache entry", [(2,)], "file"),
         (0.2, 0, 0, "r", "r", "cache entry", [(2,)], "cads"),
-        (0, 1.0e-5, 1_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
+        (0, 1.0e-5, 10_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
     ],
     indirect=["set_cache"],
 )
