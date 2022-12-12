@@ -21,7 +21,7 @@ def test_clean_cache_files(
     method: Literal["LRU", "LFU"],
 ) -> None:
 
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -41,13 +41,13 @@ def test_clean_cache_files(
 
     # Do not clean
     clean.clean_cache_files(2, method=method)
-    cur.execute("SELECT * FROM cache_entries")
+    cur.execute("SELECT * FROM cache_entries", ())
     nrows = len(cur.fetchall())
     assert nrows == fs.du(dirname) == 2
 
     # Delete one file
     clean.clean_cache_files(1, method=method)
-    cur.execute("SELECT * FROM cache_entries")
+    cur.execute("SELECT * FROM cache_entries", ())
     nrows = len(cur.fetchall())
     assert nrows == fs.du(dirname) == 1
     assert not fs.exists(f"{dirname}/{checksums[method]}.txt")

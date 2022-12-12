@@ -31,7 +31,7 @@ def cached_error() -> None:
 
 def test_cacheable(tmpdir: pathlib.Path) -> None:
 
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     cfunc = cache.cacheable(func)
@@ -42,7 +42,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
         after = datetime.datetime.utcnow()
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
 
-        cur.execute("SELECT key, expiration, result, counter FROM cache_entries")
+        cur.execute("SELECT key, expiration, result, counter FROM cache_entries", ())
         assert cur.fetchall() == [
             (
                 "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
@@ -52,8 +52,8 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
             )
         ]
 
-        cur.execute("SELECT timestamp FROM cache_entries")
-        (timestamp,) = cur.fetchone()
+        cur.execute("SELECT timestamp FROM cache_entries", ())
+        (timestamp,) = cur.fetchone() or []
         assert before < datetime.datetime.fromisoformat(timestamp) < after
 
 
@@ -87,9 +87,9 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     # cache-db must be empty
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
-    cur.execute("SELECT * FROM cache_entries")
+    cur.execute("SELECT * FROM cache_entries", ())
     assert cur.fetchall() == []
 
 
@@ -138,28 +138,28 @@ def test_expiration() -> None:
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     cached_now()
-    cur.execute("SELECT tag, counter FROM cache_entries")
+    cur.execute("SELECT tag, counter FROM cache_entries", ())
     assert cur.fetchall() == [(None, 1)]
 
     with config.set(tag="1"):
         cached_now()
-    cur.execute("SELECT tag, counter FROM cache_entries")
+    cur.execute("SELECT tag, counter FROM cache_entries", ())
     assert cur.fetchall() == [("1", 2)]
 
     with config.set(tag="2"):
         # Overwrite
         cached_now()
-    cur.execute("SELECT tag, counter FROM cache_entries")
+    cur.execute("SELECT tag, counter FROM cache_entries", ())
     assert cur.fetchall() == [("2", 3)]
 
     with config.set(tag=None):
         # Do not overwrite if None
         cached_now()
-    cur.execute("SELECT tag, counter FROM cache_entries")
+    cur.execute("SELECT tag, counter FROM cache_entries", ())
     assert cur.fetchall() == [("2", 4)]
 
 
@@ -177,13 +177,13 @@ def test_contextvar() -> None:
 
 
 def test_cached_error() -> None:
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     with pytest.raises(ValueError, match="test error"):
         cached_error()
 
-    cur.execute("SELECT * FROM cache_entries")
+    cur.execute("SELECT * FROM cache_entries", ())
     assert cur.fetchall() == []
 
 

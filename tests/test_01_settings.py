@@ -1,72 +1,37 @@
 import contextvars
 import datetime
-import json
 import os
 import pathlib
-
-import pytest
-import sqlalchemy
 
 from cacholote import config
 
 
-def test_set_engine(tmpdir: pathlib.Path) -> None:
+def test_change_engine(tmpdir: pathlib.Path) -> None:
     old_db = config.SETTINGS.get()["cache_db_urlpath"]
     new_db = "sqlite:///" + str(tmpdir / "dummy.db")
-    old_engine = config.SETTINGS.get()["engine"]
-    new_engine = sqlalchemy.create_engine(new_db, echo=True, future=True)
-    assert old_engine is not new_engine
-
-    with config.set(engine=new_engine):
-        assert config.SETTINGS.get()["engine"] is new_engine
-        assert config.SETTINGS.get()["cache_db_urlpath"] is None
-    assert config.SETTINGS.get()["engine"] is old_engine
-    assert config.SETTINGS.get()["cache_db_urlpath"] == old_db
-
-    config.set(engine=new_engine)
-    assert config.SETTINGS.get()["engine"] is new_engine
-    assert config.SETTINGS.get()["cache_db_urlpath"] is None
-
-    with pytest.raises(
-        ValueError,
-        match=r"'engine' and 'cache_db_urlpath' are mutually exclusive",
-    ):
-        config.set(engine=new_engine, cache_db_urlpath=new_db)
-
-    with pytest.raises(
-        ValueError,
-        match=r"Can NOT dump to JSON when `engine` has been directly set.",
-    ):
-        config.json_dumps()
-
-
-def test_change_settings(tmpdir: pathlib.Path) -> None:
-    old_db = config.SETTINGS.get()["cache_db_urlpath"]
-    new_db = "sqlite:///" + str(tmpdir / "dummy.db")
+    old_engine = config.ENGINE.get()
 
     with config.set(cache_db_urlpath=new_db):
-        assert str(config.SETTINGS.get()["engine"].url) == new_db
-    assert str(config.SETTINGS.get()["engine"].url) == old_db
+        assert config.ENGINE.get() is not old_engine
+        assert (
+            str(config.ENGINE.get().url)
+            == config.SETTINGS.get()["cache_db_urlpath"]
+            == new_db
+        )
+    assert config.ENGINE.get() is old_engine
+    assert (
+        str(config.ENGINE.get().url)
+        == config.SETTINGS.get()["cache_db_urlpath"]
+        == old_db
+    )
 
     config.set(cache_db_urlpath=new_db)
-    assert str(config.SETTINGS.get()["engine"].url) == new_db
-
-    with pytest.raises(
-        ValueError, match="Wrong settings: {'dummy'}. Available settings: "
-    ):
-        config.set(dummy="dummy")
-
-
-def test_json_dumps() -> None:
-    old_settings = dict(config.SETTINGS.get())
-    json_settings = json.loads(config.json_dumps())
-
-    with config.set(**json_settings):
-        new_settings = dict(config.SETTINGS.get())
-        assert old_settings["engine"].url == config.SETTINGS.get()["engine"].url
-        assert new_settings.pop("engine") != old_settings.pop("engine")
-        assert old_settings == new_settings
-        assert json.loads(config.json_dumps()) == json_settings
+    assert config.ENGINE.get() is not old_engine
+    assert (
+        str(config.ENGINE.get().url)
+        == config.SETTINGS.get()["cache_db_urlpath"]
+        == new_db
+    )
 
 
 def test_expiration() -> None:
@@ -77,19 +42,22 @@ def test_expiration() -> None:
         assert config.SETTINGS.get()["expiration"] == "1492-10-12T00:00:00"
 
 
-def test_env_variables() -> None:
+def test_env_variables(tmpdir: pathlib.Path) -> None:
+    # env variables
     old_environ = dict(os.environ)
-    os.environ.update(
-        {
-            "CACHOLOTE_CACHE_DB_URLPATH": "sqlite://",
-            "CACHOLOTE_IO_DELETE_ORIGINAL": "TRUE",
-        }
-    )
-    config._initialize_settings()
+    os.environ["CACHOLOTE_CACHE_DB_URLPATH"] = "sqlite://"
+
+    # env file
+    dotenv_path = tmpdir / ".env.cacholote"
+    with dotenv_path.open("w") as f:
+        f.write("CACHOLOTE_IO_DELETE_ORIGINAL=TRUE")
+
+    config.initialize_settings(str(dotenv_path))
     try:
         assert config.SETTINGS.get()["cache_db_urlpath"] == "sqlite://"
+        assert str(config.ENGINE.get().url) == "sqlite://"
         assert config.SETTINGS.get()["io_delete_original"] is True
-        assert str(config.SETTINGS.get()["engine"].url) == "sqlite://"
+        assert str(config.ENGINE.get().url) == "sqlite://"
     finally:
         os.environ.clear()
         os.environ.update(old_environ)

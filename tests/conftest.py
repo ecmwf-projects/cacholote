@@ -1,5 +1,4 @@
 import contextlib
-import json
 import os
 import pathlib
 import shlex
@@ -52,7 +51,7 @@ def set_cache(
     postgresql: psycopg.Connection[Any],
     request: pytest.FixtureRequest,
 ) -> Generator[str, None, None]:
-    settings = json.loads(config.json_dumps())
+    config.initialize_settings()
     if not hasattr(request, "param") or request.param == "file":
         config.set(
             cache_db_urlpath="sqlite:///" + str(tmpdir / "cacholote.db"),
@@ -78,7 +77,5 @@ def set_cache(
             )
             yield request.param
     else:
-        config.set(**settings)
         raise ValueError
-
-    config.set(**settings)
+    config.initialize_settings()

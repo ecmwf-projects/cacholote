@@ -89,7 +89,7 @@ def test_copy_from_http_to_cache(
 ) -> None:
 
     # cache-db to check
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     # http server
@@ -104,7 +104,7 @@ def test_copy_from_http_to_cache(
         result = cfunc(url)
 
         # Check hits
-        cur.execute("SELECT counter FROM cache_entries")
+        cur.execute("SELECT counter FROM cache_entries", ())
         assert cur.fetchall() == [(expected_counter,)]
 
         # Check result
@@ -146,17 +146,18 @@ def test_io_corrupted_files(
 
 
 @pytest.mark.parametrize(
-    "wait,size, mode1,mode2,warning,expected,set_cache",
+    "wait,lag,size,mode1,mode2,warning,expected,set_cache",
     [
-        (0.2, 0, "r", "r", "cache entry", [(2,)], "file"),
-        (0.2, 0, "r", "r", "cache entry", [(2,)], "cads"),
-        (0, 10_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
+        (0.2, 0, 0, "r", "r", "cache entry", [(2,)], "file"),
+        (0.2, 0, 0, "r", "r", "cache entry", [(2,)], "cads"),
+        (0, 1.0e-5, 1_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
     ],
     indirect=["set_cache"],
 )
 def test_io_concurrent_calls(
     tmpdir: pathlib.Path,
     wait: float,
+    lag: float,
     size: int,
     mode1: str,
     mode2: str,
@@ -181,7 +182,10 @@ def test_io_concurrent_calls(
             0, wait_and_open, args=(tmpfile, mode1), kwargs={"__context__": ctx}
         )
         t2 = threading.Timer(
-            wait / 2, wait_and_open, args=(tmpfile, mode2), kwargs={"__context__": ctx}
+            (wait / 2) + lag,
+            wait_and_open,
+            args=(tmpfile, mode2),
+            kwargs={"__context__": ctx},
         )
         with pytest.warns(UserWarning, match=warning):
             t1.start()
@@ -190,9 +194,9 @@ def test_io_concurrent_calls(
             t2.join()
 
         # Check hits
-        con = config.SETTINGS.get()["engine"].raw_connection()
+        con = config.ENGINE.get().raw_connection()
         cur = con.cursor()
-        cur.execute("SELECT counter FROM cache_entries")
+        cur.execute("SELECT counter FROM cache_entries", ())
         assert cur.fetchall() == expected
     finally:
         # Cleanup

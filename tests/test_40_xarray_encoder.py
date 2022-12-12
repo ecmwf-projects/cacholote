@@ -87,7 +87,7 @@ def test_xr_cacheable(
     config.set(xarray_cache_type=xarray_cache_type)
 
     # cache-db to check
-    con = config.SETTINGS.get()["engine"].raw_connection()
+    con = config.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     expected = get_grib_ds()
@@ -97,7 +97,7 @@ def test_xr_cacheable(
         actual = cfunc()
 
         # Check hits
-        cur.execute("SELECT counter FROM cache_entries")
+        cur.execute("SELECT counter FROM cache_entries", ())
         assert cur.fetchall() == [(expected_counter,)]
 
         # Check result
