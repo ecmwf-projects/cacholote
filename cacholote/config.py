@@ -185,8 +185,10 @@ def initialize_settings(
 ) -> None:
     """Initialize settings.
 
-    Values can be set through environment variables ("CACHOLOTE_*") or dotenv files.
-    Environment variables take priority over values loaded from a dotenv file.
+    Priority:
+    1. Evironment variables with prefix `CACHOLOTE_`
+    2. Dotenv files
+    3. Cacholote defaults
 
     Parameters
     ----------
