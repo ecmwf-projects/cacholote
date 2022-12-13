@@ -100,6 +100,7 @@ class Settings(pydantic.BaseSettings):
     tag: Optional[str] = None
 
     class Config:
+        case_sensitive = False
         env_prefix = "cacholote_"
 
 
