@@ -193,7 +193,7 @@ def initialize_settings(
     Parameters
     ----------
     env_file: str, tuple[str], default=(".env", ".env.cacholote")
-        Dot env files. By defult, `.env.cacholote` takes priority over `.env`.
+        Dot env files. By default, `.env.cacholote` takes priority over `.env`.
     """
     _DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     set(**Settings(_env_file=env_file).dict())
