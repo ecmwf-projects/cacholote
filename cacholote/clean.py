@@ -47,13 +47,13 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                logging.info("Deleting cache entry: %s", cache_entry)
+                logging.info("Deleting cache entry: %r", cache_entry)
                 session.delete(cache_entry)
                 session.commit()
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
-                        logging.info("Deleting %s", urlpath)
+                        logging.info("Deleting %r", urlpath)
                         fs.rm(urlpath, recursive=True)
 
     return obj
@@ -74,7 +74,7 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
-        logging.info("Size of %s: %s", self.dirname, size)
+        logging.info("Size of %r: %r", self.dirname, size)
         return size <= maxsize
 
     @property
@@ -106,7 +106,7 @@ class _Cleaner:
             self.sizes.pop(urlpath)
             with utils._Locker(self.fs, urlpath) as file_exists:
                 if file_exists:
-                    logging.info("Deleting %s", urlpath)
+                    logging.info("Deleting %r", urlpath)
                     self.fs.rm(urlpath)
 
     @staticmethod
