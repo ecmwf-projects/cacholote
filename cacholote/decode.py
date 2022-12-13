@@ -40,6 +40,7 @@ class DecodeError(Exception):
 def decode_python_object(obj: Dict[str, Any]) -> Any:
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
+    return None
 
 
 def decode_python_call(obj: Dict[str, Any]) -> Any:
@@ -51,6 +52,7 @@ def decode_python_call(obj: Dict[str, Any]) -> Any:
         args = obj.get("args", ())
         kwargs = obj.get("kwargs", {})
         return func(*args, **kwargs)
+    return None
 
 
 FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
@@ -67,7 +69,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
             if result is not None:
                 return result
         except Exception as ex:
-            raise DecodeError(ex)
+            raise DecodeError(ex) from ex
 
     return obj
 

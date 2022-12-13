@@ -78,7 +78,7 @@ def test_dictify_bytes_io_object(
         {},
     )
     assert actual == expected
-    assert open(local_path, "r").read() == "test"
+    assert open(local_path).read() == "test"
 
 
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)

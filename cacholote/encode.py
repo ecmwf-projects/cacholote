@@ -64,9 +64,9 @@ def dictify_python_call(
         "callable": callable_fqn,
     }
 
-    callable = decode.import_object(callable_fqn) if isinstance(func, str) else func
+    callable_obj = decode.import_object(callable_fqn) if isinstance(func, str) else func
     try:
-        sig = inspect.signature(callable)
+        sig = inspect.signature(callable_obj)
     except ValueError:
         # No signature available
         pass
@@ -168,8 +168,8 @@ def dumps(
     -------
     str
     """
-    for k, v in _JSON_DUMPS_KWARGS.items():
-        kwargs.setdefault(k, v)
+    for key, value in _JSON_DUMPS_KWARGS.items():
+        kwargs.setdefault(key, value)
     kwargs.setdefault("default", filecache_default)
 
     return json.dumps(obj, **kwargs)
