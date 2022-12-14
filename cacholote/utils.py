@@ -36,8 +36,8 @@ def hexdigestify(text: str) -> str:
 def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
     """Return the ``fsspec`` filesystem and directory name where cache files are stored."""
     fs, _, (path,) = fsspec.get_fs_token_paths(
-        config.SETTINGS.get()["cache_files_urlpath"],
-        storage_options=config.SETTINGS.get()["cache_files_storage_options"],
+        config.SETTINGS.get().cache_files_urlpath,
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
     )
     return (fs, path)
 

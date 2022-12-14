@@ -100,8 +100,8 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     file_dict = {
         "type": filetype,
         "href": posixpath.join(
-            config.SETTINGS.get()["cache_files_urlpath_readonly"]
-            or config.SETTINGS.get()["cache_files_urlpath"],
+            config.SETTINGS.get().cache_files_urlpath_readonly
+            or config.SETTINGS.get().cache_files_urlpath,
             posixpath.basename(local_path),
         ),
         "file:checksum": fs.checksum(local_path),
@@ -120,7 +120,7 @@ def _get_fs_and_urlpath(
 
     urlpath = file_json["file:local_path"]
     if storage_options is None:
-        storage_options = config.SETTINGS.get()["cache_files_storage_options"]
+        storage_options = config.SETTINGS.get().cache_files_storage_options
 
     if not validate:
         fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
@@ -225,15 +225,15 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
 
-    filetype = config.SETTINGS.get()["xarray_cache_type"]
+    filetype = config.SETTINGS.get().xarray_cache_type
     ext = mimetypes.guess_extension(filetype, strict=False)
     urlpath_out = posixpath.join(
-        config.SETTINGS.get()["cache_files_urlpath"], f"{root}{ext}"
+        config.SETTINGS.get().cache_files_urlpath, f"{root}{ext}"
     )
 
     fs_out, _, _ = fsspec.get_fs_token_paths(
         urlpath_out,
-        storage_options=config.SETTINGS.get()["cache_files_storage_options"],
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
     )
     _maybe_store_xr_dataset(obj, fs_out, urlpath_out, filetype)
 
@@ -250,7 +250,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     return encode.dictify_python_call(
         decode_xr_dataset,
         file_json,
-        storage_options=config.SETTINGS.get()["cache_files_storage_options"],
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
         **kwargs,
     )
 
@@ -264,7 +264,7 @@ def _maybe_store_file_object(
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             if fs_in == fs_out:
-                if config.SETTINGS.get()["io_delete_original"]:
+                if config.SETTINGS.get().io_delete_original:
                     fs_in.mv(urlpath_in, urlpath_out)
                 else:
                     fs_in.cp(urlpath_in, urlpath_out)
@@ -273,7 +273,7 @@ def _maybe_store_file_object(
                     urlpath_out, "wb"
                 ) as f_out:
                     utils.copy_buffered_file(f_in, f_out)
-                if config.SETTINGS.get()["io_delete_original"] and fs_in.exists(
+                if config.SETTINGS.get().io_delete_original and fs_in.exists(
                     urlpath_in
                 ):
                     fs_in.rm(urlpath_in)
@@ -292,10 +292,10 @@ def _maybe_store_io_object(
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
-    cache_files_urlpath = config.SETTINGS.get()["cache_files_urlpath"]
+    cache_files_urlpath = config.SETTINGS.get().cache_files_urlpath
     fs_out, _, _ = fsspec.get_fs_token_paths(
         cache_files_urlpath,
-        storage_options=config.SETTINGS.get()["cache_files_storage_options"],
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
     )
 
     if hasattr(obj, "path") or hasattr(obj, "name"):
@@ -316,7 +316,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     return encode.dictify_python_call(
         decode_io_object,
         file_json,
-        storage_options=config.SETTINGS.get()["cache_files_storage_options"],
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
         **kwargs,
     )
 

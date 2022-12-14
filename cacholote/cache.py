@@ -38,7 +38,7 @@ _LOCKER = "__locked__"
 
 
 def _update_last_primary_keys_and_return(
-    session: sqlalchemy.orm.Session, cache_entry: Any
+    session: sqlalchemy.orm.Session, cache_entry: Any, tag: Optional[str]
 ) -> Any:
     # Wait until unlocked
     warned = False
@@ -53,8 +53,8 @@ def _update_last_primary_keys_and_return(
     # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
-    if config.SETTINGS.get()["tag"] is not None:
-        cache_entry.tag = config.SETTINGS.get()["tag"]
+    if tag is not None:
+        cache_entry.tag = tag
     session.commit()
     LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
     return result
@@ -112,8 +112,16 @@ def cacheable(func: F) -> F:
             for key, value in __context__.items():
                 key.set(value)
 
+        settings = config.SETTINGS.get()
+        tag = settings.tag
+        expiration = (
+            datetime.datetime.fromisoformat(settings.expiration)
+            if settings.expiration is not None
+            else settings.expiration
+        )
+
         # Cache opt-out
-        if not config.SETTINGS.get()["use_cache"]:
+        if not settings.use_cache:
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
 
         try:
@@ -128,12 +136,9 @@ def cacheable(func: F) -> F:
             config.CacheEntry.key == hexdigest,
             config.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
-        if config.SETTINGS.get()["expiration"]:
+        if expiration is not None:
             # If expiration is provided, only get entries with matching expiration
-            filters.append(
-                config.CacheEntry.expiration
-                == datetime.datetime.fromisoformat(config.SETTINGS.get()["expiration"])
-            )
+            filters.append(config.CacheEntry.expiration == expiration)
         with sqlalchemy.orm.Session(config.ENGINE.get(), autoflush=False) as session:
             for cache_entry in (
                 session.query(config.CacheEntry)
@@ -142,7 +147,9 @@ def cacheable(func: F) -> F:
             ):
                 # Attempt all valid cache entries
                 try:
-                    return _update_last_primary_keys_and_return(session, cache_entry)
+                    return _update_last_primary_keys_and_return(
+                        session, cache_entry, tag
+                    )
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
@@ -154,9 +161,9 @@ def cacheable(func: F) -> F:
                 # Lock cache entry
                 cache_entry = config.CacheEntry(
                     key=hexdigest,
-                    expiration=config.SETTINGS.get()["expiration"],
+                    expiration=expiration,
                     result=_LOCKER,
-                    tag=config.SETTINGS.get()["tag"],
+                    tag=settings.tag,
                 )
                 session.add(cache_entry)
                 session.commit()
@@ -168,14 +175,16 @@ def cacheable(func: F) -> F:
                 ]
                 session.rollback()
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
-                return _update_last_primary_keys_and_return(session, cache_entry)
+                return _update_last_primary_keys_and_return(session, cache_entry, tag)
             else:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
                 try:
                     # Update cache
                     cache_entry.result = json.loads(encode.dumps(result))
-                    return _update_last_primary_keys_and_return(session, cache_entry)
+                    return _update_last_primary_keys_and_return(
+                        session, cache_entry, tag
+                    )
                 except encode.EncodeError as ex:
                     # Enconding error, return result without caching
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)

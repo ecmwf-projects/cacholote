@@ -27,15 +27,7 @@ import pydantic
 import sqlalchemy
 import sqlalchemy.orm
 
-# Context vars
-SETTINGS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
-    "cacholote_settings", default={}
-)
-ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
-    "cacholote_engine"
-)
-
-# Sqlalchemy
+# sqlalchemy: cache database
 Base = sqlalchemy.orm.declarative_base()
 
 
@@ -75,14 +67,15 @@ def set_epiration_to_max(
     connection: sqlalchemy.engine.Connection,
     target: CacheEntry,
 ) -> None:
-    expiration = target.expiration or datetime.datetime.max
-    if isinstance(expiration, str):
-        expiration = datetime.datetime.fromisoformat(expiration)
-    target.expiration = expiration
+    target.expiration = target.expiration or datetime.datetime.max
 
 
-# pydantic
+# pydantic: settings manager
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
+ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
+    "cacholote_engine"
+)
 
 
 class Settings(pydantic.BaseSettings):
@@ -99,12 +92,49 @@ class Settings(pydantic.BaseSettings):
     expiration: Optional[str] = None
     tag: Optional[str] = None
 
+    @pydantic.validator("expiration")
+    def expiration_must_be_isoformat(
+        cls: pydantic.BaseSettings, expiration: Optional[str]
+    ) -> Optional[str]:
+        """Validate expiration."""
+        if isinstance(expiration, str):
+            try:
+                datetime.datetime.fromisoformat(expiration)
+            except ValueError as ex:
+                raise ValueError(
+                    f"{expiration=} is NOT a valid ISO 8601 format"
+                ) from ex
+        return expiration
+
+    def make_cache_dir(self) -> None:
+        fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
+            self.cache_files_urlpath,
+            storage_options=self.cache_files_storage_options,
+        )
+        fs.mkdirs(urlpath, exist_ok=True)
+
+    def set_engine(self) -> Optional[contextvars.Token[Any]]:
+        try:
+            engine = ENGINE.get()
+        except LookupError:
+            pass
+        else:
+            if str(engine.url) == self.cache_db_urlpath:
+                return None
+        engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
+        Base.metadata.create_all(engine)
+        return ENGINE.set(engine)
+
     class Config:
         case_sensitive = False
         env_prefix = "cacholote_"
 
 
-# settings manager
+SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
+    "cacholote_settings", default=Settings()
+)
+
+
 class set:
     """Customize cacholote settings.
 
@@ -139,33 +169,10 @@ class set:
 
     def __init__(self, **kwargs: Any):
         old_settings = SETTINGS.get()
-
-        self._reset_engine = False
-        cache_db_urlpath = kwargs.get("cache_db_urlpath")
-        if (
-            cache_db_urlpath
-            and old_settings.get("cache_db_urlpath") != cache_db_urlpath
-        ):
-            # Create engine
-            engine = sqlalchemy.create_engine(cache_db_urlpath, future=True)
-            Base.metadata.create_all(engine)
-            self._engine_token = ENGINE.set(engine)
-            self._reset_engine = True
-
-        if hasattr(kwargs.get("expiration"), "isoformat"):
-            # Store datetime as string
-            kwargs["expiration"] = kwargs["expiration"].isoformat()
-
-        # Update settings
-        settings = Settings(**{**old_settings, **kwargs}).dict()
-        self._settings_token = SETTINGS.set(settings)
-
-        # Create cache files directory
-        fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
-            settings["cache_files_urlpath"],
-            storage_options=settings["cache_files_storage_options"],
-        )
-        fs.mkdirs(urlpath, exist_ok=True)
+        new_settings = Settings(**{**old_settings.dict(), **kwargs})
+        new_settings.make_cache_dir()
+        self._settings_token = SETTINGS.set(new_settings)
+        self._engine_token = new_settings.set_engine()
 
     def __enter__(self) -> None:
         pass
@@ -176,28 +183,24 @@ class set:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        SETTINGS.reset(self._settings_token)
-        if self._reset_engine:
+        if self._engine_token:
             ENGINE.reset(self._engine_token)
+        SETTINGS.reset(self._settings_token)
 
 
-def initialize_settings(
-    env_file: Union[str, Tuple[str, ...]] = (".env", ".env.cacholote")
-) -> None:
-    """Initialize settings.
+def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
+    """Reset cacholote settings.
 
     Priority:
     1. Evironment variables with prefix `CACHOLOTE_`
-    2. Dotenv files
+    2. Dotenv file(s)
     3. Cacholote defaults
 
     Parameters
     ----------
-    env_file: str, tuple[str], default=(".env", ".env.cacholote")
-        Dot env files. By default, `.env.cacholote` takes priority over `.env`.
+    env_file: str, tuple[str], default=None
+        Dot env file(s).
     """
-    _DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    set(**Settings(_env_file=env_file).dict())
-
-
-initialize_settings()
+    settings = Settings(_env_file=env_file)
+    settings.set_engine()
+    SETTINGS.set(settings)

@@ -1,5 +1,4 @@
 import contextvars
-import datetime
 import os
 import pathlib
 
@@ -7,7 +6,7 @@ from cacholote import config
 
 
 def test_change_engine(tmpdir: pathlib.Path) -> None:
-    old_db = config.SETTINGS.get()["cache_db_urlpath"]
+    old_db = config.SETTINGS.get().cache_db_urlpath
     new_db = "sqlite:///" + str(tmpdir / "dummy.db")
     old_engine = config.ENGINE.get()
 
@@ -15,31 +14,24 @@ def test_change_engine(tmpdir: pathlib.Path) -> None:
         assert config.ENGINE.get() is not old_engine
         assert (
             str(config.ENGINE.get().url)
-            == config.SETTINGS.get()["cache_db_urlpath"]
+            == config.SETTINGS.get().cache_db_urlpath
             == new_db
         )
     assert config.ENGINE.get() is old_engine
     assert (
-        str(config.ENGINE.get().url)
-        == config.SETTINGS.get()["cache_db_urlpath"]
-        == old_db
+        str(config.ENGINE.get().url) == config.SETTINGS.get().cache_db_urlpath == old_db
     )
 
     config.set(cache_db_urlpath=new_db)
     assert config.ENGINE.get() is not old_engine
     assert (
-        str(config.ENGINE.get().url)
-        == config.SETTINGS.get()["cache_db_urlpath"]
-        == new_db
+        str(config.ENGINE.get().url) == config.SETTINGS.get().cache_db_urlpath == new_db
     )
 
 
 def test_expiration() -> None:
-    with config.set(expiration=datetime.datetime(1492, 10, 12)):
-        assert config.SETTINGS.get()["expiration"] == "1492-10-12T00:00:00"
-
     with config.set(expiration="1492-10-12T00:00:00"):
-        assert config.SETTINGS.get()["expiration"] == "1492-10-12T00:00:00"
+        assert config.SETTINGS.get().expiration == "1492-10-12T00:00:00"
 
 
 def test_env_variables(tmpdir: pathlib.Path) -> None:
@@ -52,11 +44,11 @@ def test_env_variables(tmpdir: pathlib.Path) -> None:
     with dotenv_path.open("w") as f:
         f.write("CACHOLOTE_IO_DELETE_ORIGINAL=TRUE")
 
-    config.initialize_settings(str(dotenv_path))
+    config.reset(str(dotenv_path))
     try:
-        assert config.SETTINGS.get()["cache_db_urlpath"] == "sqlite://"
+        assert config.SETTINGS.get().cache_db_urlpath == "sqlite://"
         assert str(config.ENGINE.get().url) == "sqlite://"
-        assert config.SETTINGS.get()["io_delete_original"] is True
+        assert config.SETTINGS.get().io_delete_original is True
         assert str(config.ENGINE.get().url) == "sqlite://"
     finally:
         os.environ.clear()
@@ -70,7 +62,5 @@ def test_contextvar() -> None:
     ctx = contextvars.copy_context()
     ctx.run(set_tag)
 
-    assert config.SETTINGS.get()["tag"] is None
-    assert ctx[config.SETTINGS] == {
-        k: v if k != "tag" else "foo" for k, v in config.SETTINGS.get().items()
-    }
+    assert config.SETTINGS.get().tag is None
+    assert ctx[config.SETTINGS].tag == "foo"

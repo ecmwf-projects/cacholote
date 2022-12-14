@@ -123,7 +123,7 @@ def test_expiration() -> None:
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
 
-    with config.set(expiration=datetime.datetime(1908, 3, 9)):
+    with config.set(expiration="1908-03-09T00:00:00"):
         assert cached_now() != first
         assert cache.LAST_PRIMARY_KEYS.get() == {
             "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
