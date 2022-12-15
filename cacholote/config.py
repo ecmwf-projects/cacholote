@@ -113,7 +113,7 @@ class Settings(pydantic.BaseSettings):
         )
         fs.mkdirs(urlpath, exist_ok=True)
 
-    def set_engine(self) -> Optional[contextvars.Token[Any]]:
+    def set_engine(self) -> Optional[contextvars.Token]:  # type: ignore[type-arg] # py38 not subscriptable
         try:
             engine = ENGINE.get()
         except LookupError:
