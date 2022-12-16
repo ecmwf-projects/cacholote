@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import functools
 import inspect
 import io
@@ -26,7 +27,6 @@ from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
-import pydantic
 
 from . import config, encode, utils
 
@@ -55,16 +55,11 @@ _UNION_IO_TYPES = Union[
     fsspec.implementations.local.LocalFileOpener,
 ]
 
-
-def _add_ext_to_mimetypes() -> None:
-    """Add netcdf, grib, and zarr to mimetypes."""
-    mimetypes.add_type("application/netcdf", ".nc", strict=True)
-    for ext in (".grib", ".grb", ".grb1", ".grb2"):
-        mimetypes.add_type("application/x-grib", ext, strict=False)
-    mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
-
-
-_add_ext_to_mimetypes()
+# Add netcdf, grib, and zarr to mimetypes
+mimetypes.add_type("application/netcdf", ".nc", strict=True)
+for ext in (".grib", ".grb", ".grb1", ".grb2"):
+    mimetypes.add_type("application/x-grib", ext, strict=False)
+mimetypes.add_type("application/vnd+zarr", ".zarr", strict=False)
 
 
 def _requires_xarray_and_dask(func: F) -> F:
@@ -77,14 +72,6 @@ def _requires_xarray_and_dask(func: F) -> F:
         return func(*args, **kwargs)
 
     return cast(F, wrapper)
-
-
-class FileInfoModel(pydantic.BaseModel):
-    type: str
-    href: str
-    file_checksum: int = pydantic.Field(..., alias="file:checksum")
-    file_size: int = pydantic.Field(..., alias="file:size")
-    file_local_path: str = pydantic.Field(..., alias="file:local_path")
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
@@ -100,8 +87,8 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     file_dict = {
         "type": filetype,
         "href": posixpath.join(
-            config.SETTINGS.get().cache_files_urlpath_readonly
-            or config.SETTINGS.get().cache_files_urlpath,
+            config.SETTINGS["cache_files_urlpath_readonly"]
+            or config.SETTINGS["cache_files_urlpath"],
             posixpath.basename(local_path),
         ),
         "file:checksum": fs.checksum(local_path),
@@ -109,7 +96,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
         "file:local_path": local_path,
     }
 
-    return FileInfoModel(**file_dict).dict(by_alias=True)
+    return file_dict
 
 
 def _get_fs_and_urlpath(
@@ -120,7 +107,7 @@ def _get_fs_and_urlpath(
 
     urlpath = file_json["file:local_path"]
     if storage_options is None:
-        storage_options = config.SETTINGS.get().cache_files_storage_options
+        storage_options = config.SETTINGS["cache_files_storage_options"]
 
     if not validate:
         fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
@@ -225,15 +212,12 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
 
-    filetype = config.SETTINGS.get().xarray_cache_type
+    filetype = config.SETTINGS["xarray_cache_type"]
     ext = mimetypes.guess_extension(filetype, strict=False)
-    urlpath_out = posixpath.join(
-        config.SETTINGS.get().cache_files_urlpath, f"{root}{ext}"
-    )
+    urlpath_out = posixpath.join(config.SETTINGS["cache_files_urlpath"], f"{root}{ext}")
 
     fs_out, _, _ = fsspec.get_fs_token_paths(
-        urlpath_out,
-        storage_options=config.SETTINGS.get().cache_files_storage_options,
+        urlpath_out, storage_options=config.SETTINGS["cache_files_storage_options"]
     )
     _maybe_store_xr_dataset(obj, fs_out, urlpath_out, filetype)
 
@@ -250,7 +234,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     return encode.dictify_python_call(
         decode_xr_dataset,
         file_json,
-        storage_options=config.SETTINGS.get().cache_files_storage_options,
+        storage_options=config.SETTINGS["cache_files_storage_options"],
         **kwargs,
     )
 
@@ -264,7 +248,7 @@ def _maybe_store_file_object(
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             if fs_in == fs_out:
-                if config.SETTINGS.get().io_delete_original:
+                if config.SETTINGS["io_delete_original"]:
                     fs_in.mv(urlpath_in, urlpath_out)
                 else:
                     fs_in.cp(urlpath_in, urlpath_out)
@@ -273,9 +257,7 @@ def _maybe_store_file_object(
                     urlpath_out, "wb"
                 ) as f_out:
                     utils.copy_buffered_file(f_in, f_out)
-                if config.SETTINGS.get().io_delete_original and fs_in.exists(
-                    urlpath_in
-                ):
+                if config.SETTINGS["io_delete_original"] and fs_in.exists(urlpath_in):
                     fs_in.rm(urlpath_in)
 
 
@@ -292,10 +274,10 @@ def _maybe_store_io_object(
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
-    cache_files_urlpath = config.SETTINGS.get().cache_files_urlpath
+    cache_files_urlpath = config.SETTINGS["cache_files_urlpath"]
     fs_out, _, _ = fsspec.get_fs_token_paths(
         cache_files_urlpath,
-        storage_options=config.SETTINGS.get().cache_files_storage_options,
+        storage_options=config.SETTINGS["cache_files_storage_options"],
     )
 
     if hasattr(obj, "path") or hasattr(obj, "name"):
@@ -316,7 +298,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     return encode.dictify_python_call(
         decode_io_object,
         file_json,
-        storage_options=config.SETTINGS.get().cache_files_storage_options,
+        storage_options=config.SETTINGS["cache_files_storage_options"],
         **kwargs,
     )
 

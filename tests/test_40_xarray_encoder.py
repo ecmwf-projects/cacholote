@@ -1,4 +1,5 @@
 import pathlib
+import sqlite3
 
 import fsspec
 import pytest
@@ -27,7 +28,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
     # Define readonly dir
-    readonly_dir = str(tmpdir / "readonly")
+    readonly_dir = tmpdir / "readonly"
     fsspec.filesystem("file").mkdir(readonly_dir)
     config.set(cache_files_urlpath_readonly=readonly_dir)
 
@@ -68,7 +69,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
         ("application/vnd+zarr", ".zarr", "zarr"),
     ],
 )
-@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 @pytest.mark.filterwarnings(
     "ignore:GRIB write support is experimental, DO NOT RELY ON IT!"
 )
@@ -87,7 +88,7 @@ def test_xr_cacheable(
     config.set(xarray_cache_type=xarray_cache_type)
 
     # cache-db to check
-    con = config.ENGINE.get().raw_connection()
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
     cur = con.cursor()
 
     expected = get_grib_ds()
@@ -97,7 +98,7 @@ def test_xr_cacheable(
         actual = cfunc()
 
         # Check hits
-        cur.execute("SELECT counter FROM cache_entries", ())
+        cur.execute("SELECT counter FROM cache_entries")
         assert cur.fetchall() == [(expected_counter,)]
 
         # Check result

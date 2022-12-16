@@ -36,8 +36,8 @@ def hexdigestify(text: str) -> str:
 def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
     """Return the ``fsspec`` filesystem and directory name where cache files are stored."""
     fs, _, (path,) = fsspec.get_fs_token_paths(
-        config.SETTINGS.get().cache_files_urlpath,
-        storage_options=config.SETTINGS.get().cache_files_storage_options,
+        config.SETTINGS["cache_files_urlpath"],
+        storage_options=config.SETTINGS["cache_files_storage_options"],
     )
     return (fs, path)
 
@@ -70,33 +70,33 @@ class _Locker:
     def __init__(self, fs: fsspec.AbstractFileSystem, urlpath: str) -> None:
         self.fs = fs
         self.urlpath = urlpath
-        self.lockfile = urlpath + ".lock"
+        self.locker = urlpath + ".lock"
 
     @property
     def file_exists(self) -> bool:
         return bool(self.fs.exists(self.urlpath))
 
-    def acquire(self) -> None:
-        self.fs.touch(self.lockfile)
+    def lock(self) -> None:
+        self.fs.touch(self.locker)
 
-    def release(self) -> None:
-        if self.fs.exists(self.lockfile):
-            self.fs.rm(self.lockfile)
+    def unlock(self) -> None:
+        if self.fs.exists(self.locker):
+            self.fs.rm(self.locker)
 
-    def wait_until_released(self) -> None:
+    def wait_until_unlocked(self) -> None:
         warned = False
-        while self.fs.exists(self.lockfile):
+        while self.fs.exists(self.locker):
             if not warned:
                 warnings.warn(
-                    f"can NOT proceed until file is released: {self.lockfile!r}.",
+                    f"can NOT proceed until file is unlocked: {self.locker!r}.",
                     UserWarning,
                 )
                 warned = True
             time.sleep(1)
 
     def __enter__(self) -> bool:
-        self.wait_until_released()
-        self.acquire()
+        self.wait_until_unlocked()
+        self.lock()
         return self.file_exists
 
     def __exit__(
@@ -105,4 +105,4 @@ class _Locker:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        self.release()
+        self.unlock()

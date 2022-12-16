@@ -1,4 +1,5 @@
 import pathlib
+import sqlite3
 from typing import Any, Literal, Optional, Sequence
 
 import fsspec
@@ -14,14 +15,14 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 
 
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
-@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
+@pytest.mark.parametrize("set_cache", ["file", "s3"], indirect=True)
 def test_clean_cache_files(
     tmpdir: pathlib.Path,
     set_cache: str,
     method: Literal["LRU", "LFU"],
 ) -> None:
 
-    con = config.ENGINE.get().raw_connection()
+    con = sqlite3.connect(str(tmpdir / "cacholote.db"))
     cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -41,14 +42,12 @@ def test_clean_cache_files(
 
     # Do not clean
     clean.clean_cache_files(2, method=method)
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
+    nrows = len(cur.execute("SELECT * FROM cache_entries").fetchall())
     assert nrows == fs.du(dirname) == 2
 
     # Delete one file
     clean.clean_cache_files(1, method=method)
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
+    nrows = len(cur.execute("SELECT * FROM cache_entries").fetchall())
     assert nrows == fs.du(dirname) == 1
     assert not fs.exists(f"{dirname}/{checksums[method]}.txt")
 

@@ -30,14 +30,13 @@ def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sqlalchemy.orm.Session] = None,
     cache_entry: Optional[config.CacheEntry] = None,
-    sizes: Optional[Dict[str, int]] = None,
+    sizes: Dict[str, int] = {},
     dry_run: bool = False,
 ) -> Any:
     if {"type", "callable", "args", "kwargs"} == set(obj) and obj["callable"] in (
         "cacholote.extra_encoders:decode_xr_dataset",
         "cacholote.extra_encoders:decode_io_object",
     ):
-        sizes = sizes or {}
         cache_fs, cache_dirname = utils.get_cache_files_fs_dirname()
         cache_dirname = cache_fs.unstrip_protocol(cache_dirname)
 
@@ -47,13 +46,13 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                logging.info("Deleting cache entry: %r", cache_entry)
+                logging.info(f"Deleting cache entry: {cache_entry!r}")
                 session.delete(cache_entry)
                 session.commit()
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
-                        logging.info("Deleting %r", urlpath)
+                        logging.info(f"Deleting {urlpath!r}")
                         fs.rm(urlpath, recursive=True)
 
     return obj
@@ -74,7 +73,7 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
-        logging.info("Size of %r: %r", self.dirname, size)
+        logging.info(f"Size of {self.dirname!r}: {size!r}")
         return size <= maxsize
 
     @property
@@ -88,7 +87,7 @@ class _Cleaner:
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
             with sqlalchemy.orm.Session(
-                config.ENGINE.get(), autoflush=False
+                config.SETTINGS["engine"], autoflush=False
             ) as session:
                 for cache_entry in session.query(config.CacheEntry):
                     json.loads(
@@ -106,7 +105,7 @@ class _Cleaner:
             self.sizes.pop(urlpath)
             with utils._Locker(self.fs, urlpath) as file_exists:
                 if file_exists:
-                    logging.info("Deleting %r", urlpath)
+                    logging.info(f"Deleting {urlpath!r}")
                     self.fs.rm(urlpath)
 
     @staticmethod
@@ -165,7 +164,9 @@ class _Cleaner:
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
-        with sqlalchemy.orm.Session(config.ENGINE.get(), autoflush=False) as session:
+        with sqlalchemy.orm.Session(
+            config.SETTINGS["engine"], autoflush=False
+        ) as session:
             for cache_entry in (
                 session.query(config.CacheEntry).filter(*filters).order_by(*sorters)
             ):
