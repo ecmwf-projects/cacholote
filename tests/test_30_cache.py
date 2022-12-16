@@ -95,8 +95,8 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
 
 def test_hexdigestify_python_call() -> None:
     assert (
-        cache.hexdigestify_python_call(func, args=(1,))
-        == cache.hexdigestify_python_call(func, kwargs={"a": 1})
+        cache.hexdigestify_python_call(func, 1)
+        == cache.hexdigestify_python_call(func, a=1)
         == "54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c"
     )
 
