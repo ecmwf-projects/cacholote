@@ -131,7 +131,7 @@ class Settings(pydantic.BaseSettings):
 
 
 SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
-    "cacholote_settings", default=Settings()
+    "cacholote_settings"
 )
 
 
@@ -204,3 +204,6 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     settings = Settings(_env_file=env_file)
     settings.set_engine()
     SETTINGS.set(settings)
+
+
+reset()
