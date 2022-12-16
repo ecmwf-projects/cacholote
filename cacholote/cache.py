@@ -21,7 +21,7 @@ import functools
 import json
 import time
 import warnings
-from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -76,8 +76,8 @@ def _delete_cache_entry(
 
 def hexdigestify_python_call(
     func: Union[str, Callable[..., Any]],
-    *args: Any,
-    **kwargs: Any,
+    args: Tuple[Any, ...] = (),
+    kwargs: dict[str, Any] = {},
 ) -> str:
     """Convert function to its hash made of hexadecimal digits.
 
@@ -85,9 +85,9 @@ def hexdigestify_python_call(
     ----------
     func: str, callable
         Function to hexdigestify
-    *args: Any
+    args: tuple
         Arguments of ``func``
-    **kwargs: Any
+    kwargs: dict
         Keyword arguments of ``func``
 
     Returns
@@ -126,7 +126,7 @@ def cacheable(func: F) -> F:
 
         try:
             # Get key
-            hexdigest = hexdigestify_python_call(func, *args, **kwargs)
+            hexdigest = hexdigestify_python_call(func, args, kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return _clear_last_primary_keys_and_return(func(*args, **kwargs))
