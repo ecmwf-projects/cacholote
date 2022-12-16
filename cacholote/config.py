@@ -197,9 +197,8 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     env_file: str, tuple[str], default=None
         Dot env file(s).
     """
-    settings = Settings(_env_file=env_file)
-    settings.set_engine()
-    SETTINGS.set(settings)
+    SETTINGS.set(Settings(_env_file=env_file))
+    set()
 
 
 reset()
