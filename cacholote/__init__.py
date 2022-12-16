@@ -37,7 +37,6 @@ __all__ = [
     "clean_cache_files",
     "config",
     "dumps",
-    "dumps_python_call",
     "extra_encoders",
     "hexdigestify_python_call",
     "loads",

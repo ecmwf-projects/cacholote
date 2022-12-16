@@ -13,19 +13,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
-import builtins
+import contextvars
 import datetime
 import json
-import os
 import pathlib
 import tempfile
-from types import MappingProxyType, TracebackType
-from typing import Any, Dict, List, Optional, Type
+from types import TracebackType
+from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 
 import fsspec
+import pydantic
 import sqlalchemy
 import sqlalchemy.orm
+
+ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
+    "cacholote_engine"
+)
+SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
+    "cacholote_settings"
+)
+_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -66,39 +76,59 @@ def set_epiration_to_max(
     connection: sqlalchemy.engine.Connection,
     target: CacheEntry,
 ) -> None:
-    expiration = target.expiration or datetime.datetime.max
-    if isinstance(expiration, str):
-        expiration = datetime.datetime.fromisoformat(expiration)
-    target.expiration = expiration
+    target.expiration = target.expiration or datetime.datetime.max
 
 
-_ALLOWED_SETTINGS: Dict[str, List[Any]] = {
-    "xarray_cache_type": [
-        "application/netcdf",
-        "application/x-grib",
-        "application/vnd+zarr",
-    ]
-}
+class Settings(pydantic.BaseSettings):
+    use_cache: bool = True
+    cache_db_urlpath: str = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
+    cache_files_urlpath: str = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
+    cache_files_urlpath_readonly: Optional[str] = None
+    cache_files_storage_options: Dict[str, Any] = {}
+    xarray_cache_type: Literal[
+        "application/netcdf", "application/x-grib", "application/vnd+zarr"
+    ] = "application/netcdf"
+    io_delete_original: bool = False
+    raise_all_encoding_errors: bool = False
+    expiration: Optional[str] = None
+    tag: Optional[str] = None
 
-_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
-_DEFAULT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-_DEFAULTS: Dict[str, Any] = {
-    "use_cache": True,
-    "cache_db_urlpath": f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}",
-    "cache_files_urlpath": f"{_DEFAULT_CACHE_DIR / 'cache_files'}",
-    "cache_files_urlpath_readonly": None,
-    "cache_files_storage_options": {},
-    "xarray_cache_type": "application/netcdf",
-    "io_delete_original": False,
-    "raise_all_encoding_errors": False,
-    "expiration": None,
-    "tag": None,
-    "engine": None,
-}
+    @pydantic.validator("expiration")
+    def expiration_must_be_isoformat(
+        cls: pydantic.BaseSettings, expiration: Optional[str]
+    ) -> Optional[str]:
+        """Validate expiration."""
+        if isinstance(expiration, str):
+            try:
+                datetime.datetime.fromisoformat(expiration)
+            except ValueError as ex:
+                raise ValueError(
+                    f"{expiration=} is NOT a valid ISO 8601 format"
+                ) from ex
+        return expiration
 
-# Private and public (immutable) settings
-_SETTINGS: Dict[str, Any] = {}
-SETTINGS = MappingProxyType(_SETTINGS)
+    def make_cache_dir(self) -> None:
+        fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
+            self.cache_files_urlpath,
+            storage_options=self.cache_files_storage_options,
+        )
+        fs.mkdirs(urlpath, exist_ok=True)
+
+    def set_engine(self) -> Optional[contextvars.Token]:  # type: ignore[type-arg] # py38 not subscriptable
+        try:
+            engine = ENGINE.get()
+        except LookupError:
+            pass
+        else:
+            if str(engine.url) == self.cache_db_urlpath:
+                return None
+        engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
+        Base.metadata.create_all(engine)
+        return ENGINE.set(engine)
+
+    class Config:
+        case_sensitive = False
+        env_prefix = "cacholote_"
 
 
 class set:
@@ -131,46 +161,14 @@ class set:
     tag: str, optional, default: None
         Tag for the cache entry. If None, do NOT tag.
         Note that existing tags are overwritten.
-    engine:
-        `sqlalchemy` Engine. Mutually exclusive with ``cache_db_urlpath``.
     """
 
     def __init__(self, **kwargs: Any):
-
-        extra_settings = builtins.set(kwargs) - builtins.set(_DEFAULTS)
-        if extra_settings:
-            raise ValueError(
-                f"Wrong settings: {extra_settings!r}. Available settings: {list(_SETTINGS)!r}"
-            )
-
-        for k in builtins.set(_ALLOWED_SETTINGS) & builtins.set(kwargs):
-            if kwargs[k] not in _ALLOWED_SETTINGS[k]:
-                raise ValueError(f"{k!r} must be one of {_ALLOWED_SETTINGS[k]!r}")
-
-        if hasattr(kwargs.get("expiration"), "isoformat"):
-            # Store datetime as string
-            kwargs["expiration"] = kwargs["expiration"].isoformat()
-
-        # Cache DB
-        if kwargs.get("engine") and kwargs.get("cache_db_urlpath"):
-            raise ValueError("'engine' and 'cache_db_urlpath' are mutually exclusive")
-        if kwargs.get("engine"):
-            kwargs["cache_db_urlpath"] = None
-        elif kwargs.get("cache_db_urlpath"):
-            engine = sqlalchemy.create_engine(kwargs["cache_db_urlpath"], future=True)
-            Base.metadata.create_all(engine)
-            kwargs["engine"] = engine
-
-        # Update
-        self._old = dict(SETTINGS)
-        _SETTINGS.update(kwargs)
-
-        # Create cache files directory
-        fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
-            SETTINGS["cache_files_urlpath"],
-            storage_options=SETTINGS["cache_files_storage_options"],
-        )
-        fs.mkdirs(urlpath, exist_ok=True)
+        old_settings = SETTINGS.get()
+        new_settings = Settings(**{**old_settings.dict(), **kwargs})
+        new_settings.make_cache_dir()
+        self._settings_token = SETTINGS.set(new_settings)
+        self._engine_token = new_settings.set_engine()
 
     def __enter__(self) -> None:
         pass
@@ -181,31 +179,26 @@ class set:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        _SETTINGS.update(self._old)
+        if self._engine_token:
+            ENGINE.reset(self._engine_token)
+        SETTINGS.reset(self._settings_token)
 
 
-def json_dumps() -> str:
-    """Serialize configuration to a JSON formatted string."""
-    if SETTINGS["cache_db_urlpath"] is None:
-        raise ValueError("Can NOT dump to JSON when `engine` has been directly set.")
-    return json.dumps({k: v for k, v in SETTINGS.items() if k != "engine"})
+def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
+    """Reset cacholote settings.
+
+    Priority:
+    1. Evironment variables with prefix `CACHOLOTE_`
+    2. Dotenv file(s)
+    3. Cacholote defaults
+
+    Parameters
+    ----------
+    env_file: str, tuple[str], default=None
+        Dot env file(s).
+    """
+    SETTINGS.set(Settings(_env_file=env_file))
+    set()
 
 
-def _initialize_settings() -> None:
-
-    settings = {}
-    for key, default in _DEFAULTS.items():
-        env_key = f"CACHOLOTE_{key.upper()}"
-        value = os.getenv(env_key, default)
-        if isinstance(default, bool):
-            if str(value).lower() in ("y", "yes", "t", "true", "on", "1"):
-                value = True
-            elif str(value).lower() in ("n", "no", "f", "false", "off", "0"):
-                value = False
-            else:
-                raise ValueError(f"{env_key}={value!r} is not a valid bool.")
-        settings[key] = value
-    set(**settings)
-
-
-_initialize_settings()
+reset()
