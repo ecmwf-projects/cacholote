@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import contextvars
 import datetime
@@ -27,7 +28,15 @@ import pydantic
 import sqlalchemy
 import sqlalchemy.orm
 
-# sqlalchemy: cache database
+ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
+    "cacholote_engine"
+)
+SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
+    "cacholote_settings"
+)
+_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+_DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
+
 Base = sqlalchemy.orm.declarative_base()
 
 
@@ -68,14 +77,6 @@ def set_epiration_to_max(
     target: CacheEntry,
 ) -> None:
     target.expiration = target.expiration or datetime.datetime.max
-
-
-# pydantic: settings manager
-_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
-_DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
-ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
-    "cacholote_engine"
-)
 
 
 class Settings(pydantic.BaseSettings):
@@ -128,11 +129,6 @@ class Settings(pydantic.BaseSettings):
     class Config:
         case_sensitive = False
         env_prefix = "cacholote_"
-
-
-SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
-    "cacholote_settings"
-)
 
 
 class set:
