@@ -53,20 +53,24 @@ def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]
 
 
 def dictify_python_call(
-    func: Union[str, Callable[..., Any]],
+    func_to_dict: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> Dict[str, Any]:
 
-    callable_fqn = dictify_python_object(func)["fully_qualified_name"]
+    callable_fqn = dictify_python_object(func_to_dict)["fully_qualified_name"]
     python_call_simple: Dict[str, Any] = {
         "type": "python_call",
         "callable": callable_fqn,
     }
 
-    callable = decode.import_object(callable_fqn) if isinstance(func, str) else func
+    callable_obj = (
+        decode.import_object(callable_fqn)
+        if isinstance(func_to_dict, str)
+        else func_to_dict
+    )
     try:
-        sig = inspect.signature(callable)
+        sig = inspect.signature(callable_obj)
     except ValueError:
         # No signature available
         pass
@@ -145,7 +149,7 @@ def filecache_default(
             try:
                 return encoder(obj)
             except Exception as ex:
-                if config.SETTINGS["raise_all_encoding_errors"]:
+                if config.SETTINGS.get().raise_all_encoding_errors:
                     raise ex
                 warnings.warn(f"{encoder!r} did not work: {ex!r}")
     raise EncodeError("can't encode object")
@@ -168,15 +172,15 @@ def dumps(
     -------
     str
     """
-    for k, v in _JSON_DUMPS_KWARGS.items():
-        kwargs.setdefault(k, v)
+    for key, value in _JSON_DUMPS_KWARGS.items():
+        kwargs.setdefault(key, value)
     kwargs.setdefault("default", filecache_default)
 
     return json.dumps(obj, **kwargs)
 
 
 def dumps_python_call(
-    func: Union[str, Callable[..., Any]],
+    func_to_dump: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> str:
@@ -184,7 +188,7 @@ def dumps_python_call(
 
     Parameters
     ----------
-    func: str, callable
+    func_to_dump: str, callable
         Function to serialize
     *args: Any
         Arguments of ``func``
@@ -195,5 +199,5 @@ def dumps_python_call(
     -------
     str
     """
-    python_call = dictify_python_call(func, *args, **kwargs)
+    python_call = dictify_python_call(func_to_dump, *args, **kwargs)
     return dumps(python_call)
