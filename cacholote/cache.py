@@ -75,7 +75,7 @@ def _delete_cache_entry(
 
 
 def hexdigestify_python_call(
-    func_to_hex: Union[str, Callable[..., Any]],
+    _func: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> str:
@@ -83,7 +83,7 @@ def hexdigestify_python_call(
 
     Parameters
     ----------
-    func_to_hex: str, callable
+    _func: str, callable
         Function to hexdigestify
     *args: Any
         Arguments of ``func``
@@ -94,7 +94,7 @@ def hexdigestify_python_call(
     -------
     str
     """
-    return utils.hexdigestify(encode.dumps_python_call(func_to_hex, *args, **kwargs))
+    return utils.hexdigestify(encode.dumps_python_call(_func, *args, **kwargs))
 
 
 def cacheable(func: F) -> F:
@@ -154,8 +154,6 @@ def cacheable(func: F) -> F:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
                     _delete_cache_entry(session, cache_entry)
-                finally:
-                    session.rollback()
 
             # Not in the cache
             cache_entry = None
@@ -192,7 +190,6 @@ def cacheable(func: F) -> F:
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                     return _clear_last_primary_keys_and_return(result)
             finally:
-                session.rollback()
                 # Unlock
                 if cache_entry and cache_entry.result == _LOCKER:
                     _delete_cache_entry(session, cache_entry)

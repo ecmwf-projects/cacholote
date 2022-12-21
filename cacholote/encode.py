@@ -53,21 +53,19 @@ def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]
 
 
 def dictify_python_call(
-    func_to_dict: Union[str, Callable[..., Any]],
+    _func: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> Dict[str, Any]:
 
-    callable_fqn = dictify_python_object(func_to_dict)["fully_qualified_name"]
+    callable_fqn = dictify_python_object(_func)["fully_qualified_name"]
     python_call_simple: Dict[str, Any] = {
         "type": "python_call",
         "callable": callable_fqn,
     }
 
     callable_obj = (
-        decode.import_object(callable_fqn)
-        if isinstance(func_to_dict, str)
-        else func_to_dict
+        decode.import_object(callable_fqn) if isinstance(_func, str) else _func
     )
     try:
         sig = inspect.signature(callable_obj)
@@ -180,7 +178,7 @@ def dumps(
 
 
 def dumps_python_call(
-    func_to_dump: Union[str, Callable[..., Any]],
+    _func: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> str:
@@ -188,7 +186,7 @@ def dumps_python_call(
 
     Parameters
     ----------
-    func_to_dump: str, callable
+    _func: str, callable
         Function to serialize
     *args: Any
         Arguments of ``func``
@@ -199,5 +197,5 @@ def dumps_python_call(
     -------
     str
     """
-    python_call = dictify_python_call(func_to_dump, *args, **kwargs)
+    python_call = dictify_python_call(_func, *args, **kwargs)
     return dumps(python_call)
