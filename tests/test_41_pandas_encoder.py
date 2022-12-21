@@ -34,9 +34,7 @@ def test_dictify_pd_dataframe(tmpdir: pathlib.Path) -> None:
     assert actual == expected
 
 
-def test_pd_cacheable(
-    tmpdir: pathlib.Path,
-) -> None:
+def test_pd_cacheable(tmpdir: pathlib.Path) -> None:
     @cache.cacheable
     def cfunc() -> Any:
         return pd.DataFrame({"foo": [0]})
