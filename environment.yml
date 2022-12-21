@@ -17,6 +17,7 @@ dependencies:
 - dask
 - moto
 - netCDF4
+- pandas-stubs
 - postgresql
 - psycopg
 - psycopg2

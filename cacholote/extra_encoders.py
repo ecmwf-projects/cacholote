@@ -15,14 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import inspect
 import io
 import mimetypes
 import pathlib
 import posixpath
 import tempfile
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union
 
 import fsspec
 import fsspec.implementations.local
@@ -32,11 +31,24 @@ from . import config, encode, utils
 
 try:
     import dask
+
+    _HAS_DASK = True
+except ImportError:
+    _HAS_DASK = False
+
+try:
+    import pandas as pd
+
+    _HAS_PANDAS = True
+except ImportError:
+    _HAS_PANDAS = False
+
+try:
     import xarray as xr
 
-    _HAS_XARRAY_AND_DASK = True
+    _HAS_XARRAY = True
 except ImportError:
-    _HAS_XARRAY_AND_DASK = False
+    _HAS_XARRAY = False
 
 try:
     import magic
@@ -65,18 +77,6 @@ def _add_ext_to_mimetypes() -> None:
 
 
 _add_ext_to_mimetypes()
-
-
-def _requires_xarray_and_dask(func: F) -> F:
-    """Raise an error if `xarray` or `dask` are not installed."""
-
-    @functools.wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
-        if not _HAS_XARRAY_AND_DASK:
-            raise ValueError("please install 'xarray' and 'dask'")
-        return func(*args, **kwargs)
-
-    return cast(F, wrapper)
 
 
 class FileInfoModel(pydantic.BaseModel):
@@ -149,7 +149,6 @@ def _get_fs_and_urlpath(
     )
 
 
-@_requires_xarray_and_dask
 def decode_xr_dataset(
     file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
 ) -> "xr.Dataset":
@@ -174,6 +173,16 @@ def decode_xr_dataset(
     return xr.open_dataset(filename_or_obj, **kwargs)
 
 
+def decode_pd_dataframe(
+    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+) -> Any:
+    fs, urlpath = _get_fs_and_urlpath(
+        file_json, storage_options=storage_options, validate=True
+    )
+    with fs.open(urlpath) as f:
+        return pd.read_csv(f, **kwargs)
+
+
 def decode_io_object(
     file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
 ) -> _UNION_IO_TYPES:
@@ -183,7 +192,6 @@ def decode_io_object(
     return fs.open(urlpath, **kwargs)
 
 
-@_requires_xarray_and_dask
 def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
@@ -219,7 +227,15 @@ def _maybe_store_xr_dataset(
                             utils.copy_buffered_file(f_in, f_out)
 
 
-@_requires_xarray_and_dask
+def _maybe_store_pd_dataframe(
+    obj: "pd.DataFrame", fs: fsspec.AbstractFileSystem, urlpath: str
+) -> None:
+    with utils._Locker(fs, urlpath) as file_exists:
+        if not file_exists:
+            with fs.open(urlpath, "wb") as f:
+                obj.to_csv(f, index=False)
+
+
 def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
     with dask.config.set({"tokenize.ensure-deterministic": True}):
@@ -252,6 +268,27 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
         file_json,
         storage_options=config.SETTINGS.get().cache_files_storage_options,
         **kwargs,
+    )
+
+
+def dictify_pd_dataframe(obj: "pd.DataFrame") -> Dict[str, Any]:
+    """Encode a ``pd.DataFrame`` to JSON deserialized data (``dict``)."""
+    root = pd.util.hash_pandas_object(obj).sum()
+    urlpath_out = posixpath.join(
+        config.SETTINGS.get().cache_files_urlpath, f"{root}.csv"
+    )
+    fs_out, _, _ = fsspec.get_fs_token_paths(
+        urlpath_out,
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
+    )
+    _maybe_store_pd_dataframe(obj, fs_out, urlpath_out)
+
+    file_json = _dictify_file(fs_out, urlpath_out)
+
+    return encode.dictify_python_call(
+        decode_pd_dataframe,
+        file_json,
+        storage_options=config.SETTINGS.get().cache_files_storage_options,
     )
 
 
@@ -331,5 +368,7 @@ def register_all() -> None:
         fsspec.implementations.local.LocalFileOpener,
     ):
         encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))
-    if _HAS_XARRAY_AND_DASK:
+    if _HAS_PANDAS:
+        encode.FILECACHE_ENCODERS.append((pd.DataFrame, dictify_pd_dataframe))
+    if _HAS_XARRAY and _HAS_DASK:
         encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
