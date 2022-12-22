@@ -37,7 +37,7 @@ LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
 _LOCKER = "__locked__"
 
 
-def _update_last_primary_keys_and_return(
+def _update_last_primary_keys(
     session: sqlalchemy.orm.Session, cache_entry: Any, tag: Optional[str]
 ) -> Any:
     # Wait until unlocked
@@ -63,7 +63,7 @@ def _update_last_primary_keys_and_return(
     return result
 
 
-def _clear_last_primary_keys_and_return(result: Any) -> Any:
+def _clear_last_primary_keys(result: Any) -> Any:
     LAST_PRIMARY_KEYS.set({})
     return result
 
@@ -128,14 +128,14 @@ def cacheable(func: F) -> F:
 
         # Cache opt-out
         if not settings.use_cache:
-            return _clear_last_primary_keys_and_return(func(*args, **kwargs))
+            return _clear_last_primary_keys(func(*args, **kwargs))
 
         try:
             # Get key
             hexdigest = hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
-            return _clear_last_primary_keys_and_return(func(*args, **kwargs))
+            return _clear_last_primary_keys(func(*args, **kwargs))
 
         # Filters for the database query
         filters = [
@@ -153,9 +153,7 @@ def cacheable(func: F) -> F:
             ):
                 # Attempt all valid cache entries
                 try:
-                    return _update_last_primary_keys_and_return(
-                        session, cache_entry, tag
-                    )
+                    return _update_last_primary_keys(session, cache_entry, tag)
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
@@ -183,20 +181,18 @@ def cacheable(func: F) -> F:
                     config.CacheEntry.expiration == cache_entry.expiration,
                 ]
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
-                return _update_last_primary_keys_and_return(session, cache_entry, tag)
+                return _update_last_primary_keys(session, cache_entry, tag)
             else:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
                 try:
                     # Update cache
                     cache_entry.result = json.loads(encode.dumps(result))
-                    return _update_last_primary_keys_and_return(
-                        session, cache_entry, tag
-                    )
+                    return _update_last_primary_keys(session, cache_entry, tag)
                 except encode.EncodeError as ex:
                     # Enconding error, return result without caching
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                    return _clear_last_primary_keys_and_return(result)
+                    return _clear_last_primary_keys(result)
             finally:
                 # Release lock
                 if cache_entry and cache_entry.result == _LOCKER:
