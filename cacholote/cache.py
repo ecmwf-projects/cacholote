@@ -55,7 +55,10 @@ def _update_last_primary_keys_and_return(
     cache_entry.counter += 1
     if tag is not None:
         cache_entry.tag = tag
-    session.commit()
+    try:
+        session.commit()
+    finally:
+        session.rollback()
     LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
     return result
 
@@ -69,7 +72,10 @@ def _delete_cache_entry(
     session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
 ) -> None:
     session.delete(cache_entry)
-    session.commit()
+    try:
+        session.commit()
+    finally:
+        session.rollback()
     # Delete cache file
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
@@ -154,8 +160,6 @@ def cacheable(func: F) -> F:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
                     _delete_cache_entry(session, cache_entry)
-                finally:
-                    session.rollback()
 
             # Not in the cache
             cache_entry = None
@@ -168,14 +172,16 @@ def cacheable(func: F) -> F:
                     tag=settings.tag,
                 )
                 session.add(cache_entry)
-                session.commit()
+                try:
+                    session.commit()
+                finally:
+                    session.rollback()
             except sqlalchemy.exc.IntegrityError:
                 # Concurrent job: This cache entry already exists.
                 filters = [
                     config.CacheEntry.key == cache_entry.key,
                     config.CacheEntry.expiration == cache_entry.expiration,
                 ]
-                session.rollback()
                 cache_entry = session.query(config.CacheEntry).filter(*filters).one()
                 return _update_last_primary_keys_and_return(session, cache_entry, tag)
             else:
@@ -192,7 +198,6 @@ def cacheable(func: F) -> F:
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                     return _clear_last_primary_keys_and_return(result)
             finally:
-                session.rollback()
                 # Unlock
                 if cache_entry and cache_entry.result == _LOCKER:
                     _delete_cache_entry(session, cache_entry)
