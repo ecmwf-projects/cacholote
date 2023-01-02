@@ -92,6 +92,7 @@ class Settings(pydantic.BaseSettings):
     raise_all_encoding_errors: bool = False
     expiration: Optional[str] = None
     tag: Optional[str] = None
+    lock_cache_db: bool = False
 
     @pydantic.validator("expiration")
     def expiration_must_be_isoformat(
@@ -161,6 +162,8 @@ class set:
     tag: str, optional, default: None
         Tag for the cache entry. If None, do NOT tag.
         Note that existing tags are overwritten.
+    lock_cache_db: bool, default: False
+        Whether to lock or not cache entries in the database.
     """
 
     def __init__(self, **kwargs: Any):

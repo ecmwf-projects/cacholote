@@ -37,6 +37,14 @@ LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
 _LOCKER = "__locked__"
 
 
+def _add_commit_or_rollback(session: sqlalchemy.orm.Session, cache_entry: Any) -> None:
+    session.add(cache_entry)
+    try:
+        session.commit()
+    finally:
+        session.rollback()
+
+
 def _update_last_primary_keys(
     session: sqlalchemy.orm.Session, cache_entry: Any, tag: Optional[str]
 ) -> Any:
@@ -162,18 +170,15 @@ def cacheable(func: F) -> F:
             # Not in the cache
             cache_entry = None
             try:
-                # Acquire lock
-                cache_entry = config.CacheEntry(
-                    key=hexdigest,
-                    expiration=expiration,
-                    result=_LOCKER,
-                    tag=settings.tag,
-                )
-                session.add(cache_entry)
-                try:
-                    session.commit()
-                finally:
-                    session.rollback()
+                if settings.lock_cache_db:
+                    # Acquire lock
+                    cache_entry = config.CacheEntry(
+                        key=hexdigest,
+                        expiration=expiration,
+                        result=_LOCKER,
+                        tag=settings.tag,
+                    )
+                    _add_commit_or_rollback(session, cache_entry)
             except sqlalchemy.exc.IntegrityError:
                 # Concurrent job: This cache entry already exists.
                 filters = [
@@ -186,16 +191,26 @@ def cacheable(func: F) -> F:
                 # Compute result from scratch
                 result = func(*args, **kwargs)
                 try:
-                    # Update cache
-                    cache_entry.result = json.loads(encode.dumps(result))
-                    return _update_last_primary_keys(session, cache_entry, tag)
+                    result_json = json.loads(encode.dumps(result))
                 except encode.EncodeError as ex:
                     # Enconding error, return result without caching
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                     return _clear_last_primary_keys(result)
+                # Update cache
+                if settings.lock_cache_db:
+                    cache_entry.result = result_json
+                else:
+                    cache_entry = config.CacheEntry(
+                        key=hexdigest,
+                        expiration=expiration,
+                        result=result_json,
+                        tag=settings.tag,
+                    )
+                    _add_commit_or_rollback(session, cache_entry)
+                return _update_last_primary_keys(session, cache_entry, tag)
             finally:
-                # Release lock
                 if cache_entry and cache_entry.result == _LOCKER:
+                    # Release lock
                     _delete_cache_entry(session, cache_entry)
 
     return cast(F, wrapper)

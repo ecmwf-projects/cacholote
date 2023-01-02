@@ -165,6 +165,8 @@ def test_io_concurrent_calls(
     expected: List[Any],
     set_cache: str,
 ) -> None:
+    config.set(lock_cache_db=True)
+
     @cache.cacheable
     def wait_and_open(urlpath: str, mode: str) -> fsspec.spec.AbstractBufferedFile:
         time.sleep(wait)
