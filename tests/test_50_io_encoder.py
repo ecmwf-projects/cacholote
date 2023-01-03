@@ -154,6 +154,7 @@ def test_io_corrupted_files(
     ],
     indirect=["set_cache"],
 )
+@pytest.mark.parametrize("lock_cache_db", [True, False])
 def test_io_concurrent_calls(
     tmpdir: pathlib.Path,
     wait: float,
@@ -164,8 +165,9 @@ def test_io_concurrent_calls(
     warning: str,
     expected: List[Any],
     set_cache: str,
+    lock_cache_db: bool,
 ) -> None:
-    config.set(lock_cache_db=True)
+    config.set(lock_cache_db=lock_cache_db)
 
     @cache.cacheable
     def wait_and_open(urlpath: str, mode: str) -> fsspec.spec.AbstractBufferedFile:
@@ -189,7 +191,13 @@ def test_io_concurrent_calls(
             args=(tmpfile, mode2),
             kwargs={"__context__": ctx},
         )
-        with pytest.warns(UserWarning, match=warning):
+        if lock_cache_db or warning == "file":
+            with pytest.warns(UserWarning, match=warning):
+                t1.start()
+                t2.start()
+                t1.join()
+                t2.join()
+        else:
             t1.start()
             t2.start()
             t1.join()

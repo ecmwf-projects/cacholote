@@ -196,17 +196,24 @@ def cacheable(func: F) -> F:
                     # Enconding error, return result without caching
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                     return _clear_last_primary_keys(result)
+
                 # Update cache
                 if settings.lock_cache_db:
                     cache_entry.result = result_json
                 else:
-                    cache_entry = config.CacheEntry(
-                        key=hexdigest,
-                        expiration=expiration,
-                        result=result_json,
-                        tag=settings.tag,
-                    )
-                    _add_commit_or_rollback(session, cache_entry)
+                    try:
+                        cache_entry = config.CacheEntry(
+                            key=hexdigest,
+                            expiration=expiration,
+                            result=result_json,
+                            tag=settings.tag,
+                        )
+                        _add_commit_or_rollback(session, cache_entry)
+                    except sqlalchemy.exc.IntegrityError:
+                        # Concurrent job: This cache entry already exists.
+                        cache_entry = (
+                            session.query(config.CacheEntry).filter(*filters).one()
+                        )
                 return _update_last_primary_keys(session, cache_entry, tag)
             finally:
                 if cache_entry and cache_entry.result == _LOCKER:
