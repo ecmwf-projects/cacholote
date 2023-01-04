@@ -36,7 +36,7 @@ LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
 _LOCKER = "__locked__"
 
 
-def _decode_and_update_last_primary_keys(
+def _decode_and_set_primary_keys(
     session: sqlalchemy.orm.Session,
     cache_entry: Any,
     settings: config.Settings,
@@ -135,9 +135,7 @@ def cacheable(func: F) -> F:
             ):
                 # Attempt all valid cache entries
                 try:
-                    return _decode_and_update_last_primary_keys(
-                        session, cache_entry, settings
-                    )
+                    return _decode_and_set_primary_keys(session, cache_entry, settings)
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
@@ -166,9 +164,7 @@ def cacheable(func: F) -> F:
                 # Update cache
                 result = func(*args, **kwargs)
                 cache_entry.result = json.loads(encode.dumps(result))
-                return _decode_and_update_last_primary_keys(
-                    session, cache_entry, settings
-                )
+                return _decode_and_set_primary_keys(session, cache_entry, settings)
             except encode.EncodeError as ex:
                 # Enconding error, return result without caching
                 warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
