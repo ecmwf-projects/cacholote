@@ -1,6 +1,8 @@
+import contextvars
 import importlib
 import io
 import pathlib
+import threading
 from typing import Any, Dict, Tuple, Union
 
 import fsspec
@@ -140,3 +142,32 @@ def test_io_corrupted_files(
         result = cfunc(url)
     assert result.read() == b"test"
     assert fs.exists(f"{dirname}/{cached_basename}")
+
+
+def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
+    cfunc = cache.cacheable(open)
+
+    # Create tmpfile
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").touch(tmpfile)
+
+    # Acquire lock
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    checksum = fsspec.filesystem("file").checksum(tmpfile)
+    lock = f"{dirname}/{checksum}.txt.lock"
+    fs.touch(lock)
+
+    def release_lock(fs: fsspec.AbstractFileSystem, lock: str) -> None:
+        fs.rm(lock)
+
+    # Threading
+    ctx = contextvars.copy_context()
+    t1 = threading.Timer(0, cfunc, args=(tmpfile,), kwargs={"__context__": ctx})
+    t2 = threading.Timer(0.1, release_lock, args=(fs, lock))
+    with pytest.warns(
+        UserWarning, match=f"can NOT proceed until file is released: {lock!r}."
+    ):
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()

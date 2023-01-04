@@ -2,8 +2,8 @@ import contextvars
 import datetime
 import pathlib
 import threading
-from typing import Any
 import time
+from typing import Any
 
 import pytest
 
@@ -197,15 +197,17 @@ def test_context_argument() -> None:
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
 def test_concurrent(set_cache: str) -> None:
     @cache.cacheable
-    def cached_sleep(sleep):
+    def cached_sleep(sleep: float) -> Any:
         time.sleep(sleep)
         return sleep
 
     # Threading
     ctx = contextvars.copy_context()
-    sleep = .2
-    t1 = threading.Timer(0, cached_sleep, args=(sleep, ), kwargs={"__context__": ctx})
-    t2 = threading.Timer(sleep/2, cached_sleep, args=(sleep, ), kwargs={"__context__": ctx})
+    sleep = 0.2
+    t1 = threading.Timer(0, cached_sleep, args=(sleep,), kwargs={"__context__": ctx})
+    t2 = threading.Timer(
+        sleep / 2, cached_sleep, args=(sleep,), kwargs={"__context__": ctx}
+    )
     t1.start()
     t2.start()
     t1.join()

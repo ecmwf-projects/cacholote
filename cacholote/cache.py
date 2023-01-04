@@ -161,6 +161,7 @@ def cacheable(func: F) -> F:
                 .with_for_update()
                 .one()
             )
+
             try:
                 # Update cache
                 result = func(*args, **kwargs)
