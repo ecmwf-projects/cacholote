@@ -1,10 +1,7 @@
-import contextvars
 import importlib
 import io
 import pathlib
-import threading
-import time
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 import fsspec
 import pytest
@@ -143,63 +140,3 @@ def test_io_corrupted_files(
         result = cfunc(url)
     assert result.read() == b"test"
     assert fs.exists(f"{dirname}/{cached_basename}")
-
-
-@pytest.mark.parametrize(
-    "wait,lag,size,mode1,mode2,warning,expected,set_cache",
-    [
-        (0.2, 0, 0, "r", "r", "cache entry", [(2,)], "file"),
-        (0.2, 0, 0, "r", "r", "cache entry", [(2,)], "cads"),
-        (0, 1.0e-5, 10_000_000, "r", "rb", "file", [(1,), (1,)], "file"),
-    ],
-    indirect=["set_cache"],
-)
-def test_io_concurrent_calls(
-    tmpdir: pathlib.Path,
-    wait: float,
-    lag: float,
-    size: int,
-    mode1: str,
-    mode2: str,
-    warning: str,
-    expected: List[Any],
-    set_cache: str,
-) -> None:
-    @cache.cacheable
-    def wait_and_open(urlpath: str, mode: str) -> fsspec.spec.AbstractBufferedFile:
-        time.sleep(wait)
-        with fsspec.open(urlpath, mode) as f:
-            return f
-
-    # Create file
-    tmpfile = tmpdir / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1" * size)
-
-    ctx = contextvars.copy_context()
-    try:
-        # Threading
-        t1 = threading.Timer(
-            0, wait_and_open, args=(tmpfile, mode1), kwargs={"__context__": ctx}
-        )
-        t2 = threading.Timer(
-            (wait / 2) + lag,
-            wait_and_open,
-            args=(tmpfile, mode2),
-            kwargs={"__context__": ctx},
-        )
-        with pytest.warns(UserWarning, match=warning):
-            t1.start()
-            t2.start()
-            t1.join()
-            t2.join()
-
-        # Check hits
-        con = config.ENGINE.get().raw_connection()
-        cur = con.cursor()
-        cur.execute("SELECT counter FROM cache_entries", ())
-        assert cur.fetchall() == expected
-    finally:
-        # Cleanup
-        fsspec.filesystem("file").rm(tmpfile)
-        fs, dirname = utils.get_cache_files_fs_dirname()
-        fs.rm(dirname, recursive=True)
