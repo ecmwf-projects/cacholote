@@ -24,6 +24,14 @@ False
 
 ```
 
+## Configuration
+
+`cacholote` offers various configuration settings.
+`cacholote` configuration can be accessed using `cacholote.config.get()` and modified using `cacholote.config.set(**kwargs)`.
+All settings available are documented through docstrings (see `help(cacholote.config.set)`).
+
+Defaults are controlled by environment variables. It is also possible to use dotenv files (see `help(cacholote.config.reset)`)
+
 ## Workflow for developers/contributors
 
 For best experience create a new conda environment (e.g. DEVELOP) with Python 3.10:
