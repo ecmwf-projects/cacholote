@@ -23,6 +23,7 @@ from types import TracebackType
 from typing import Any, Optional, Tuple, Type
 
 import fsspec
+import sqlalchemy.orm
 
 from . import config
 
@@ -106,3 +107,10 @@ class _Locker:
         exc_tb: Optional[TracebackType],
     ) -> None:
         self.release()
+
+
+def _commit_or_rollback(session: sqlalchemy.orm.Session) -> None:
+    try:
+        session.commit()
+    finally:
+        session.rollback()

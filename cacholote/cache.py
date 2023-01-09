@@ -19,7 +19,6 @@ import contextvars
 import datetime
 import functools
 import json
-import time
 import warnings
 from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
 
@@ -37,34 +36,17 @@ LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextV
 _LOCKER = "__locked__"
 
 
-def _update_last_primary_keys(
-    session: sqlalchemy.orm.Session, cache_entry: Any, tag: Optional[str]
+def _decode_and_update(
+    session: sqlalchemy.orm.Session,
+    cache_entry: Any,
+    settings: config.Settings,
 ) -> Any:
-    # Wait until unlocked
-    warned = False
-    while cache_entry.result == _LOCKER:
-        session.refresh(cache_entry)
-        if not warned:
-            warnings.warn(
-                f"can NOT proceed until the cache entry is unlocked: {cache_entry!r}."
-            )
-            warned = True
-        time.sleep(1)
-    # Get result
     result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter += 1
-    if tag is not None:
-        cache_entry.tag = tag
-    try:
-        session.commit()
-    finally:
-        session.rollback()
+    if settings.tag is not None:
+        cache_entry.tag = settings.tag
+    utils._commit_or_rollback(session)
     LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
-    return result
-
-
-def _clear_last_primary_keys(result: Any) -> Any:
-    LAST_PRIMARY_KEYS.set({})
     return result
 
 
@@ -72,10 +54,7 @@ def _delete_cache_entry(
     session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
 ) -> None:
     session.delete(cache_entry)
-    try:
-        session.commit()
-    finally:
-        session.rollback()
+    utils._commit_or_rollback(session)
     # Delete cache file
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
@@ -118,8 +97,9 @@ def cacheable(func: F) -> F:
             for key, value in __context__.items():
                 key.set(value)
 
+        LAST_PRIMARY_KEYS.set({})
+
         settings = config.SETTINGS.get()
-        tag = settings.tag
         expiration = (
             datetime.datetime.fromisoformat(settings.expiration)
             if settings.expiration is not None
@@ -128,14 +108,14 @@ def cacheable(func: F) -> F:
 
         # Cache opt-out
         if not settings.use_cache:
-            return _clear_last_primary_keys(func(*args, **kwargs))
+            return func(*args, **kwargs)
 
         try:
             # Get key
             hexdigest = hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
-            return _clear_last_primary_keys(func(*args, **kwargs))
+            return func(*args, **kwargs)
 
         # Filters for the database query
         filters = [
@@ -150,52 +130,47 @@ def cacheable(func: F) -> F:
                 session.query(config.CacheEntry)
                 .filter(*filters)
                 .order_by(config.CacheEntry.timestamp.desc())
+                .with_for_update()
             ):
                 # Attempt all valid cache entries
                 try:
-                    return _update_last_primary_keys(session, cache_entry, tag)
+                    return _decode_and_update(session, cache_entry, settings)
                 except decode.DecodeError as ex:
                     # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
                     _delete_cache_entry(session, cache_entry)
 
-            # Not in the cache
-            cache_entry = None
-            try:
-                # Acquire lock
-                cache_entry = config.CacheEntry(
-                    key=hexdigest,
-                    expiration=expiration,
-                    result=_LOCKER,
-                    tag=settings.tag,
-                )
-                session.add(cache_entry)
-                try:
-                    session.commit()
-                finally:
-                    session.rollback()
-            except sqlalchemy.exc.IntegrityError:
-                # Concurrent job: This cache entry already exists.
-                filters = [
+            # Not in the cache: Acquire lock
+            cache_entry = config.CacheEntry(
+                key=hexdigest,
+                expiration=expiration,
+                result=_LOCKER,
+                tag=settings.tag,
+            )
+            session.add(cache_entry)
+            utils._commit_or_rollback(session)
+            cache_entry = (
+                session.query(config.CacheEntry)
+                .filter(
                     config.CacheEntry.key == cache_entry.key,
                     config.CacheEntry.expiration == cache_entry.expiration,
-                ]
-                cache_entry = session.query(config.CacheEntry).filter(*filters).one()
-                return _update_last_primary_keys(session, cache_entry, tag)
-            else:
-                # Compute result from scratch
+                )
+                .with_for_update()
+                .one()
+            )
+
+            try:
+                # Update cache
                 result = func(*args, **kwargs)
-                try:
-                    # Update cache
-                    cache_entry.result = json.loads(encode.dumps(result))
-                    return _update_last_primary_keys(session, cache_entry, tag)
-                except encode.EncodeError as ex:
-                    # Enconding error, return result without caching
-                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                    return _clear_last_primary_keys(result)
+                cache_entry.result = json.loads(encode.dumps(result))
+                return _decode_and_update(session, cache_entry, settings)
+            except encode.EncodeError as ex:
+                # Enconding error, return result without caching
+                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                return result
             finally:
                 # Release lock
-                if cache_entry and cache_entry.result == _LOCKER:
+                if cache_entry.result == _LOCKER:
                     _delete_cache_entry(session, cache_entry)
 
     return cast(F, wrapper)

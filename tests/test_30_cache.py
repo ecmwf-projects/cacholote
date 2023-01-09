@@ -1,6 +1,8 @@
 import contextvars
 import datetime
 import pathlib
+import threading
+import time
 from typing import Any
 
 import pytest
@@ -190,3 +192,29 @@ def test_cached_error() -> None:
 def test_context_argument() -> None:
     ctx = contextvars.copy_context()
     assert cached_now() == cached_now(__context__=ctx)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
+def test_concurrent(set_cache: str) -> None:
+    @cache.cacheable
+    def cached_sleep(sleep: float) -> Any:
+        time.sleep(sleep)
+        return sleep
+
+    # Threading
+    ctx = contextvars.copy_context()
+    sleep = 0.2
+    t1 = threading.Timer(0, cached_sleep, args=(sleep,), kwargs={"__context__": ctx})
+    t2 = threading.Timer(
+        sleep / 2, cached_sleep, args=(sleep,), kwargs={"__context__": ctx}
+    )
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    # Check hits
+    con = config.ENGINE.get().raw_connection()
+    cur = con.cursor()
+    cur.execute("SELECT counter FROM cache_entries", ())
+    assert cur.fetchall() == [(2,)]
