@@ -26,11 +26,9 @@ False
 
 ## Configuration
 
-`cacholote` offers various configuration settings.
-`cacholote` configuration can be accessed using `cacholote.config.get()` and modified using `cacholote.config.set(**kwargs)`.
-All settings available are documented through docstrings (see `help(cacholote.config.set)`).
+Configuration settings can be accessed using `cacholote.config.get()` and modified using `cacholote.config.set(**kwargs)`. It is possible to use `cacholote.config.set` either as a context manager, or to configure global settings. See `help(cacholote.config.set)`.
 
-Defaults are controlled by environment variables. It is also possible to use dotenv files (see `help(cacholote.config.reset)`)
+Defaults are controlled by environment variables and dotenv files. See `help(cacholote.config.reset)`.
 
 ## Workflow for developers/contributors
 
