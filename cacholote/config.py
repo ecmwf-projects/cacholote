@@ -201,4 +201,9 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     set()
 
 
+def get() -> Settings:
+    """Get cacholote settings."""
+    return SETTINGS.get()
+
+
 reset()
