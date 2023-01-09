@@ -12,21 +12,13 @@ def test_change_engine(tmpdir: pathlib.Path) -> None:
 
     with config.set(cache_db_urlpath=new_db):
         assert config.ENGINE.get() is not old_engine
-        assert (
-            str(config.ENGINE.get().url)
-            == config.get().cache_db_urlpath
-            == new_db
-        )
+        assert str(config.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
     assert config.ENGINE.get() is old_engine
-    assert (
-        str(config.ENGINE.get().url) == config.get().cache_db_urlpath == old_db
-    )
+    assert str(config.ENGINE.get().url) == config.get().cache_db_urlpath == old_db
 
     config.set(cache_db_urlpath=new_db)
     assert config.ENGINE.get() is not old_engine
-    assert (
-        str(config.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
-    )
+    assert str(config.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
 
 
 def test_expiration() -> None:
