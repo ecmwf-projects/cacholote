@@ -15,9 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import config, extra_encoders, utils
-from .cache import cacheable, hexdigestify_python_call
+from . import config, database, extra_encoders, utils
+from .cache import cacheable
 from .clean import clean_cache_files
+from .database import CacheEntry
 from .decode import loads
 from .encode import dumps
 
@@ -35,10 +36,11 @@ __all__ = [
     "__version__",
     "cacheable",
     "clean_cache_files",
+    "database",
+    "CacheEntry",
     "config",
     "dumps",
     "extra_encoders",
-    "hexdigestify_python_call",
     "loads",
     "utils",
 ]
