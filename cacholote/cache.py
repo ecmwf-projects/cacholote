@@ -59,26 +59,11 @@ def _delete_cache_entry(
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
 
-def hexdigestify_python_call(
+def _hexdigestify_python_call(
     func_to_hex: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> str:
-    """Convert function to its hash made of hexadecimal digits.
-
-    Parameters
-    ----------
-    func_to_hex: str, callable
-        Function to hexdigestify
-    *args: Any
-        Arguments of ``func``
-    **kwargs: Any
-        Keyword arguments of ``func``
-
-    Returns
-    -------
-    str
-    """
     return utils.hexdigestify(encode.dumps_python_call(func_to_hex, *args, **kwargs))
 
 
@@ -112,7 +97,7 @@ def cacheable(func: F) -> F:
 
         try:
             # Get key
-            hexdigest = hexdigestify_python_call(func, *args, **kwargs)
+            hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)

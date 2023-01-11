@@ -95,12 +95,23 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
     assert cur.fetchall() == []
 
 
-def test_hexdigestify_python_call() -> None:
-    assert (
-        cache.hexdigestify_python_call(func, 1)
-        == cache.hexdigestify_python_call(func, a=1)
-        == "54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c"
-    )
+def test_same_args_kwargs() -> None:
+    ufunc = cache.cacheable(func)
+
+    con = database.ENGINE.get().raw_connection()
+    cur = con.cursor()
+
+    ufunc(1)
+    cur.execute("SELECT key, counter FROM cache_entries", ())
+    assert cur.fetchall() == [
+        ("54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c", 1)
+    ]
+
+    ufunc(a=1)
+    cur.execute("SELECT key, counter FROM cache_entries", ())
+    assert cur.fetchall() == [
+        ("54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c", 2)
+    ]
 
 
 @pytest.mark.parametrize("use_cache", [True, False])
