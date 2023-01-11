@@ -4,7 +4,7 @@ from typing import Any, Literal, Optional, Sequence
 import fsspec
 import pytest
 
-from cacholote import cache, clean, config, utils
+from cacholote import cache, clean, config, database, utils
 
 
 @cache.cacheable
@@ -21,7 +21,7 @@ def test_clean_cache_files(
     method: Literal["LRU", "LFU"],
 ) -> None:
 
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()
 

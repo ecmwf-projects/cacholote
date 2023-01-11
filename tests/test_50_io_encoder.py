@@ -9,7 +9,7 @@ import fsspec
 import pytest
 import pytest_httpserver
 
-from cacholote import cache, config, decode, encode, extra_encoders, utils
+from cacholote import cache, config, database, decode, encode, extra_encoders, utils
 
 
 def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
@@ -88,7 +88,7 @@ def test_copy_from_http_to_cache(
 ) -> None:
 
     # cache-db to check
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     # http server

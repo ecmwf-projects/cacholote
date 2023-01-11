@@ -2,23 +2,23 @@ import contextvars
 import os
 import pathlib
 
-from cacholote import config
+from cacholote import config, database
 
 
 def test_change_engine(tmpdir: pathlib.Path) -> None:
     old_db = config.get().cache_db_urlpath
     new_db = "sqlite:///" + str(tmpdir / "dummy.db")
-    old_engine = config.ENGINE.get()
+    old_engine = database.ENGINE.get()
 
     with config.set(cache_db_urlpath=new_db):
-        assert config.ENGINE.get() is not old_engine
-        assert str(config.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
-    assert config.ENGINE.get() is old_engine
-    assert str(config.ENGINE.get().url) == config.get().cache_db_urlpath == old_db
+        assert database.ENGINE.get() is not old_engine
+        assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
+    assert database.ENGINE.get() is old_engine
+    assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == old_db
 
     config.set(cache_db_urlpath=new_db)
-    assert config.ENGINE.get() is not old_engine
-    assert str(config.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
+    assert database.ENGINE.get() is not old_engine
+    assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
 
 
 def test_expiration() -> None:
@@ -39,9 +39,9 @@ def test_env_variables(tmpdir: pathlib.Path) -> None:
     config.reset(str(dotenv_path))
     try:
         assert config.get().cache_db_urlpath == "sqlite://"
-        assert str(config.ENGINE.get().url) == "sqlite://"
+        assert str(database.ENGINE.get().url) == "sqlite://"
         assert config.get().io_delete_original is True
-        assert str(config.ENGINE.get().url) == "sqlite://"
+        assert str(database.ENGINE.get().url) == "sqlite://"
     finally:
         os.environ.clear()
         os.environ.update(old_environ)
