@@ -6,7 +6,6 @@ import subprocess
 import time
 from typing import Any, Dict, Generator
 
-import psycopg
 import pytest
 
 from cacholote import config
@@ -48,7 +47,7 @@ def initialize_s3() -> Generator[Dict[str, str], None, None]:
 @pytest.fixture(autouse=True)
 def set_cache(
     tmpdir: pathlib.Path,
-    postgresql: psycopg.Connection[Any],
+    postgresql,
     request: pytest.FixtureRequest,
 ) -> Generator[str, None, None]:
     if not hasattr(request, "param") or request.param == "file":
