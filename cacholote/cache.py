@@ -84,7 +84,7 @@ def cacheable(func: F) -> F:
 
         LAST_PRIMARY_KEYS.set({})
 
-        settings = config.SETTINGS.get()
+        settings = config.get()
         expiration = (
             datetime.datetime.fromisoformat(settings.expiration)
             if settings.expiration is not None

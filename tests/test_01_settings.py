@@ -55,4 +55,4 @@ def test_contextvar() -> None:
     ctx.run(set_tag)
 
     assert config.get().tag is None
-    assert ctx[config.SETTINGS].tag == "foo"
+    assert ctx[config._SETTINGS].tag == "foo"

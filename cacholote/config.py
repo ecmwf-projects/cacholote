@@ -28,7 +28,7 @@ import sqlalchemy
 
 from . import database
 
-SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
+_SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
     "cacholote_settings"
 )
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
@@ -120,10 +120,10 @@ class set:
     """
 
     def __init__(self, **kwargs: Any):
-        old_settings = SETTINGS.get()
+        old_settings = _SETTINGS.get()
         new_settings = Settings(**{**old_settings.dict(), **kwargs})
         new_settings.make_cache_dir()
-        self._settings_token = SETTINGS.set(new_settings)
+        self._settings_token = _SETTINGS.set(new_settings)
         self._engine_token = new_settings.set_engine()
 
     def __enter__(self) -> None:
@@ -137,7 +137,7 @@ class set:
     ) -> None:
         if self._engine_token:
             database.ENGINE.reset(self._engine_token)
-        SETTINGS.reset(self._settings_token)
+        _SETTINGS.reset(self._settings_token)
 
 
 def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
@@ -153,13 +153,13 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     env_file: str, tuple[str], default=None
         Dot env file(s).
     """
-    SETTINGS.set(Settings(_env_file=env_file))
+    _SETTINGS.set(Settings(_env_file=env_file))
     set()
 
 
 def get() -> Settings:
     """Get cacholote settings."""
-    return SETTINGS.get()
+    return _SETTINGS.get()
 
 
 reset()
