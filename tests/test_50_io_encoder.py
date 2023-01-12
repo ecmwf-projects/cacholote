@@ -1,4 +1,5 @@
 import contextvars
+import hashlib
 import importlib
 import io
 import pathlib
@@ -64,7 +65,8 @@ def test_dictify_bytes_io_object(
     tmpdir: pathlib.Path, obj: Union[io.BytesIO, io.StringIO]
 ) -> None:
     actual = extra_encoders.dictify_io_object(obj)["args"]
-    local_path = f"{tmpdir}/cache_files/{hash(obj)}"
+    obj_hash = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()
+    local_path = f"{tmpdir}/cache_files/{obj_hash}"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected: Tuple[Dict[str, Any], ...] = (
         {
@@ -153,8 +155,8 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
 
     # Acquire lock
     fs, dirname = utils.get_cache_files_fs_dirname()
-    hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
-    lock = f"{dirname}/{hash}.txt.lock"
+    file_hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
+    lock = f"{dirname}/{file_hash}.txt.lock"
     fs.touch(lock)
 
     def release_lock(fs: fsspec.AbstractFileSystem, lock: str) -> None:

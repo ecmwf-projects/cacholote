@@ -16,6 +16,7 @@
 # limitations under the License.
 
 import functools
+import hashlib
 import inspect
 import io
 import mimetypes
@@ -306,7 +307,8 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
         urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
         _maybe_store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
     else:
-        urlpath_out = posixpath.join(cache_files_urlpath, f"{hash(obj)}")
+        root = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()  # fsspec uses md5
+        urlpath_out = posixpath.join(cache_files_urlpath, root)
         _maybe_store_io_object(obj, fs_out, urlpath_out)
 
     file_json = _dictify_file(fs_out, urlpath_out)

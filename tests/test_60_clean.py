@@ -30,8 +30,8 @@ def test_clean_cache_files(
     for algorithm in ("LRU", "LFU"):
         filename = tmpdir / f"{algorithm}.txt"
         fsspec.filesystem("file").pipe_file(filename, b"1")
-        hash = f"{fsspec.filesystem('file').checksum(filename):x}"
-        cachedname = f"{dirname}/{hash}.txt"
+        file_hash = f"{fsspec.filesystem('file').checksum(filename):x}"
+        cachedname = f"{dirname}/{file_hash}.txt"
         paths[algorithm] = cachedname
 
     # Copy to cache
@@ -76,8 +76,8 @@ def test_delete_unknown_files(
     # Clean one file
     clean.clean_cache_files(1, delete_unknown_files=delete_unknown_files)
     if delete_unknown_files and not add_lock:
-        hash = f"{fs.checksum(tmpfile):x}"
-        assert fs.ls(dirname) == [f"{dirname}/{hash}.txt"]
+        file_hash = f"{fs.checksum(tmpfile):x}"
+        assert fs.ls(dirname) == [f"{dirname}/{file_hash}.txt"]
     else:
         if add_lock:
             assert set(fs.ls(dirname)) == {
@@ -114,8 +114,8 @@ def test_clean_tagged_files(
             open_url(tmpfile)
 
     clean.clean_cache_files(1, tags_to_clean=tags_to_clean, tags_to_keep=tags_to_keep)
-    hash = f"{fs.checksum(tmpdir / f'test_{expected}.txt'):x}"
-    assert fs.ls(dirname) == [f"{dirname}/{hash}.txt"]
+    file_hash = f"{fs.checksum(tmpdir / f'test_{expected}.txt'):x}"
+    assert fs.ls(dirname) == [f"{dirname}/{file_hash}.txt"]
 
 
 def test_clean_tagged_files_wrong_args() -> None:
