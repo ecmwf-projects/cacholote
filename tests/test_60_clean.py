@@ -26,18 +26,19 @@ def test_clean_cache_files(
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create files
-    checksums = {}
+    paths = {}
     for algorithm in ("LRU", "LFU"):
         filename = tmpdir / f"{algorithm}.txt"
         fsspec.filesystem("file").pipe_file(filename, b"1")
-        cachedname = f"{dirname}/{fsspec.filesystem('file').checksum(filename)}.txt"
-        checksums[algorithm] = cachedname
+        hash = f"{fsspec.filesystem('file').checksum(filename):x}"
+        cachedname = f"{dirname}/{hash}.txt"
+        paths[algorithm] = cachedname
 
     # Copy to cache
     open_url(tmpdir / "LRU.txt")
     open_url(tmpdir / "LRU.txt")
     open_url(tmpdir / "LFU.txt")
-    assert set(fs.ls(dirname)) == set(checksums.values())
+    assert set(fs.ls(dirname)) == set(paths.values())
 
     # Do not clean
     clean.clean_cache_files(2, method=method)
@@ -50,7 +51,7 @@ def test_clean_cache_files(
     cur.execute("SELECT * FROM cache_entries", ())
     nrows = len(cur.fetchall())
     assert nrows == fs.du(dirname) == 1
-    assert not fs.exists(f"{dirname}/{checksums[method]}.txt")
+    assert not fs.exists(f"{dirname}/{paths[method]}.txt")
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
@@ -75,7 +76,8 @@ def test_delete_unknown_files(
     # Clean one file
     clean.clean_cache_files(1, delete_unknown_files=delete_unknown_files)
     if delete_unknown_files and not add_lock:
-        assert fs.ls(dirname) == [f"{dirname}/{fs.checksum(tmpfile)}.txt"]
+        hash = f"{fs.checksum(tmpfile):x}"
+        assert fs.ls(dirname) == [f"{dirname}/{hash}.txt"]
     else:
         if add_lock:
             assert set(fs.ls(dirname)) == {
@@ -112,9 +114,8 @@ def test_clean_tagged_files(
             open_url(tmpfile)
 
     clean.clean_cache_files(1, tags_to_clean=tags_to_clean, tags_to_keep=tags_to_keep)
-    assert fs.ls(dirname) == [
-        f"{dirname}/{fs.checksum(tmpdir / f'test_{expected}.txt')}.txt"
-    ]
+    hash = f"{fs.checksum(tmpdir / f'test_{expected}.txt'):x}"
+    assert fs.ls(dirname) == [f"{dirname}/{hash}.txt"]
 
 
 def test_clean_tagged_files_wrong_args() -> None:
