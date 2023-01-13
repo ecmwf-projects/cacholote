@@ -45,7 +45,7 @@ def _decode_and_update(
     cache_entry.counter += 1
     if settings.tag is not None:
         cache_entry.tag = settings.tag
-    utils._commit_or_rollback(session)
+    database._commit_or_rollback(session)
     LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
     return result
 
@@ -54,7 +54,7 @@ def _delete_cache_entry(
     session: sqlalchemy.orm.Session, cache_entry: database.CacheEntry
 ) -> None:
     session.delete(cache_entry)
-    utils._commit_or_rollback(session)
+    database._commit_or_rollback(session)
     # Delete cache file
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
@@ -133,7 +133,7 @@ def cacheable(func: F) -> F:
                 tag=settings.tag,
             )
             session.add(cache_entry)
-            utils._commit_or_rollback(session)
+            database._commit_or_rollback(session)
             cache_entry = (
                 session.query(database.CacheEntry)
                 .filter(

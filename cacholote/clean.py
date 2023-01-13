@@ -49,7 +49,7 @@ def _delete_cache_file(
             if session and cache_entry and not dry_run:
                 logging.info("Deleting cache entry: %r", cache_entry)
                 session.delete(cache_entry)
-                utils._commit_or_rollback(session)
+                database._commit_or_rollback(session)
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
