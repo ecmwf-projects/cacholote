@@ -47,7 +47,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
         cur.execute("SELECT key, expiration, result, counter FROM cache_entries", ())
         assert cur.fetchall() == [
             (
-                "a8260ac3cdc1404aa64a6fb71e85304922e86bcab2eeb6177df5c933",
+                "a8260ac3cdc1404aa64a6fb71e853049",
                 "9999-12-31 23:59:59.999999",
                 '{"a": "test", "b": null, "args": [], "kwargs": {}}',
                 counter,
@@ -104,13 +104,13 @@ def test_same_args_kwargs() -> None:
     ufunc(1)
     cur.execute("SELECT key, counter FROM cache_entries", ())
     assert cur.fetchall() == [
-        ("54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c", 1)
+        ("54f546036ae7dccdd0155893189154c0", 1)
     ]
 
     ufunc(a=1)
     cur.execute("SELECT key, counter FROM cache_entries", ())
     assert cur.fetchall() == [
-        ("54f546036ae7dccdd0155893189154c029803b1f52a7bf5e6283296c", 2)
+        ("54f546036ae7dccdd0155893189154c0", 2)
     ]
 
 
@@ -121,7 +121,7 @@ def test_use_cache(use_cache: bool) -> None:
     if use_cache:
         assert cached_now() == cached_now()
         assert cache.LAST_PRIMARY_KEYS.get() == {
-            "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+            "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
             "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
         }
     else:
@@ -132,20 +132,20 @@ def test_use_cache(use_cache: bool) -> None:
 def test_expiration() -> None:
     first = cached_now()
     assert cache.LAST_PRIMARY_KEYS.get() == {
-        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
 
     with config.set(expiration="1908-03-09T00:00:00"):
         assert cached_now() != first
         assert cache.LAST_PRIMARY_KEYS.get() == {
-            "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+            "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
             "expiration": datetime.datetime(1908, 3, 9),
         }
 
     assert first == cached_now()
     assert cache.LAST_PRIMARY_KEYS.get() == {
-        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
 
@@ -182,7 +182,7 @@ def test_contextvar() -> None:
     ctx = contextvars.copy_context()
     ctx.run(cached_now)
     assert ctx[cache.LAST_PRIMARY_KEYS] == {
-        "key": "c3d9e414d0d32337c3672cb29b1b3cc9408001bf2d1b2a71c5e45fb6",
+        "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
         "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
     }
 

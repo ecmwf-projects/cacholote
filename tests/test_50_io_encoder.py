@@ -1,4 +1,5 @@
 import contextvars
+import hashlib
 import importlib
 import io
 import pathlib
@@ -29,12 +30,12 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     # Create file
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"test")
-    tmp_checksum = fsspec.filesystem("file").checksum(tmpfile)
+    tmp_hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
 
     # Check dict and cached file
     actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
-    href = f"{readonly_dir}/{tmp_checksum}.txt"
-    local_path = f"{tmpdir}/cache_files/{tmp_checksum}.txt"
+    href = f"{readonly_dir}/{tmp_hash}.txt"
+    local_path = f"{tmpdir}/cache_files/{tmp_hash}.txt"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
         "type": "python_call",
@@ -64,7 +65,8 @@ def test_dictify_bytes_io_object(
     tmpdir: pathlib.Path, obj: Union[io.BytesIO, io.StringIO]
 ) -> None:
     actual = extra_encoders.dictify_io_object(obj)["args"]
-    local_path = f"{tmpdir}/cache_files/{hash(obj)}"
+    obj_hash = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()
+    local_path = f"{tmpdir}/cache_files/{obj_hash}"
     checksum = fsspec.filesystem("file").checksum(local_path)
     expected: Tuple[Dict[str, Any], ...] = (
         {
@@ -94,7 +96,7 @@ def test_copy_from_http_to_cache(
     # http server
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
-    cached_basename = str(fsspec.filesystem("http").checksum(url))
+    cached_basename = f"{fsspec.filesystem('http').checksum(url):x}"
 
     # cache http file
     fs, dirname = utils.get_cache_files_fs_dirname()
@@ -121,7 +123,7 @@ def test_io_corrupted_files(
     # http server
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")
-    cached_basename = str(fsspec.filesystem("http").checksum(url))
+    cached_basename = f"{fsspec.filesystem('http').checksum(url):x}"
 
     # cache file
     fs, dirname = utils.get_cache_files_fs_dirname()
@@ -153,8 +155,8 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
 
     # Acquire lock
     fs, dirname = utils.get_cache_files_fs_dirname()
-    checksum = fsspec.filesystem("file").checksum(tmpfile)
-    lock = f"{dirname}/{checksum}.txt.lock"
+    file_hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
+    lock = f"{dirname}/{file_hash}.txt.lock"
     fs.touch(lock)
 
     def release_lock(fs: fsspec.AbstractFileSystem, lock: str) -> None:
