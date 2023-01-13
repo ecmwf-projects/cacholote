@@ -103,15 +103,11 @@ def test_same_args_kwargs() -> None:
 
     ufunc(1)
     cur.execute("SELECT key, counter FROM cache_entries", ())
-    assert cur.fetchall() == [
-        ("54f546036ae7dccdd0155893189154c0", 1)
-    ]
+    assert cur.fetchall() == [("54f546036ae7dccdd0155893189154c0", 1)]
 
     ufunc(a=1)
     cur.execute("SELECT key, counter FROM cache_entries", ())
-    assert cur.fetchall() == [
-        ("54f546036ae7dccdd0155893189154c0", 2)
-    ]
+    assert cur.fetchall() == [("54f546036ae7dccdd0155893189154c0", 2)]
 
 
 @pytest.mark.parametrize("use_cache", [True, False])
