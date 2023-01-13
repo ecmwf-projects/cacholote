@@ -31,7 +31,7 @@ from . import config
 def hexdigestify(text: str) -> str:
     """Convert text to its hash made of hexadecimal digits."""
     hash_req = hashlib.sha3_224(text.encode())
-    return hash_req.hexdigest()
+    return hash_req.hexdigest()[:32]
 
 
 def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
