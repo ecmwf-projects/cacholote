@@ -23,13 +23,13 @@ from typing import Any, Dict, Literal, Optional, Sequence, Set
 import sqlalchemy
 import sqlalchemy.orm
 
-from . import config, extra_encoders, utils
+from . import database, extra_encoders, utils
 
 
 def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sqlalchemy.orm.Session] = None,
-    cache_entry: Optional[config.CacheEntry] = None,
+    cache_entry: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
 ) -> Any:
@@ -88,9 +88,9 @@ class _Cleaner:
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
             with sqlalchemy.orm.Session(
-                config.ENGINE.get(), autoflush=False
+                database.ENGINE.get(), autoflush=False
             ) as session:
-                for cache_entry in session.query(config.CacheEntry):
+                for cache_entry in session.query(database.CacheEntry):
                     json.loads(
                         cache_entry._result_as_string,
                         object_hook=functools.partial(
@@ -137,37 +137,37 @@ class _Cleaner:
         if tags_to_keep is not None:
             filters.append(
                 sqlalchemy.or_(
-                    config.CacheEntry.tag.not_in(tags_to_keep),
-                    config.CacheEntry.tag.is_not(None)
+                    database.CacheEntry.tag.not_in(tags_to_keep),
+                    database.CacheEntry.tag.is_not(None)
                     if None in tags_to_keep
-                    else config.CacheEntry.tag.is_(None),
+                    else database.CacheEntry.tag.is_(None),
                 )
             )
         elif tags_to_clean is not None:
             filters.append(
                 sqlalchemy.or_(
-                    config.CacheEntry.tag.in_(tags_to_clean),
-                    config.CacheEntry.tag.is_(None)
+                    database.CacheEntry.tag.in_(tags_to_clean),
+                    database.CacheEntry.tag.is_(None)
                     if None in tags_to_clean
-                    else config.CacheEntry.tag.is_not(None),
+                    else database.CacheEntry.tag.is_not(None),
                 )
             )
 
         # Sorters
         if method == "LRU":
-            sorters = [config.CacheEntry.timestamp, config.CacheEntry.counter]
+            sorters = [database.CacheEntry.timestamp, database.CacheEntry.counter]
         elif method == "LFU":
-            sorters = [config.CacheEntry.counter, config.CacheEntry.timestamp]
+            sorters = [database.CacheEntry.counter, database.CacheEntry.timestamp]
         else:
             raise ValueError("`method` must be 'LRU' or 'LFU'.")
-        sorters.append(config.CacheEntry.expiration)
+        sorters.append(database.CacheEntry.expiration)
 
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
-        with sqlalchemy.orm.Session(config.ENGINE.get(), autoflush=False) as session:
+        with sqlalchemy.orm.Session(database.ENGINE.get(), autoflush=False) as session:
             for cache_entry in (
-                session.query(config.CacheEntry).filter(*filters).order_by(*sorters)
+                session.query(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
                 json.loads(
                     cache_entry._result_as_string,

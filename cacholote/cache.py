@@ -25,7 +25,7 @@ from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
 import sqlalchemy
 import sqlalchemy.orm
 
-from . import clean, config, decode, encode, utils
+from . import clean, config, database, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -51,7 +51,7 @@ def _decode_and_update(
 
 
 def _delete_cache_entry(
-    session: sqlalchemy.orm.Session, cache_entry: config.CacheEntry
+    session: sqlalchemy.orm.Session, cache_entry: database.CacheEntry
 ) -> None:
     session.delete(cache_entry)
     utils._commit_or_rollback(session)
@@ -59,26 +59,11 @@ def _delete_cache_entry(
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
 
-def hexdigestify_python_call(
+def _hexdigestify_python_call(
     func_to_hex: Union[str, Callable[..., Any]],
     *args: Any,
     **kwargs: Any,
 ) -> str:
-    """Convert function to its hash made of hexadecimal digits.
-
-    Parameters
-    ----------
-    func_to_hex: str, callable
-        Function to hexdigestify
-    *args: Any
-        Arguments of ``func``
-    **kwargs: Any
-        Keyword arguments of ``func``
-
-    Returns
-    -------
-    str
-    """
     return utils.hexdigestify(encode.dumps_python_call(func_to_hex, *args, **kwargs))
 
 
@@ -99,7 +84,7 @@ def cacheable(func: F) -> F:
 
         LAST_PRIMARY_KEYS.set({})
 
-        settings = config.SETTINGS.get()
+        settings = config.get()
         expiration = (
             datetime.datetime.fromisoformat(settings.expiration)
             if settings.expiration is not None
@@ -112,24 +97,24 @@ def cacheable(func: F) -> F:
 
         try:
             # Get key
-            hexdigest = hexdigestify_python_call(func, *args, **kwargs)
+            hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)
 
         # Filters for the database query
         filters = [
-            config.CacheEntry.key == hexdigest,
-            config.CacheEntry.expiration > datetime.datetime.utcnow(),
+            database.CacheEntry.key == hexdigest,
+            database.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
         if expiration is not None:
             # If expiration is provided, only get entries with matching expiration
-            filters.append(config.CacheEntry.expiration == expiration)
-        with sqlalchemy.orm.Session(config.ENGINE.get(), autoflush=False) as session:
+            filters.append(database.CacheEntry.expiration == expiration)
+        with sqlalchemy.orm.Session(database.ENGINE.get(), autoflush=False) as session:
             for cache_entry in (
-                session.query(config.CacheEntry)
+                session.query(database.CacheEntry)
                 .filter(*filters)
-                .order_by(config.CacheEntry.timestamp.desc())
+                .order_by(database.CacheEntry.timestamp.desc())
                 .with_for_update()
             ):
                 # Attempt all valid cache entries
@@ -141,7 +126,7 @@ def cacheable(func: F) -> F:
                     _delete_cache_entry(session, cache_entry)
 
             # Not in the cache: Acquire lock
-            cache_entry = config.CacheEntry(
+            cache_entry = database.CacheEntry(
                 key=hexdigest,
                 expiration=expiration,
                 result=_LOCKER,
@@ -150,10 +135,10 @@ def cacheable(func: F) -> F:
             session.add(cache_entry)
             utils._commit_or_rollback(session)
             cache_entry = (
-                session.query(config.CacheEntry)
+                session.query(database.CacheEntry)
                 .filter(
-                    config.CacheEntry.key == cache_entry.key,
-                    config.CacheEntry.expiration == cache_entry.expiration,
+                    database.CacheEntry.key == cache_entry.key,
+                    database.CacheEntry.expiration == cache_entry.expiration,
                 )
                 .with_for_update()
                 .one()

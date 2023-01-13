@@ -149,7 +149,7 @@ def filecache_default(
             try:
                 return encoder(obj)
             except Exception as ex:
-                if config.SETTINGS.get().raise_all_encoding_errors:
+                if config.get().raise_all_encoding_errors:
                     raise ex
                 warnings.warn(f"{encoder!r} did not work: {ex!r}")
     raise EncodeError("can't encode object")

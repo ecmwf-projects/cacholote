@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import contextvars
 import datetime
-import json
 import pathlib
 import tempfile
 from types import TracebackType
@@ -26,57 +25,14 @@ from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 import fsspec
 import pydantic
 import sqlalchemy
-import sqlalchemy.orm
 
-ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
-    "cacholote_engine"
-)
-SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
+from . import database
+
+_SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
     "cacholote_settings"
 )
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
-
-Base = sqlalchemy.orm.declarative_base()
-
-
-class CacheEntry(Base):
-    __tablename__ = "cache_entries"
-
-    key = sqlalchemy.Column(sqlalchemy.String(32), primary_key=True)
-    expiration = sqlalchemy.Column(
-        sqlalchemy.DateTime, default=datetime.datetime.max, primary_key=True
-    )
-    result = sqlalchemy.Column(sqlalchemy.JSON)
-    timestamp = sqlalchemy.Column(
-        sqlalchemy.DateTime,
-        default=datetime.datetime.utcnow,
-        onupdate=datetime.datetime.utcnow,
-    )
-    counter = sqlalchemy.Column(sqlalchemy.Integer, default=0)
-    tag = sqlalchemy.Column(sqlalchemy.String)
-
-    constraint = sqlalchemy.UniqueConstraint(key, expiration)
-
-    @property
-    def _result_as_string(self) -> str:
-        return json.dumps(self.result)
-
-    @property
-    def _primary_keys(self) -> Dict[str, Any]:
-        return {name: getattr(self, name) for name in ["key", "expiration"]}
-
-    def __repr__(self) -> str:
-        return str(self._primary_keys)
-
-
-@sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
-def set_epiration_to_max(
-    mapper: sqlalchemy.orm.Mapper,
-    connection: sqlalchemy.engine.Connection,
-    target: CacheEntry,
-) -> None:
-    target.expiration = target.expiration or datetime.datetime.max
 
 
 class Settings(pydantic.BaseSettings):
@@ -116,15 +72,15 @@ class Settings(pydantic.BaseSettings):
 
     def set_engine(self) -> Optional[contextvars.Token]:  # type: ignore[type-arg] # py38 not subscriptable
         try:
-            engine = ENGINE.get()
+            engine = database.ENGINE.get()
         except LookupError:
             pass
         else:
             if str(engine.url) == self.cache_db_urlpath:
                 return None
         engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
-        Base.metadata.create_all(engine)
-        return ENGINE.set(engine)
+        database.Base.metadata.create_all(engine)
+        return database.ENGINE.set(engine)
 
     class Config:
         case_sensitive = False
@@ -164,10 +120,10 @@ class set:
     """
 
     def __init__(self, **kwargs: Any):
-        old_settings = SETTINGS.get()
+        old_settings = _SETTINGS.get()
         new_settings = Settings(**{**old_settings.dict(), **kwargs})
         new_settings.make_cache_dir()
-        self._settings_token = SETTINGS.set(new_settings)
+        self._settings_token = _SETTINGS.set(new_settings)
         self._engine_token = new_settings.set_engine()
 
     def __enter__(self) -> None:
@@ -180,8 +136,8 @@ class set:
         exc_tb: Optional[TracebackType],
     ) -> None:
         if self._engine_token:
-            ENGINE.reset(self._engine_token)
-        SETTINGS.reset(self._settings_token)
+            database.ENGINE.reset(self._engine_token)
+        _SETTINGS.reset(self._settings_token)
 
 
 def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
@@ -197,13 +153,13 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     env_file: str, tuple[str], default=None
         Dot env file(s).
     """
-    SETTINGS.set(Settings(_env_file=env_file))
+    _SETTINGS.set(Settings(_env_file=env_file))
     set()
 
 
 def get() -> Settings:
     """Get cacholote settings."""
-    return SETTINGS.get()
+    return _SETTINGS.get()
 
 
 reset()

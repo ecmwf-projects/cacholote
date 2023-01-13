@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from cacholote import cache, config
+from cacholote import cache, config, database
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
@@ -33,7 +33,7 @@ def cached_error() -> None:
 
 def test_cacheable(tmpdir: pathlib.Path) -> None:
 
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     cfunc = cache.cacheable(func)
@@ -89,18 +89,25 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     # cache-db must be empty
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
     cur.execute("SELECT * FROM cache_entries", ())
     assert cur.fetchall() == []
 
 
-def test_hexdigestify_python_call() -> None:
-    assert (
-        cache.hexdigestify_python_call(func, 1)
-        == cache.hexdigestify_python_call(func, a=1)
-        == "54f546036ae7dccdd0155893189154c0"
-    )
+def test_same_args_kwargs() -> None:
+    ufunc = cache.cacheable(func)
+
+    con = database.ENGINE.get().raw_connection()
+    cur = con.cursor()
+
+    ufunc(1)
+    cur.execute("SELECT key, counter FROM cache_entries", ())
+    assert cur.fetchall() == [("54f546036ae7dccdd0155893189154c0", 1)]
+
+    ufunc(a=1)
+    cur.execute("SELECT key, counter FROM cache_entries", ())
+    assert cur.fetchall() == [("54f546036ae7dccdd0155893189154c0", 2)]
 
 
 @pytest.mark.parametrize("use_cache", [True, False])
@@ -140,7 +147,7 @@ def test_expiration() -> None:
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     cached_now()
@@ -179,7 +186,7 @@ def test_contextvar() -> None:
 
 
 def test_cached_error() -> None:
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
 
     with pytest.raises(ValueError, match="test error"):
@@ -214,7 +221,7 @@ def test_concurrent(set_cache: str) -> None:
     t2.join()
 
     # Check hits
-    con = config.ENGINE.get().raw_connection()
+    con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries", ())
     assert cur.fetchall() == [(2,)]
