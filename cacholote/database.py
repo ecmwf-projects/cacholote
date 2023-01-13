@@ -50,3 +50,10 @@ def set_epiration_to_max(
     target: CacheEntry,
 ) -> None:
     target.expiration = target.expiration or datetime.datetime.max
+
+
+def _commit_or_rollback(session: sqlalchemy.orm.Session) -> None:
+    try:
+        session.commit()
+    finally:
+        session.rollback()
