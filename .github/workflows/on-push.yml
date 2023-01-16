@@ -11,7 +11,7 @@ on:
     - main
 
 concurrency:
-  group: ${{ '{{ github.workflow }}' }}-${{ '{{ github.ref }}' }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 defaults:
@@ -138,10 +138,10 @@ jobs:
     strategy:
       matrix:
         include:
-        - extra: -integration
-          python-version: '3.10'
-        - extra: -ci
-          python-version: '3.8'
+        - python-version: '3.10'
+          extra: -integration
+        - python-version: '3.8'
+          extra: -ci
 
     steps:
     - uses: actions/checkout@v3
@@ -153,12 +153,12 @@ jobs:
     - name: Install Conda environment with Micromamba
       uses: mamba-org/provision-with-micromamba@v14
       with:
-        environment-file: ci/combined-environment${{ '{{ matrix.extra }}' }}.yml
-        environment-name: DEVELOP${{ '{{ matrix.extra }}' }}
+        environment-file: ci/combined-environment${{ matrix.extra }}.yml
+        environment-name: DEVELOP${{ matrix.extra }}
         channels: conda-forge
         cache-env: true
         extra-specs: |
-          python=${{ '{{ matrix.python-version }}' }}
+          python=${{ matrix.python-version }}
     - name: Install package
       run: |
         python -m pip install --no-deps -e .
@@ -187,12 +187,12 @@ jobs:
     - name: Check wheels
       run: |
         cd dist || exit
-        $CONDA/bin/python -m pip install cacholote*.whl || exit
+        $CONDA/bin/python -m pip install my_package*.whl || exit
         $CONDA/bin/python -m twine check * || exit
-        $CONDA/bin/python -c "import cacholote"
+        $CONDA/bin/python -c "import my_package"
     - name: Publish a Python distribution to PyPI
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
-        password: ${{ '{{ secrets.PYPI_API_TOKEN }}' }}
+        password: ${{ secrets.PYPI_API_TOKEN }}
