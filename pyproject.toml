@@ -1,15 +1,72 @@
 [build-system]
 requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 
+[project]
+name = "cacholote"
+description = "Efficiently cache calls to functions"
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering"
+]
+dynamic = ["version"]
+dependencies = [
+    "fsspec",
+    "pydantic[dotenv]",
+    "sqlalchemy"
+]
+
 [tool.coverage.run]
 branch = true
 
-[tool.isort]
-profile = "black"
+[tool.mypy]
+strict = true
+plugins = [
+  "sqlalchemy.ext.mypy.plugin"
+  ]
 
-[tool.pydocstyle]
-convention = "numpy"
-add_ignore = "D1"
+[[tool.mypy.overrides]]
+module = [
+  "cfgrib.*",
+  "fsspec.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+# Black line length is 88, but black does not format comments.
+line-length = 110
+select = [
+  # pyflakes
+  "F",
+  # pycodestyle
+  "E",
+  "W",
+  # isort
+  "I",
+  # pydocstyle
+  "D",
+]
+ignore = [
+  # pydocstyle: Missing Docstrings
+  "D1",
+  # pydocstyle: numpy convention
+  "D107",
+  "D203",
+  "D212",
+  "D213",
+  "D402",
+  "D413",
+  "D415",
+  "D416",
+  "D417"
+]
 
 [tool.setuptools_scm]
 write_to = "cacholote/version.py"
