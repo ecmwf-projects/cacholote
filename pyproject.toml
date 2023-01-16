@@ -68,6 +68,9 @@ ignore = [
   "D417"
 ]
 
+[tool.setuptools]
+packages = ["cacholote"]
+
 [tool.setuptools_scm]
 write_to = "cacholote/version.py"
 write_to_template = '''
