@@ -73,7 +73,7 @@ def _hexdigestify_python_call(
 def _lock_cache_entry(
     session: sqlalchemy.orm.Session,
     hexdigest: str,
-    expiration: datetime.datetime | None,
+    expiration: Optional[datetime.datetime],
     settings: config.Settings,
 ) -> Iterator[database.CacheEntry]:
     cache_entry = database.CacheEntry(
@@ -139,7 +139,7 @@ def cacheable(func: F) -> F:
             database.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
         if expiration is not None:
-            # If expiration is provided, only get entries with matching expiration
+            # When expiration is provided, only get entries with matching expiration
             filters.append(database.CacheEntry.expiration == expiration)
 
         with sqlalchemy.orm.Session(database.ENGINE.get(), autoflush=False) as session:
