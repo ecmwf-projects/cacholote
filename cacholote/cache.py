@@ -119,12 +119,6 @@ def cacheable(func: F) -> F:
         LAST_PRIMARY_KEYS.set({})
 
         settings = config.get()
-        expiration = (
-            datetime.datetime.fromisoformat(settings.expiration)
-            if settings.expiration is not None
-            else settings.expiration
-        )
-
         if not settings.use_cache:
             return func(*args, **kwargs)
 
@@ -138,6 +132,12 @@ def cacheable(func: F) -> F:
             database.CacheEntry.key == hexdigest,
             database.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
+
+        expiration = (
+            datetime.datetime.fromisoformat(settings.expiration)
+            if settings.expiration is not None
+            else settings.expiration
+        )
         if expiration is not None:
             # When expiration is provided, only get entries with matching expiration
             filters.append(database.CacheEntry.expiration == expiration)
