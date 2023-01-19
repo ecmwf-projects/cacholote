@@ -15,12 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import contextvars
 import datetime
 import functools
 import json
 import warnings
-from typing import Any, Callable, Dict, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Dict, Iterator, Optional, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -53,9 +54,10 @@ def _decode_and_update(
 def _delete_cache_entry(
     session: sqlalchemy.orm.Session, cache_entry: database.CacheEntry
 ) -> None:
+    # First, delete database entry
     session.delete(cache_entry)
     database._commit_or_rollback(session)
-    # Delete cache file
+    # Then, delete files
     json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
 
 
@@ -65,6 +67,38 @@ def _hexdigestify_python_call(
     **kwargs: Any,
 ) -> str:
     return utils.hexdigestify(encode.dumps_python_call(func_to_hex, *args, **kwargs))
+
+
+@contextlib.contextmanager
+def _lock_cache_entry(
+    session: sqlalchemy.orm.Session,
+    hexdigest: str,
+    expiration: datetime.datetime | None,
+    settings: config.Settings,
+) -> Iterator[database.CacheEntry]:
+    cache_entry = database.CacheEntry(
+        key=hexdigest,
+        expiration=expiration,
+        result=_LOCKER,
+        tag=settings.tag,
+    )
+    session.add(cache_entry)
+    database._commit_or_rollback(session)
+
+    cache_entry = (
+        session.query(database.CacheEntry)
+        .filter(
+            database.CacheEntry.key == cache_entry.key,
+            database.CacheEntry.expiration == cache_entry.expiration,
+        )
+        .with_for_update()
+        .one()
+    )
+    try:
+        yield cache_entry
+    finally:
+        if cache_entry.result == _LOCKER:
+            _delete_cache_entry(session, cache_entry)
 
 
 def cacheable(func: F) -> F:
@@ -91,18 +125,15 @@ def cacheable(func: F) -> F:
             else settings.expiration
         )
 
-        # Cache opt-out
         if not settings.use_cache:
             return func(*args, **kwargs)
 
         try:
-            # Get key
             hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)
 
-        # Filters for the database query
         filters = [
             database.CacheEntry.key == hexdigest,
             database.CacheEntry.expiration > datetime.datetime.utcnow(),
@@ -110,6 +141,7 @@ def cacheable(func: F) -> F:
         if expiration is not None:
             # If expiration is provided, only get entries with matching expiration
             filters.append(database.CacheEntry.expiration == expiration)
+
         with sqlalchemy.orm.Session(database.ENGINE.get(), autoflush=False) as session:
             for cache_entry in (
                 session.query(database.CacheEntry)
@@ -117,45 +149,21 @@ def cacheable(func: F) -> F:
                 .order_by(database.CacheEntry.timestamp.desc())
                 .with_for_update()
             ):
-                # Attempt all valid cache entries
                 try:
                     return _decode_and_update(session, cache_entry, settings)
                 except decode.DecodeError as ex:
-                    # Something wrong, e.g. cached files are corrupted
                     warnings.warn(str(ex), UserWarning)
                     _delete_cache_entry(session, cache_entry)
 
-            # Not in the cache: Acquire lock
-            cache_entry = database.CacheEntry(
-                key=hexdigest,
-                expiration=expiration,
-                result=_LOCKER,
-                tag=settings.tag,
-            )
-            session.add(cache_entry)
-            database._commit_or_rollback(session)
-            cache_entry = (
-                session.query(database.CacheEntry)
-                .filter(
-                    database.CacheEntry.key == cache_entry.key,
-                    database.CacheEntry.expiration == cache_entry.expiration,
-                )
-                .with_for_update()
-                .one()
-            )
-
-            try:
-                # Update cache
-                result = func(*args, **kwargs)
-                cache_entry.result = json.loads(encode.dumps(result))
-                return _decode_and_update(session, cache_entry, settings)
-            except encode.EncodeError as ex:
-                # Enconding error, return result without caching
-                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                return result
-            finally:
-                # Release lock
-                if cache_entry.result == _LOCKER:
-                    _delete_cache_entry(session, cache_entry)
+            with _lock_cache_entry(
+                session, hexdigest, expiration, settings
+            ) as cache_entry:
+                try:
+                    result = func(*args, **kwargs)
+                    cache_entry.result = json.loads(encode.dumps(result))
+                    return _decode_and_update(session, cache_entry, settings)
+                except encode.EncodeError as ex:
+                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                    return result
 
     return cast(F, wrapper)
