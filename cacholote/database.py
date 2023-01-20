@@ -9,6 +9,9 @@ import sqlalchemy.orm
 ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
     "cacholote_engine"
 )
+SESSION: contextvars.ContextVar[  # type: ignore[type-arg]
+    sqlalchemy.orm.sessionmaker
+] = contextvars.ContextVar("cacholote_session")
 
 Base = sqlalchemy.orm.declarative_base()
 
