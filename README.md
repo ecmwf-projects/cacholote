@@ -14,8 +14,7 @@ Efficiently cache calls to functions
 ...     import datetime
 ...     return datetime.datetime.now()
 
->>> with cacholote.config.set(use_cache=True):
-...     now() == now()
+>>> now() == now()
 True
 
 >>> with cacholote.config.set(use_cache=False):
