@@ -70,17 +70,22 @@ class Settings(pydantic.BaseSettings):
         )
         fs.mkdirs(urlpath, exist_ok=True)
 
-    def set_engine(self) -> Optional[contextvars.Token]:  # type: ignore[type-arg] # py38 not subscriptable
+    def set_engine_and_session(
+        self,
+    ) -> Tuple[  # type: ignore[type-arg]
+        Optional[contextvars.Token], Optional[contextvars.Token]
+    ]:
         try:
             engine = database.ENGINE.get()
         except LookupError:
             pass
         else:
             if str(engine.url) == self.cache_db_urlpath:
-                return None
+                return (None, None)
         engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
         database.Base.metadata.create_all(engine)
-        return database.ENGINE.set(engine)
+        session = sqlalchemy.orm.sessionmaker(engine)
+        return database.ENGINE.set(engine), database.SESSION.set(session)
 
     class Config:
         case_sensitive = False
@@ -124,7 +129,10 @@ class set:
         new_settings = Settings(**{**old_settings.dict(), **kwargs})
         new_settings.make_cache_dir()
         self._settings_token = _SETTINGS.set(new_settings)
-        self._engine_token = new_settings.set_engine()
+        (
+            self._engine_token,
+            self._session_token,
+        ) = new_settings.set_engine_and_session()
 
     def __enter__(self) -> None:
         pass
@@ -137,6 +145,9 @@ class set:
     ) -> None:
         if self._engine_token:
             database.ENGINE.reset(self._engine_token)
+        if self._session_token:
+            database.SESSION.reset(self._session_token)
+
         _SETTINGS.reset(self._settings_token)
 
 

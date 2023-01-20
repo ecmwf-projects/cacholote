@@ -142,7 +142,7 @@ def cacheable(func: F) -> F:
             # When expiration is provided, only get entries with matching expiration
             filters.append(database.CacheEntry.expiration == expiration)
 
-        with sqlalchemy.orm.Session(database.ENGINE.get(), autoflush=False) as session:
+        with database.SESSION.get()(autoflush=False) as session:
             for cache_entry in (
                 session.query(database.CacheEntry)
                 .filter(*filters)
