@@ -84,7 +84,7 @@ class Settings(pydantic.BaseSettings):
                 return (None, None)
         engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
         database.Base.metadata.create_all(engine)
-        session = sqlalchemy.orm.sessionmaker(engine, autoflush=False)
+        session = sqlalchemy.orm.sessionmaker(engine)
         return database.ENGINE.set(engine), database.SESSION.set(session)
 
     class Config:
