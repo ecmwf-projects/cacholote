@@ -129,10 +129,7 @@ class set:
         new_settings = Settings(**{**old_settings.dict(), **kwargs})
         new_settings.make_cache_dir()
         self._settings_token = _SETTINGS.set(new_settings)
-        (
-            self._engine_token,
-            self._session_token,
-        ) = new_settings.set_engine_and_session()
+        self._engine_token, self._session_token = new_settings.set_engine_and_session()
 
     def __enter__(self) -> None:
         pass
