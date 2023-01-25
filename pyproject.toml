@@ -2,57 +2,44 @@
 requires = ["setuptools>=45", "setuptools_scm[toml]>=6.2"]
 
 [project]
-name = "cacholote"
-description = "Efficiently cache calls to functions"
-readme = "README.md"
-license = {file = "LICENSE"}
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Topic :: Scientific/Engineering"
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Topic :: Scientific/Engineering"
 ]
-dynamic = ["version"]
 dependencies = [
-    "fsspec",
-    "pydantic[dotenv]",
-    "sqlalchemy"
+  "fsspec",
+  "pydantic[dotenv]",
+  "sqlalchemy"
 ]
+description = "Efficiently cache calls to functions"
+dynamic = ["version"]
+license = {file = "LICENSE"}
+name = "cacholote"
+readme = "README.md"
 
 [tool.coverage.run]
 branch = true
 
 [tool.mypy]
-strict = true
 plugins = [
   "sqlalchemy.ext.mypy.plugin"
-  ]
+]
+strict = true
 
 [[tool.mypy.overrides]]
+ignore_missing_imports = true
 module = [
   "cfgrib.*",
-  "fsspec.*",
+  "fsspec.*"
 ]
-ignore_missing_imports = true
 
 [tool.ruff]
-# Black line length is 88, but black does not format comments.
-line-length = 110
-select = [
-  # pyflakes
-  "F",
-  # pycodestyle
-  "E",
-  "W",
-  # isort
-  "I",
-  # pydocstyle
-  "D",
-]
 ignore = [
   # pydocstyle: Missing Docstrings
   "D1",
@@ -66,6 +53,19 @@ ignore = [
   "D415",
   "D416",
   "D417"
+]
+# Black line length is 88, but black does not format comments.
+line-length = 110
+select = [
+  # pyflakes
+  "F",
+  # pycodestyle
+  "E",
+  "W",
+  # isort
+  "I",
+  # pydocstyle
+  "D"
 ]
 
 [tool.setuptools]
