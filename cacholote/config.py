@@ -20,7 +20,7 @@ import datetime
 import pathlib
 import tempfile
 from types import TracebackType
-from typing import Any, Dict, Literal, Optional, Tuple, Type
+from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 
 import fsspec
 import pydantic
@@ -148,7 +148,7 @@ class set:
         _SETTINGS.reset(self._settings_token)
 
 
-def reset(*env_files: str) -> None:
+def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     """Reset cacholote settings.
 
     Priority:
@@ -158,10 +158,10 @@ def reset(*env_files: str) -> None:
 
     Parameters
     ----------
-    *env_files: str
-        Dot env files.
+    env_file: str, tuple[str], default=None
+        Dot env file(s).
     """
-    _SETTINGS.set(Settings(_env_file=env_files))
+    _SETTINGS.set(Settings(_env_file=env_file))
     set()
 
 
