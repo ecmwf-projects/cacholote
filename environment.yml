@@ -11,4 +11,4 @@ dependencies:
 - fsspec
 - pydantic
 - python-dotenv
-- sqlalchemy < 2.0
+- sqlalchemy==1.4*
