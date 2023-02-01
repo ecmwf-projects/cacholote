@@ -63,7 +63,7 @@ class CacheEntry(Base):
 
 
 @sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
-def set_epiration_to_max(
+def set_expiration_to_max(
     mapper: sqlalchemy.orm.Mapper,
     connection: sqlalchemy.engine.Connection,
     target: CacheEntry,
