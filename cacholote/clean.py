@@ -171,7 +171,7 @@ class _Cleaner:
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
-        with sqlalchemy.orm.Session(database.ENGINE.get(), autoflush=False) as session:
+        with database.SESSION.get()() as session:
             for cache_entry in (
                 session.query(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
