@@ -25,6 +25,8 @@ import sqlalchemy.orm
 
 from . import database, extra_encoders, utils
 
+LOGGER = logging.getLogger(__name__)
+
 
 def _delete_cache_file(
     obj: Dict[str, Any],
@@ -32,7 +34,10 @@ def _delete_cache_file(
     cache_entry: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
+    logger: Optional[logging.Logger] = None,
 ) -> Any:
+    logger = logger or LOGGER
+
     if {"type", "callable", "args", "kwargs"} == set(obj) and obj["callable"] in (
         "cacholote.extra_encoders:decode_xr_dataset",
         "cacholote.extra_encoders:decode_io_object",
@@ -47,20 +52,22 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                logging.info("Deleting cache entry: %r", cache_entry)
+                logger.info(f"Deleting cache entry: {cache_entry!r}")
                 session.delete(cache_entry)
                 database._commit_or_rollback(session)
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
-                        logging.info("Deleting %r", urlpath)
+                        logger.info(f"Deleting file: {urlpath!r}")
                         fs.rm(urlpath, recursive=True)
 
     return obj
 
 
 class _Cleaner:
-    def __init__(self) -> None:
+    def __init__(self, logger: logging.Logger) -> None:
+        self.logger = logger
+
         fs, dirname = utils.get_cache_files_fs_dirname()
         sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
 
@@ -74,7 +81,7 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
-        logging.info("Size of %r: %r", self.dirname, size)
+        self.logger.info(f"Size of {self.dirname!r}: {size!r}")
         return size <= maxsize
 
     @property
@@ -95,6 +102,7 @@ class _Cleaner:
                             _delete_cache_file,
                             sizes=unknown_sizes,
                             dry_run=True,
+                            logger=self.logger,
                         ),
                     )
         return set(unknown_sizes)
@@ -104,7 +112,7 @@ class _Cleaner:
             self.sizes.pop(urlpath)
             with utils._Locker(self.fs, urlpath) as file_exists:
                 if file_exists:
-                    logging.info("Deleting %r", urlpath)
+                    self.logger.info(f"Deleting file: {urlpath!r}")
                     self.fs.rm(urlpath)
 
     @staticmethod
@@ -174,6 +182,7 @@ class _Cleaner:
                         session=session,
                         cache_entry=cache_entry,
                         sizes=self.sizes,
+                        logger=self.logger,
                     ),
                 )
                 if self.stop_cleaning(maxsize):
@@ -190,6 +199,7 @@ def clean_cache_files(
     delete_unknown_files: bool = False,
     tags_to_clean: Optional[Sequence[Optional[str]]] = None,
     tags_to_keep: Optional[Sequence[Optional[str]]] = None,
+    logger: Optional[logging.Logger] = None,
 ) -> None:
     """Clean cache files.
 
@@ -207,7 +217,7 @@ def clean_cache_files(
         To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
     """
-    cleaner = _Cleaner()
+    cleaner = _Cleaner(logger=logger or LOGGER)
 
     if delete_unknown_files:
         cleaner.delete_unknown_files()
