@@ -82,7 +82,9 @@ class Settings(pydantic.BaseSettings):
         else:
             if str(engine.url) == self.cache_db_urlpath:
                 return (None, None)
-        engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
+        engine = sqlalchemy.create_engine(
+            self.cache_db_urlpath, future=True, pool_pre_ping=True
+        )
         database.Base.metadata.create_all(engine)
         session = sqlalchemy.orm.sessionmaker(engine)
         return database.ENGINE.set(engine), database.SESSION.set(session)
