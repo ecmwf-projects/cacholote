@@ -38,6 +38,7 @@ _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 class Settings(pydantic.BaseSettings):
     use_cache: bool = True
     cache_db_urlpath: str = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
+    create_engine_kwargs: Dict[str, Any] = {}
     cache_files_urlpath: str = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
     cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: Dict[str, Any] = {}
@@ -82,7 +83,9 @@ class Settings(pydantic.BaseSettings):
         else:
             if str(engine.url) == self.cache_db_urlpath:
                 return (None, None)
-        engine = sqlalchemy.create_engine(self.cache_db_urlpath, future=True)
+        engine = sqlalchemy.create_engine(
+            self.cache_db_urlpath, future=True, **self.create_engine_kwargs
+        )
         database.Base.metadata.create_all(engine)
         session = sqlalchemy.orm.sessionmaker(engine)
         return database.ENGINE.set(engine), database.SESSION.set(session)
@@ -103,6 +106,8 @@ class set:
         Enable/disable cache.
     cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
         URL for cache database (driver://user:pass@host/database).
+    create_engine_kwargs: dict, default: {}
+        Keyword arguments for ``sqlalchemy.create_engine``
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
         URL for cache files (protocol://location).
     cache_files_storage_options: dict, default: {}
