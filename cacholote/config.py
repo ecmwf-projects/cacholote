@@ -107,7 +107,7 @@ class set:
     cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
         URL for cache database (driver://user:pass@host/database).
     create_engine_kwargs: dict, default: {}
-        Keyword argyments for ``sqlalchemy.create_engine``
+        Keyword arguments for ``sqlalchemy.create_engine``
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
         URL for cache files (protocol://location).
     cache_files_storage_options: dict, default: {}
