@@ -88,7 +88,6 @@ def test_copy_from_http_to_cache(
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
 ) -> None:
-
     # cache-db to check
     con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
@@ -119,7 +118,6 @@ def test_copy_from_http_to_cache(
 def test_io_corrupted_files(
     tmpdir: pathlib.Path, httpserver: pytest_httpserver.HTTPServer
 ) -> None:
-
     # http server
     httpserver.expect_request("/test").respond_with_data(b"test")
     url = httpserver.url_for("/test")

@@ -89,7 +89,6 @@ class FileInfoModel(pydantic.BaseModel):
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
-
     filetype = mimetypes.guess_type(local_path, strict=False)[0]
     if filetype is None and _HAS_MAGIC:
         with fs.open(local_path, "rb") as f:
@@ -118,7 +117,6 @@ def _get_fs_and_urlpath(
     storage_options: Optional[Dict[str, Any]] = None,
     validate: bool = False,
 ) -> Tuple[fsspec.AbstractFileSystem, str]:
-
     urlpath = file_json["file:local_path"]
     if storage_options is None:
         storage_options = config.get().cache_files_storage_options

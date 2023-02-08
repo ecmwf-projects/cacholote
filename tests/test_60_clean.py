@@ -20,7 +20,6 @@ def test_clean_cache_files(
     set_cache: str,
     method: Literal["LRU", "LFU"],
 ) -> None:
-
     con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()

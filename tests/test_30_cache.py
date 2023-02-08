@@ -32,7 +32,6 @@ def cached_error() -> None:
 
 
 def test_cacheable(tmpdir: pathlib.Path) -> None:
-
     con = database.ENGINE.get().raw_connection()
     cur = con.cursor()
 

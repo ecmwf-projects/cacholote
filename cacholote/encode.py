@@ -57,7 +57,6 @@ def dictify_python_call(
     *args: Any,
     **kwargs: Any,
 ) -> Dict[str, Any]:
-
     callable_fqn = dictify_python_object(func_to_dict)["fully_qualified_name"]
     python_call_simple: Dict[str, Any] = {
         "type": "python_call",

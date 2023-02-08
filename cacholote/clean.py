@@ -134,7 +134,6 @@ class _Cleaner:
         tags_to_clean: Optional[Sequence[Optional[str]]],
         tags_to_keep: Optional[Sequence[Optional[str]]],
     ) -> None:
-
         self.check_tags(tags_to_clean, tags_to_keep)
 
         # Filters
