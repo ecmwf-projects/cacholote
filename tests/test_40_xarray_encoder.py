@@ -51,7 +51,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
             },
             {},
         ),
-        "kwargs": {"chunks": "auto"},
+        "kwargs": {"chunks": {}},
     }
     assert actual == expected
 
