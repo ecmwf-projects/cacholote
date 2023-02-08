@@ -235,14 +235,14 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     _maybe_store_xr_dataset(obj, fs_out, urlpath_out, filetype)
 
     file_json = _dictify_file(fs_out, urlpath_out)
+    kwargs: Dict[str, Any] = {"chunks": {}}
     if filetype == "application/vnd+zarr":
-        kwargs = {
-            "engine": "zarr",
-            "consolidated": True,
-            "chunks": "auto",
-        }
-    else:
-        kwargs = {"chunks": "auto"}
+        kwargs.update(
+            {
+                "engine": "zarr",
+                "consolidated": True,
+            }
+        )
 
     return encode.dictify_python_call(
         decode_xr_dataset,
