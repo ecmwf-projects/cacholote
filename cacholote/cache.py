@@ -101,6 +101,39 @@ def _lock_cache_entry(
             _delete_cache_entry(session, cache_entry)
 
 
+def get_cache_entry(session, func, *args, **kwargs):
+    settings = config.get()
+
+    hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
+
+    filters = [
+        database.CacheEntry.key == hexdigest,
+        database.CacheEntry.expiration > datetime.datetime.utcnow(),
+    ]
+
+    expiration = (
+        datetime.datetime.fromisoformat(settings.expiration)
+        if settings.expiration is not None
+        else settings.expiration
+    )
+    if expiration is not None:
+        # When expiration is provided, only get entries with matching expiration
+        filters.append(database.CacheEntry.expiration == expiration)
+
+    for cache_entry in (
+        session.query(database.CacheEntry)
+        .filter(*filters)
+        .order_by(database.CacheEntry.timestamp.desc())
+        .with_for_update()
+    ):
+        return cache_entry
+
+    with _lock_cache_entry(session, hexdigest, expiration, settings) as cache_entry:
+        result = func(*args, **kwargs)
+        cache_entry.result = json.loads(encode.dumps(result))
+        return cache_entry
+
+
 def cacheable(func: F) -> F:
     """Make a function cacheable.
 
@@ -122,48 +155,17 @@ def cacheable(func: F) -> F:
         if not settings.use_cache:
             return func(*args, **kwargs)
 
-        try:
-            hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
-        except encode.EncodeError as ex:
-            warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
-            return func(*args, **kwargs)
-
-        filters = [
-            database.CacheEntry.key == hexdigest,
-            database.CacheEntry.expiration > datetime.datetime.utcnow(),
-        ]
-
-        expiration = (
-            datetime.datetime.fromisoformat(settings.expiration)
-            if settings.expiration is not None
-            else settings.expiration
-        )
-        if expiration is not None:
-            # When expiration is provided, only get entries with matching expiration
-            filters.append(database.CacheEntry.expiration == expiration)
-
         with database.SESSION.get()() as session:
-            for cache_entry in (
-                session.query(database.CacheEntry)
-                .filter(*filters)
-                .order_by(database.CacheEntry.timestamp.desc())
-                .with_for_update()
-            ):
-                try:
-                    return _decode_and_update(session, cache_entry, settings)
-                except decode.DecodeError as ex:
-                    warnings.warn(str(ex), UserWarning)
-                    _delete_cache_entry(session, cache_entry)
+            try:
+                cache_entry = get_cache_entry(session, func, *args, **kwargs)
+            except encode.EncodeError as ex:
+                warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
+                return func(*args, **kwargs)
 
-            with _lock_cache_entry(
-                session, hexdigest, expiration, settings
-            ) as cache_entry:
-                try:
-                    result = func(*args, **kwargs)
-                    cache_entry.result = json.loads(encode.dumps(result))
-                    return _decode_and_update(session, cache_entry, settings)
-                except encode.EncodeError as ex:
-                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                    return result
+            try:
+                return _decode_and_update(session, cache_entry, settings)
+            except encode.EncodeError as ex:
+                warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                return func(*args, **kwargs)
 
     return cast(F, wrapper)
