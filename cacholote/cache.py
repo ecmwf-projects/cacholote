@@ -101,7 +101,7 @@ def _lock_cache_entry(
             _delete_cache_entry(session, cache_entry)
 
 
-def get_cache_entry(session, func, *args, **kwargs):
+def get_cache_entry(session, func, *args, **kwargs) -> database.CacheEntry:
     settings = config.get()
 
     hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
@@ -130,7 +130,11 @@ def get_cache_entry(session, func, *args, **kwargs):
 
     with _lock_cache_entry(session, hexdigest, expiration, settings) as cache_entry:
         result = func(*args, **kwargs)
-        cache_entry.result = json.loads(encode.dumps(result))
+        if isinstance(result, database.CacheEntry):
+            cache_entry.result = result.result
+            cache_entry.expiration = result.expiration
+        else:
+            cache_entry.result = json.loads(encode.dumps(result))
         return cache_entry
 
 
