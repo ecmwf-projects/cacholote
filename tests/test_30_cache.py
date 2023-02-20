@@ -76,7 +76,6 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.warns(UserWarning, match="can NOT encode python call"):
             res = cfunc(inst)
         assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
-        assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     if raise_all_encoding_errors:
         with pytest.raises(AttributeError):
@@ -85,7 +84,6 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.warns(UserWarning, match="can NOT encode output"):
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
-        assert cache.LAST_PRIMARY_KEYS.get() == {}
 
     # cache-db must be empty
     con = database.ENGINE.get().raw_connection()
@@ -115,34 +113,26 @@ def test_use_cache(use_cache: bool) -> None:
 
     if use_cache:
         assert cached_now() == cached_now()
-        assert cache.LAST_PRIMARY_KEYS.get() == {
-            "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
-            "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
-        }
     else:
         assert cached_now() < cached_now()
-        assert cache.LAST_PRIMARY_KEYS.get() == {}
 
 
-def test_expiration() -> None:
-    first = cached_now()
-    assert cache.LAST_PRIMARY_KEYS.get() == {
-        "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
-        "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
-    }
+def test_expiration_and_return_cache_entry() -> None:
+    config.set(return_cache_entry=True)
+    first: database.CacheEntry = cached_now()  # type: ignore[assignment]
+    first.key = "c3d9e414d0d32337c3672cb29b1b3cc9"
+    first.expiration = datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
 
     with config.set(expiration="1908-03-09T00:00:00"):
-        assert cached_now() != first
-        assert cache.LAST_PRIMARY_KEYS.get() == {
-            "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
-            "expiration": datetime.datetime(1908, 3, 9),
-        }
+        second: database.CacheEntry = cached_now()  # type: ignore[assignment]
+        assert second.result != first.result
+        assert second.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
+        assert second.expiration == datetime.datetime(1908, 3, 9)
 
-    assert first == cached_now()
-    assert cache.LAST_PRIMARY_KEYS.get() == {
-        "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
-        "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
-    }
+    third: database.CacheEntry = cached_now()  # type: ignore[assignment]
+    assert first.result == third.result
+    assert third.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
+    assert third.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
@@ -169,19 +159,6 @@ def test_tag(tmpdir: pathlib.Path) -> None:
         cached_now()
     cur.execute("SELECT tag, counter FROM cache_entries", ())
     assert cur.fetchall() == [("2", 4)]
-
-
-def test_contextvar() -> None:
-    cache.LAST_PRIMARY_KEYS.set({})
-
-    ctx = contextvars.copy_context()
-    ctx.run(cached_now)
-    assert ctx[cache.LAST_PRIMARY_KEYS] == {
-        "key": "c3d9e414d0d32337c3672cb29b1b3cc9",
-        "expiration": datetime.datetime(9999, 12, 31, 23, 59, 59, 999999),
-    }
-
-    assert cache.LAST_PRIMARY_KEYS.get() == {}
 
 
 def test_cached_error() -> None:
