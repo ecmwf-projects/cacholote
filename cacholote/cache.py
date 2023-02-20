@@ -99,11 +99,7 @@ def _lock_cache_entry(
 
 
 def cacheable(func: F) -> F:
-    """Make a function cacheable.
-
-    The __settings__ argument allows to provide the configuration settings to use.
-    __settings__ is not passed to the wrapped function.
-    """
+    """Make a function cacheable."""
 
     @functools.wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
