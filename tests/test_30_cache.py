@@ -186,12 +186,8 @@ def test_concurrent(set_cache: str) -> None:
 
     # Threading
     sleep = 0.5
-    t1 = threading.Timer(
-        0, cached_sleep, args=(sleep,), kwargs={"__settings__": config.get()}
-    )
-    t2 = threading.Timer(
-        sleep / 2, cached_sleep, args=(sleep,), kwargs={"__settings__": config.get()}
-    )
+    t1 = threading.Timer(0, cached_sleep, args=(sleep,))
+    t2 = threading.Timer(sleep / 2, cached_sleep, args=(sleep,))
     t1.start()
     t2.start()
     t1.join()

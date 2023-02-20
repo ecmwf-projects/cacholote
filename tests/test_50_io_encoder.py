@@ -160,9 +160,7 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
         fs.rm(lock)
 
     # Threading
-    t1 = threading.Timer(
-        0, cfunc, args=(tmpfile,), kwargs={"__settings__": config.get()}
-    )
+    t1 = threading.Timer(0, cfunc, args=(tmpfile,))
     t2 = threading.Timer(0.1, release_lock, args=(fs, lock))
     with pytest.warns(
         UserWarning, match=f"can NOT proceed until file is released: {lock!r}."
