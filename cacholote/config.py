@@ -144,11 +144,11 @@ class set:
     """
 
     def __init__(self, **kwargs: Any):
-        global _SETTINGS
         self._old_engine = database.ENGINE
         self._old_session = database.SESSIONMAKER
         self._old_settings = get()
 
+        global _SETTINGS
         _SETTINGS = Settings(**{**self._old_settings.dict(), **kwargs})
         _SETTINGS.make_cache_dir()
         _SETTINGS.set_engine_and_session()
@@ -162,9 +162,10 @@ class set:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        global _SETTINGS
         database.ENGINE = self._old_engine
         database.SESSIONMAKER = self._old_session
+
+        global _SETTINGS
         _SETTINGS = self._old_settings
 
 
