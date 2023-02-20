@@ -52,6 +52,9 @@ class CacheEntry(Base):
     def _result_as_string(self) -> str:
         return json.dumps(self.result)
 
+    def __repr__(self) -> str:
+        return f"CacheEntry(id={self.id!r}, key={self.key!r}, expiration={self.expiration!r})"
+
 
 @sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
 def set_expiration_to_max(
