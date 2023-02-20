@@ -34,7 +34,7 @@ Base = sqlalchemy.orm.declarative_base()
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
-    id = sqlalchemy.Column(sqlalchemy.Integer(), primary_key=True, autoincrement=True)
+    id = sqlalchemy.Column(sqlalchemy.Integer(), primary_key=True)
     key = sqlalchemy.Column(sqlalchemy.String(32))
     expiration = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.max)
     result = sqlalchemy.Column(sqlalchemy.JSON)
