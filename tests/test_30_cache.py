@@ -43,9 +43,12 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
         after = datetime.datetime.utcnow()
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
 
-        cur.execute("SELECT key, expiration, result, counter FROM cache_entries", ())
+        cur.execute(
+            "SELECT id, key, expiration, result, counter FROM cache_entries", ()
+        )
         assert cur.fetchall() == [
             (
+                1,
                 "a8260ac3cdc1404aa64a6fb71e853049",
                 "9999-12-31 23:59:59.999999",
                 '{"a": "test", "b": null, "args": [], "kwargs": {}}',
@@ -99,12 +102,12 @@ def test_same_args_kwargs() -> None:
     cur = con.cursor()
 
     ufunc(1)
-    cur.execute("SELECT key, counter FROM cache_entries", ())
-    assert cur.fetchall() == [("54f546036ae7dccdd0155893189154c0", 1)]
+    cur.execute("SELECT id, key, counter FROM cache_entries", ())
+    assert cur.fetchall() == [(1, "54f546036ae7dccdd0155893189154c0", 1)]
 
     ufunc(a=1)
-    cur.execute("SELECT key, counter FROM cache_entries", ())
-    assert cur.fetchall() == [("54f546036ae7dccdd0155893189154c0", 2)]
+    cur.execute("SELECT id, key, counter FROM cache_entries", ())
+    assert cur.fetchall() == [(1, "54f546036ae7dccdd0155893189154c0", 2)]
 
 
 @pytest.mark.parametrize("use_cache", [True, False])
@@ -120,17 +123,20 @@ def test_use_cache(use_cache: bool) -> None:
 def test_expiration_and_return_cache_entry() -> None:
     config.set(return_cache_entry=True)
     first: database.CacheEntry = cached_now()  # type: ignore[assignment]
-    first.key = "c3d9e414d0d32337c3672cb29b1b3cc9"
-    first.expiration = datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
+    assert first.id == 1
+    assert first.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
+    assert first.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
 
     with config.set(expiration="1908-03-09T00:00:00"):
         second: database.CacheEntry = cached_now()  # type: ignore[assignment]
         assert second.result != first.result
+        assert second.id == 2
         assert second.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
         assert second.expiration == datetime.datetime(1908, 3, 9)
 
     third: database.CacheEntry = cached_now()  # type: ignore[assignment]
     assert first.result == third.result
+    assert third.id == 1
     assert third.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
     assert third.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
 

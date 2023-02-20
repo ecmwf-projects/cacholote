@@ -17,7 +17,6 @@
 import contextvars
 import datetime
 import json
-from typing import Any, Dict
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -35,10 +34,9 @@ Base = sqlalchemy.orm.declarative_base()
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
-    key = sqlalchemy.Column(sqlalchemy.String(32), primary_key=True)
-    expiration = sqlalchemy.Column(
-        sqlalchemy.DateTime, default=datetime.datetime.max, primary_key=True
-    )
+    id = sqlalchemy.Column(sqlalchemy.Integer(), primary_key=True)
+    key = sqlalchemy.Column(sqlalchemy.String(32))
+    expiration = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.max)
     result = sqlalchemy.Column(sqlalchemy.JSON)
     timestamp = sqlalchemy.Column(
         sqlalchemy.DateTime,
@@ -53,13 +51,6 @@ class CacheEntry(Base):
     @property
     def _result_as_string(self) -> str:
         return json.dumps(self.result)
-
-    @property
-    def _primary_keys(self) -> Dict[str, Any]:
-        return {name: getattr(self, name) for name in ["key", "expiration"]}
-
-    def __repr__(self) -> str:
-        return str(self._primary_keys)
 
 
 @sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
