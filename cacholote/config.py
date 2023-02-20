@@ -83,12 +83,16 @@ class Settings(pydantic.BaseSettings):
         )
         fs.mkdirs(urlpath, exist_ok=True)
 
-    def set_engine_and_session(self) -> None:
-        if database.ENGINE and str(database.ENGINE.url) == self.cache_db_urlpath:
-            return
-        database._set_engine_and_session(
-            self.cache_db_urlpath, self.create_engine_kwargs
-        )
+    def set_engine_and_session(self, force_reset: bool = False) -> None:
+        if (
+            force_reset
+            or database.ENGINE is None
+            or database.SESSIONMAKER is None
+            or str(database.ENGINE.url) != self.cache_db_urlpath
+        ):
+            database._set_engine_and_session(
+                self.cache_db_urlpath, self.create_engine_kwargs
+            )
 
     @property
     def engine(self) -> sqlalchemy.engine.Engine:
@@ -151,7 +155,9 @@ class set:
         global _SETTINGS
         _SETTINGS = Settings(**{**self._old_settings.dict(), **kwargs})
         _SETTINGS.make_cache_dir()
-        _SETTINGS.set_engine_and_session()
+        _SETTINGS.set_engine_and_session(
+            self._old_settings.create_engine_kwargs != _SETTINGS.create_engine_kwargs
+        )
 
     def __enter__(self) -> Settings:
         return get()
