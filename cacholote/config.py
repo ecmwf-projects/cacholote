@@ -144,7 +144,7 @@ class set:
         Tag for the cache entry. If None, do NOT tag.
         Note that existing tags are overwritten.
     return_cache_entry: bool, default: False
-        Whether to return the cache database entry rather than decoded resuts.
+        Whether to return the cache database entry rather than decoded results.
     """
 
     def __init__(self, **kwargs: Any):
@@ -179,7 +179,7 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     """Reset cacholote settings.
 
     Priority:
-    1. Evironment variables with prefix `CACHOLOTE_`
+    1. Environment variables with prefix `CACHOLOTE_`
     2. Dotenv file(s)
     3. Cacholote defaults
 
