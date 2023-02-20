@@ -49,6 +49,7 @@ class Settings(pydantic.BaseSettings):
     raise_all_encoding_errors: bool = False
     expiration: Optional[str] = None
     tag: Optional[str] = None
+    return_cache_entry: bool = False
 
     @pydantic.validator("expiration")
     def expiration_must_be_isoformat(

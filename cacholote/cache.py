@@ -21,7 +21,7 @@ import datetime
 import functools
 import json
 import warnings
-from typing import Any, Callable, Dict, Iterator, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Iterator, Optional, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -29,10 +29,6 @@ import sqlalchemy.orm
 from . import clean, config, database, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
-
-LAST_PRIMARY_KEYS: contextvars.ContextVar[Dict[str, Any]] = contextvars.ContextVar(
-    "cacholote_last_primary_keys"
-)
 
 _LOCKER = "__locked__"
 
@@ -47,7 +43,9 @@ def _decode_and_update(
     if settings.tag is not None:
         cache_entry.tag = settings.tag
     database._commit_or_rollback(session)
-    LAST_PRIMARY_KEYS.set(cache_entry._primary_keys)
+    if settings.return_cache_entry:
+        session.refresh(cache_entry)
+        return cache_entry
     return result
 
 
@@ -116,8 +114,6 @@ def cacheable(func: F) -> F:
             for key, value in __context__.items():
                 key.set(value)
 
-        LAST_PRIMARY_KEYS.set({})
-
         settings = config.get()
         if not settings.use_cache:
             return func(*args, **kwargs)
@@ -125,6 +121,8 @@ def cacheable(func: F) -> F:
         try:
             hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
+            if settings.return_cache_entry:
+                raise ex
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)
 
@@ -163,6 +161,8 @@ def cacheable(func: F) -> F:
                     cache_entry.result = json.loads(encode.dumps(result))
                     return _decode_and_update(session, cache_entry, settings)
                 except encode.EncodeError as ex:
+                    if settings.return_cache_entry:
+                        raise ex
                     warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
                     return result
 
