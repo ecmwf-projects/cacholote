@@ -65,6 +65,16 @@ class Settings(pydantic.BaseSettings):
                 ) from ex
         return expiration
 
+    @pydantic.validator("return_cache_entry")
+    def validate_return_cache_entry(
+        cls: pydantic.BaseSettings, return_cache_entry: bool, values: Dict[str, Any]
+    ) -> bool:
+        if return_cache_entry is True and values["use_cache"] is False:
+            raise ValueError(
+                "`use_cache` must be True when `return_cache_entry` is True"
+            )
+        return return_cache_entry
+
     def make_cache_dir(self) -> None:
         fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
             self.cache_files_urlpath,
@@ -128,6 +138,8 @@ class set:
     tag: str, optional, default: None
         Tag for the cache entry. If None, do NOT tag.
         Note that existing tags are overwritten.
+    return_cache_entry: bool, default: False
+        Whether to return the cache database entry rather than decoded resuts.
     """
 
     def __init__(self, **kwargs: Any):
