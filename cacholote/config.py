@@ -15,7 +15,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import contextvars
 import datetime
 import pathlib
 import tempfile
@@ -28,9 +27,7 @@ import sqlalchemy
 
 from . import database
 
-_SETTINGS: contextvars.ContextVar[Settings] = contextvars.ContextVar(
-    "cacholote_settings"
-)
+_SETTINGS: Optional[Settings] = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 
@@ -82,24 +79,24 @@ class Settings(pydantic.BaseSettings):
         )
         fs.mkdirs(urlpath, exist_ok=True)
 
-    def set_engine_and_session(
-        self,
-    ) -> Tuple[  # type: ignore[type-arg]
-        Optional[contextvars.Token], Optional[contextvars.Token]
-    ]:
-        try:
-            engine = database.ENGINE.get()
-        except LookupError:
-            pass
-        else:
-            if str(engine.url) == self.cache_db_urlpath:
-                return (None, None)
-        engine = sqlalchemy.create_engine(
-            self.cache_db_urlpath, future=True, **self.create_engine_kwargs
+    def set_engine_and_session(self) -> None:
+        if database.ENGINE and str(database.ENGINE.url) == self.cache_db_urlpath:
+            return
+        database._set_engine_and_session(
+            self.cache_db_urlpath, self.create_engine_kwargs
         )
-        database.Base.metadata.create_all(engine)
-        session = sqlalchemy.orm.sessionmaker(engine)
-        return database.ENGINE.set(engine), database.SESSION.set(session)
+
+    @property
+    def engine(self) -> sqlalchemy.engine.Engine:
+        if database.ENGINE is None:
+            raise ValueError("config has not been set. Run `cacholote.config.reset()`")
+        return database.ENGINE
+
+    @property
+    def sessionmaker(self) -> sqlalchemy.orm.sessionmaker:  # type: ignore[type-arg]
+        if database.SESSION is None:
+            raise ValueError("config has not been set. Run `cacholote.config.reset()`")
+        return database.SESSION
 
     class Config:
         case_sensitive = False
@@ -143,11 +140,14 @@ class set:
     """
 
     def __init__(self, **kwargs: Any):
-        old_settings = _SETTINGS.get()
-        new_settings = Settings(**{**old_settings.dict(), **kwargs})
-        new_settings.make_cache_dir()
-        self._settings_token = _SETTINGS.set(new_settings)
-        self._engine_token, self._session_token = new_settings.set_engine_and_session()
+        global _SETTINGS
+        self._old_engine = database.ENGINE
+        self._old_session = database.SESSION
+        self._old_settings = get()
+
+        _SETTINGS = Settings(**{**self._old_settings.dict(), **kwargs})
+        _SETTINGS.make_cache_dir()
+        _SETTINGS.set_engine_and_session()
 
     def __enter__(self) -> None:
         pass
@@ -158,12 +158,10 @@ class set:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        if self._engine_token:
-            database.ENGINE.reset(self._engine_token)
-        if self._session_token:
-            database.SESSION.reset(self._session_token)
-
-        _SETTINGS.reset(self._settings_token)
+        global _SETTINGS
+        database.ENGINE = self._old_engine
+        database.SESSION = self._old_session
+        _SETTINGS = self._old_settings
 
 
 def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
@@ -179,13 +177,16 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     env_file: str, tuple[str], default=None
         Dot env file(s).
     """
-    _SETTINGS.set(Settings(_env_file=env_file))
+    global _SETTINGS
+    _SETTINGS = Settings(_env_file=env_file)
     set()
 
 
 def get() -> Settings:
     """Get cacholote settings."""
-    return _SETTINGS.get()
+    if _SETTINGS is None:
+        raise ValueError("config has not been set. Run `cacholote.config.reset()`")
+    return _SETTINGS.copy()
 
 
 reset()

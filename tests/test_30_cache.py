@@ -1,4 +1,3 @@
-import contextvars
 import datetime
 import pathlib
 import threading
@@ -32,7 +31,7 @@ def cached_error() -> None:
 
 
 def test_cacheable(tmpdir: pathlib.Path) -> None:
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
 
     cfunc = cache.cacheable(func)
@@ -86,7 +85,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         assert res.__class__.__name__ == "LocalClass"
 
     # cache-db must be empty
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
     cur.execute("SELECT * FROM cache_entries", ())
     assert cur.fetchall() == []
@@ -95,7 +94,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
 def test_same_args_kwargs() -> None:
     ufunc = cache.cacheable(func)
 
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
 
     ufunc(1)
@@ -136,7 +135,7 @@ def test_expiration_and_return_cache_entry() -> None:
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
 
     cached_now()
@@ -162,7 +161,7 @@ def test_tag(tmpdir: pathlib.Path) -> None:
 
 
 def test_cached_error() -> None:
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
 
     with pytest.raises(ValueError, match="test error"):
@@ -170,11 +169,6 @@ def test_cached_error() -> None:
 
     cur.execute("SELECT * FROM cache_entries", ())
     assert cur.fetchall() == []
-
-
-def test_context_argument() -> None:
-    ctx = contextvars.copy_context()
-    assert cached_now() == cached_now(__context__=ctx)  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
@@ -185,11 +179,12 @@ def test_concurrent(set_cache: str) -> None:
         return sleep
 
     # Threading
-    ctx = contextvars.copy_context()
     sleep = 0.2
-    t1 = threading.Timer(0, cached_sleep, args=(sleep,), kwargs={"__context__": ctx})
+    t1 = threading.Timer(
+        0, cached_sleep, args=(sleep,), kwargs={"__settings__": config.get()}
+    )
     t2 = threading.Timer(
-        sleep / 2, cached_sleep, args=(sleep,), kwargs={"__context__": ctx}
+        sleep / 2, cached_sleep, args=(sleep,), kwargs={"__settings__": config.get()}
     )
     t1.start()
     t2.start()
@@ -197,7 +192,7 @@ def test_concurrent(set_cache: str) -> None:
     t2.join()
 
     # Check hits
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries", ())
     assert cur.fetchall() == [(2,)]

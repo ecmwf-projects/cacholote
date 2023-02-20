@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import contextlib
-import contextvars
 import datetime
 import functools
 import json
@@ -102,68 +101,65 @@ def _lock_cache_entry(
 def cacheable(func: F) -> F:
     """Make a function cacheable.
 
-    The __context__ argument allows to set the `contextvars.Context`.
-    __context__ is not passed to the wrapped function.
+    The __settings__ argument allows to provide the configuration settings to use.
     """
 
     @functools.wraps(func)
     def wrapper(
-        *args: Any, __context__: Optional[contextvars.Context] = None, **kwargs: Any
+        *args: Any, __settings__: Optional[config.Settings] = None, **kwargs: Any
     ) -> Any:
-        if __context__:
-            for key, value in __context__.items():
-                key.set(value)
+        settings_kwargs = __settings__.dict() if __settings__ else {}
+        with config.set(**dict(settings_kwargs or {})):
+            settings = config.get()
+            if not settings.use_cache:
+                return func(*args, **kwargs)
 
-        settings = config.get()
-        if not settings.use_cache:
-            return func(*args, **kwargs)
+            try:
+                hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
+            except encode.EncodeError as ex:
+                if settings.return_cache_entry:
+                    raise ex
+                warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
+                return func(*args, **kwargs)
 
-        try:
-            hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
-        except encode.EncodeError as ex:
-            if settings.return_cache_entry:
-                raise ex
-            warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
-            return func(*args, **kwargs)
+            filters = [
+                database.CacheEntry.key == hexdigest,
+                database.CacheEntry.expiration > datetime.datetime.utcnow(),
+            ]
 
-        filters = [
-            database.CacheEntry.key == hexdigest,
-            database.CacheEntry.expiration > datetime.datetime.utcnow(),
-        ]
+            expiration = (
+                datetime.datetime.fromisoformat(settings.expiration)
+                if settings.expiration is not None
+                else settings.expiration
+            )
+            if expiration is not None:
+                # When expiration is provided, only get entries with matching expiration
+                filters.append(database.CacheEntry.expiration == expiration)
 
-        expiration = (
-            datetime.datetime.fromisoformat(settings.expiration)
-            if settings.expiration is not None
-            else settings.expiration
-        )
-        if expiration is not None:
-            # When expiration is provided, only get entries with matching expiration
-            filters.append(database.CacheEntry.expiration == expiration)
+            with settings.sessionmaker() as session:
+                for cache_entry in (
+                    session.query(database.CacheEntry)
+                    .filter(*filters)
+                    .order_by(database.CacheEntry.timestamp.desc())
+                    .with_for_update()
+                ):
+                    try:
+                        return _decode_and_update(session, cache_entry, settings)
+                    except decode.DecodeError as ex:
+                        warnings.warn(str(ex), UserWarning)
+                        _delete_cache_entry(session, cache_entry)
 
-        with database.SESSION.get()() as session:
-            for cache_entry in (
-                session.query(database.CacheEntry)
-                .filter(*filters)
-                .order_by(database.CacheEntry.timestamp.desc())
-                .with_for_update()
-            ):
-                try:
-                    return _decode_and_update(session, cache_entry, settings)
-                except decode.DecodeError as ex:
-                    warnings.warn(str(ex), UserWarning)
-                    _delete_cache_entry(session, cache_entry)
-
-            with _lock_cache_entry(
-                session, hexdigest, expiration, settings
-            ) as cache_entry:
-                try:
-                    result = func(*args, **kwargs)
-                    cache_entry.result = json.loads(encode.dumps(result))
-                    return _decode_and_update(session, cache_entry, settings)
-                except encode.EncodeError as ex:
-                    if settings.return_cache_entry:
-                        raise ex
-                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                    return result
+                with _lock_cache_entry(
+                    session, hexdigest, expiration, settings
+                ) as cache_entry:
+                    try:
+                        result = func(*args, **kwargs)
+                        cache_entry.result = json.loads(encode.dumps(result))
+                        return _decode_and_update(session, cache_entry, settings)
+                    except encode.EncodeError as ex:
+                        if settings.return_cache_entry:
+                            raise ex
+                        warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+                        return result
 
     return cast(F, wrapper)

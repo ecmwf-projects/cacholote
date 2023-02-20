@@ -14,20 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextvars
 import datetime
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import sqlalchemy
 import sqlalchemy.orm
 
-ENGINE: contextvars.ContextVar[sqlalchemy.engine.Engine] = contextvars.ContextVar(
-    "cacholote_engine"
-)
-SESSION: contextvars.ContextVar[  # type: ignore[type-arg]
-    sqlalchemy.orm.sessionmaker
-] = contextvars.ContextVar("cacholote_session")
+ENGINE: Optional[sqlalchemy.engine.Engine] = None
+SESSION: Optional[sqlalchemy.orm.sessionmaker] = None  # type: ignore[type-arg]
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -76,3 +71,14 @@ def _commit_or_rollback(session: sqlalchemy.orm.Session) -> None:
         session.commit()
     finally:
         session.rollback()
+
+
+def _set_engine_and_session(
+    cache_db_urlpath: str, create_engine_kwargs: Dict[str, Any]
+) -> None:
+    global ENGINE, SESSION
+    ENGINE = sqlalchemy.create_engine(
+        cache_db_urlpath, future=True, **create_engine_kwargs
+    )
+    Base.metadata.create_all(ENGINE)
+    SESSION = sqlalchemy.orm.sessionmaker(ENGINE)

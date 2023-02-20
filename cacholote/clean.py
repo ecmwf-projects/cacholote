@@ -23,7 +23,7 @@ from typing import Any, Dict, Literal, Optional, Sequence, Set
 import sqlalchemy
 import sqlalchemy.orm
 
-from . import database, extra_encoders, utils
+from . import config, database, extra_encoders, utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class _Cleaner:
 
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
-            with database.SESSION.get()() as session:
+            with config.get().sessionmaker() as session:
                 for cache_entry in session.query(database.CacheEntry):
                     json.loads(
                         cache_entry._result_as_string,
@@ -169,7 +169,7 @@ class _Cleaner:
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
-        with database.SESSION.get()() as session:
+        with config.get().sessionmaker() as session:
             for cache_entry in (
                 session.query(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
