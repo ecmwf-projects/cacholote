@@ -94,9 +94,9 @@ class Settings(pydantic.BaseSettings):
 
     @property
     def sessionmaker(self) -> sqlalchemy.orm.sessionmaker:  # type: ignore[type-arg]
-        if database.SESSION is None:
+        if database.SESSIONMAKER is None:
             raise ValueError("config has not been set. Run `cacholote.config.reset()`")
-        return database.SESSION
+        return database.SESSIONMAKER
 
     class Config:
         case_sensitive = False
@@ -142,7 +142,7 @@ class set:
     def __init__(self, **kwargs: Any):
         global _SETTINGS
         self._old_engine = database.ENGINE
-        self._old_session = database.SESSION
+        self._old_session = database.SESSIONMAKER
         self._old_settings = get()
 
         _SETTINGS = Settings(**{**self._old_settings.dict(), **kwargs})
@@ -160,7 +160,7 @@ class set:
     ) -> None:
         global _SETTINGS
         database.ENGINE = self._old_engine
-        database.SESSION = self._old_session
+        database.SESSIONMAKER = self._old_session
         _SETTINGS = self._old_settings
 
 

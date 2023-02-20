@@ -22,7 +22,7 @@ import sqlalchemy
 import sqlalchemy.orm
 
 ENGINE: Optional[sqlalchemy.engine.Engine] = None
-SESSION: Optional[sqlalchemy.orm.sessionmaker] = None  # type: ignore[type-arg]
+SESSIONMAKER: Optional[sqlalchemy.orm.sessionmaker] = None  # type: ignore[type-arg]
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -68,9 +68,9 @@ def _commit_or_rollback(session: sqlalchemy.orm.Session) -> None:
 def _set_engine_and_session(
     cache_db_urlpath: str, create_engine_kwargs: Dict[str, Any]
 ) -> None:
-    global ENGINE, SESSION
+    global ENGINE, SESSIONMAKER
     ENGINE = sqlalchemy.create_engine(
         cache_db_urlpath, future=True, **create_engine_kwargs
     )
     Base.metadata.create_all(ENGINE)
-    SESSION = sqlalchemy.orm.sessionmaker(ENGINE)
+    SESSIONMAKER = sqlalchemy.orm.sessionmaker(ENGINE)
