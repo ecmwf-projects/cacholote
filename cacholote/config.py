@@ -31,6 +31,10 @@ _SETTINGS: Optional[Settings] = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 
+_CONFIG_NOT_SET_MSG = (
+    "Configuration settings have not been set. Run `cacholote.config.reset()`."
+)
+
 
 class Settings(pydantic.BaseSettings):
     use_cache: bool = True
@@ -89,13 +93,13 @@ class Settings(pydantic.BaseSettings):
     @property
     def engine(self) -> sqlalchemy.engine.Engine:
         if database.ENGINE is None:
-            raise ValueError("config has not been set. Run `cacholote.config.reset()`")
+            raise ValueError(_CONFIG_NOT_SET_MSG)
         return database.ENGINE
 
     @property
     def sessionmaker(self) -> sqlalchemy.orm.sessionmaker:  # type: ignore[type-arg]
         if database.SESSIONMAKER is None:
-            raise ValueError("config has not been set. Run `cacholote.config.reset()`")
+            raise ValueError(_CONFIG_NOT_SET_MSG)
         return database.SESSIONMAKER
 
     class Config:
@@ -185,7 +189,7 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
 def get() -> Settings:
     """Get cacholote settings."""
     if _SETTINGS is None:
-        raise ValueError("config has not been set. Run `cacholote.config.reset()`")
+        raise ValueError(_CONFIG_NOT_SET_MSG)
     return _SETTINGS.copy()
 
 
