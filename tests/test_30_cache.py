@@ -185,7 +185,7 @@ def test_concurrent(set_cache: str) -> None:
         return sleep
 
     # Threading
-    sleep = 0.2
+    sleep = 0.5
     t1 = threading.Timer(
         0, cached_sleep, args=(sleep,), kwargs={"__settings__": config.get()}
     )
