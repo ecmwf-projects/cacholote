@@ -102,14 +102,14 @@ def cacheable(func: F) -> F:
     """Make a function cacheable.
 
     The __settings__ argument allows to provide the configuration settings to use.
+    __settings__ is not passed to the wrapped function.
     """
 
     @functools.wraps(func)
     def wrapper(
         *args: Any, __settings__: Optional[config.Settings] = None, **kwargs: Any
     ) -> Any:
-        settings_kwargs = __settings__.dict() if __settings__ else {}
-        with config.set(**dict(settings_kwargs or {})):
+        with config.set(**dict(__settings__ or {})):
             settings = config.get()
             if not settings.use_cache:
                 return func(*args, **kwargs)
