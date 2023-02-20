@@ -153,8 +153,8 @@ class set:
         _SETTINGS.make_cache_dir()
         _SETTINGS.set_engine_and_session()
 
-    def __enter__(self) -> None:
-        pass
+    def __enter__(self) -> Settings:
+        return get()
 
     def __exit__(
         self,

@@ -109,8 +109,7 @@ def cacheable(func: F) -> F:
     def wrapper(
         *args: Any, __settings__: Optional[config.Settings] = None, **kwargs: Any
     ) -> Any:
-        with config.set(**dict(__settings__ or {})):
-            settings = config.get()
+        with config.set(**dict(__settings__ or {})) as settings:
             if not settings.use_cache:
                 return func(*args, **kwargs)
 
