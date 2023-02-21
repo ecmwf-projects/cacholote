@@ -21,11 +21,6 @@ def test_change_engine(tmpdir: pathlib.Path) -> None:
     assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
 
 
-def test_expiration() -> None:
-    with config.set(expiration="1492-10-12T00:00:00"):
-        assert config.get().expiration == "1492-10-12T00:00:00"
-
-
 def test_env_variables(tmpdir: pathlib.Path) -> None:
     # env variables
     old_environ = dict(os.environ)

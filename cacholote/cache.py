@@ -71,12 +71,11 @@ def _hexdigestify_python_call(
 def _lock_cache_entry(
     session: sqlalchemy.orm.Session,
     hexdigest: str,
-    expiration: Optional[datetime.datetime],
     settings: config.Settings,
 ) -> Iterator[database.CacheEntry]:
     cache_entry = database.CacheEntry(
         key=hexdigest,
-        expiration=expiration,
+        expiration=settings.expiration,
         result=_LOCKER,
         tag=settings.tag,
     )
@@ -85,10 +84,7 @@ def _lock_cache_entry(
 
     cache_entry = (
         session.query(database.CacheEntry)
-        .filter(
-            database.CacheEntry.key == cache_entry.key,
-            database.CacheEntry.expiration == cache_entry.expiration,
-        )
+        .filter(database.CacheEntry.id == cache_entry.id)
         .with_for_update()
         .one()
     )
@@ -130,15 +126,9 @@ def cacheable(func: F) -> F:
             database.CacheEntry.key == hexdigest,
             database.CacheEntry.expiration > datetime.datetime.utcnow(),
         ]
-
-        expiration = (
-            datetime.datetime.fromisoformat(settings.expiration)
-            if settings.expiration is not None
-            else settings.expiration
-        )
-        if expiration is not None:
+        if settings.expiration:
             # When expiration is provided, only get entries with matching expiration
-            filters.append(database.CacheEntry.expiration == expiration)
+            filters.append(database.CacheEntry.expiration == settings.expiration)
 
         with database.SESSION.get()() as session:
             for cache_entry in (
@@ -153,9 +143,7 @@ def cacheable(func: F) -> F:
                     warnings.warn(str(ex), UserWarning)
                     _delete_cache_entry(session, cache_entry)
 
-            with _lock_cache_entry(
-                session, hexdigest, expiration, settings
-            ) as cache_entry:
+            with _lock_cache_entry(session, hexdigest, settings) as cache_entry:
                 try:
                     result = func(*args, **kwargs)
                     cache_entry.result = json.loads(encode.dumps(result))
