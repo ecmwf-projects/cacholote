@@ -203,7 +203,7 @@ def test_concurrent(set_cache: str) -> None:
 def test_stale_lock() -> None:
     first = cached_now()
 
-    with database.SESSION.get()() as session:
+    with config.get().sessionmaker() as session:
         # Create stale lock
         cache_entry = session.query(database.CacheEntry).one()
         cache_entry.result = "__locked__"
