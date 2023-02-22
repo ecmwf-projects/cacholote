@@ -198,3 +198,17 @@ def test_concurrent(set_cache: str) -> None:
     cur = con.cursor()
     cur.execute("SELECT counter FROM cache_entries", ())
     assert cur.fetchall() == [(2,)]
+
+
+def test_stale_lock() -> None:
+    first = cached_now()
+
+    with database.SESSION.get()() as session:
+        # Create stale lock
+        cache_entry = session.query(database.CacheEntry).one()
+        cache_entry.result = "__locked__"
+        session.commit()
+
+    with pytest.warns(UserWarning, match="Stale lock."):
+        second = cached_now()
+    assert second > first
