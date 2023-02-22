@@ -39,6 +39,8 @@ def _decode_and_update(
     settings: config.Settings,
 ) -> Any:
     result = decode.loads(cache_entry._result_as_string)
+    if isinstance(result, type(_LOCKER)) and result == _LOCKER:
+        raise decode.DecodeError("Stale lock.")
     cache_entry.counter += 1
     if settings.tag is not None:
         cache_entry.tag = settings.tag
