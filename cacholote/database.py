@@ -46,8 +46,6 @@ class CacheEntry(Base):
     counter = sqlalchemy.Column(sqlalchemy.Integer, default=0)
     tag = sqlalchemy.Column(sqlalchemy.String)
 
-    constraint = sqlalchemy.UniqueConstraint(key, expiration)
-
     @property
     def _result_as_string(self) -> str:
         return json.dumps(self.result)
