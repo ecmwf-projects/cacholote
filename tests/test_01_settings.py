@@ -62,11 +62,6 @@ def test_set_engine_and_sessionmaker(
         assert config.get().sessionmaker is old_sessionmaker
 
 
-def test_expiration() -> None:
-    with config.set(expiration="1492-10-12T00:00:00"):
-        assert config.get().expiration == "1492-10-12T00:00:00"
-
-
 def test_env_variables(tmpdir: pathlib.Path) -> None:
     # env variables
     old_environ = dict(os.environ)

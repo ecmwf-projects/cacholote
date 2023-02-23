@@ -57,6 +57,8 @@ def set_expiration_to_max(
     target: CacheEntry,
 ) -> None:
     target.expiration = target.expiration or datetime.datetime.max
+    if target.expiration < datetime.datetime.utcnow():
+        raise ValueError("Expiration date has passed.")
 
 
 def _commit_or_rollback(session: sqlalchemy.orm.Session) -> None:

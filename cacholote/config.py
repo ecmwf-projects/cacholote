@@ -48,23 +48,9 @@ class Settings(pydantic.BaseSettings):
     ] = "application/netcdf"
     io_delete_original: bool = False
     raise_all_encoding_errors: bool = False
-    expiration: Optional[str] = None
+    expiration: Optional[datetime.datetime] = None
     tag: Optional[str] = None
     return_cache_entry: bool = False
-
-    @pydantic.validator("expiration")
-    def expiration_must_be_isoformat(
-        cls: pydantic.BaseSettings, expiration: Optional[str]
-    ) -> Optional[str]:
-        """Validate expiration."""
-        if isinstance(expiration, str):
-            try:
-                datetime.datetime.fromisoformat(expiration)
-            except ValueError as ex:
-                raise ValueError(
-                    f"{expiration=} is NOT a valid ISO 8601 format"
-                ) from ex
-        return expiration
 
     @pydantic.validator("return_cache_entry")
     def validate_return_cache_entry(

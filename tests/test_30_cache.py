@@ -126,15 +126,17 @@ def test_expiration_and_return_cache_entry() -> None:
     assert first.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
     assert first.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
 
-    with config.set(expiration="1908-03-09T00:00:00"):
+    expiration = datetime.datetime.utcnow() + datetime.timedelta(seconds=0.1)
+    with config.set(expiration=expiration):
         second: database.CacheEntry = cached_now()  # type: ignore[assignment]
         assert second.result != first.result
         assert second.id == 2
         assert second.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
-        assert second.expiration == datetime.datetime(1908, 3, 9)
+        assert second.expiration == expiration
 
+    time.sleep(0.1)
     third: database.CacheEntry = cached_now()  # type: ignore[assignment]
-    assert first.result == third.result
+    assert third.result == first.result
     assert third.id == 1
     assert third.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
     assert third.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
