@@ -20,7 +20,7 @@ import datetime
 import functools
 import json
 import warnings
-from typing import Any, Callable, Iterator, Optional, TypeVar, Union, cast
+from typing import Any, Callable, Iterator, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
