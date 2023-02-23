@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import functools
 import json
 import logging
@@ -83,13 +84,17 @@ class _Cleaner:
         size = self.size
         return size <= maxsize
 
-    @property
-    def unknown_files(self) -> Set[str]:
+    def unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
+        now = datetime.datetime.now()
         files_to_skip = []
         for urlpath in self.sizes:
             if urlpath.endswith(".lock"):
-                files_to_skip.append(urlpath)
-                files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
+                delta = now - self.fs.modified(urlpath)
+                if lock_validity_period is None or delta < datetime.timedelta(
+                    seconds=lock_validity_period
+                ):
+                    files_to_skip.append(urlpath)
+                    files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
 
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
@@ -106,8 +111,8 @@ class _Cleaner:
                     )
         return set(unknown_sizes)
 
-    def delete_unknown_files(self) -> None:
-        for urlpath in self.unknown_files:
+    def delete_unknown_files(self, lock_validity_period: Optional[float]) -> None:
+        for urlpath in self.unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
             with utils._Locker(self.fs, urlpath) as file_exists:
                 if file_exists:
@@ -195,6 +200,7 @@ def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
+    lock_validity_period: Optional[float] = None,
     tags_to_clean: Optional[Sequence[Optional[str]]] = None,
     tags_to_keep: Optional[Sequence[Optional[str]]] = None,
     logger: Optional[logging.Logger] = None,
@@ -210,15 +216,19 @@ def clean_cache_files(
         * LFU: Least Frequently Used
     delete_unknown_files: bool, default: False
         Delete all files that are not registered in the cache database.
+    lock_validity_period: float, optional, default: None
+        Validity period of lock files in seconds. Expired locks will be deleted.
     tags_to_clean, tags_to_keep: sequence of strings/None, optional, default: None
         Tags to clean/keep. If None, delete all cache entries.
         To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
+    logger: optional
+        Python object use to produce logs.
     """
     cleaner = _Cleaner(logger=logger or LOGGER)
 
     if delete_unknown_files:
-        cleaner.delete_unknown_files()
+        cleaner.delete_unknown_files(lock_validity_period)
 
     cleaner.delete_cache_files(
         maxsize=maxsize,
