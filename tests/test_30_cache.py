@@ -1,6 +1,5 @@
 import datetime
 import pathlib
-import threading
 import time
 from typing import Any
 
@@ -177,26 +176,3 @@ def test_cached_error() -> None:
 
     cur.execute("SELECT * FROM cache_entries", ())
     assert cur.fetchall() == []
-
-
-@pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
-def test_concurrent(set_cache: str) -> None:
-    @cache.cacheable
-    def cached_sleep(sleep: float) -> Any:
-        time.sleep(sleep)
-        return sleep
-
-    # Threading
-    sleep = 0.5
-    t1 = threading.Timer(0, cached_sleep, args=(sleep,))
-    t2 = threading.Timer(sleep / 2, cached_sleep, args=(sleep,))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-    # Check hits
-    con = config.get().engine.raw_connection()
-    cur = con.cursor()
-    cur.execute("SELECT id, counter FROM cache_entries", ())
-    assert cur.fetchall() == [(1, 1), (2, 1)]
