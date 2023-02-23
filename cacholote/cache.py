@@ -15,12 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
 import datetime
 import functools
 import json
 import warnings
-from typing import Any, Callable, Iterator, TypeVar, Union, cast
+from typing import Any, Callable, TypeVar, Union, cast
 
 import sqlalchemy
 import sqlalchemy.orm
@@ -29,8 +28,6 @@ from . import clean, config, database, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
-_LOCKER = "__locked__"
-
 
 def _decode_and_update(
     session: sqlalchemy.orm.Session,
@@ -38,9 +35,7 @@ def _decode_and_update(
     settings: config.Settings,
 ) -> Any:
     result = decode.loads(cache_entry._result_as_string)
-    if isinstance(result, type(_LOCKER)) and result == _LOCKER:
-        raise decode.DecodeError("Stale lock.")
-    cache_entry.counter += 1
+    cache_entry.counter = (cache_entry.counter or 0) + 1
     if settings.tag is not None:
         cache_entry.tag = settings.tag
     database._commit_or_rollback(session)
@@ -66,34 +61,6 @@ def _hexdigestify_python_call(
     **kwargs: Any,
 ) -> str:
     return utils.hexdigestify(encode.dumps_python_call(func_to_hex, *args, **kwargs))
-
-
-@contextlib.contextmanager
-def _lock_cache_entry(
-    session: sqlalchemy.orm.Session,
-    hexdigest: str,
-    settings: config.Settings,
-) -> Iterator[database.CacheEntry]:
-    cache_entry = database.CacheEntry(
-        key=hexdigest,
-        expiration=settings.expiration,
-        result=_LOCKER,
-        tag=settings.tag,
-    )
-    session.add(cache_entry)
-    database._commit_or_rollback(session)
-
-    cache_entry = (
-        session.query(database.CacheEntry)
-        .filter(database.CacheEntry.id == cache_entry.id)
-        .with_for_update()
-        .one()
-    )
-    try:
-        yield cache_entry
-    finally:
-        if cache_entry.result == _LOCKER:
-            _delete_cache_entry(session, cache_entry)
 
 
 def cacheable(func: F) -> F:
@@ -135,15 +102,22 @@ def cacheable(func: F) -> F:
                     warnings.warn(str(ex), UserWarning)
                     _delete_cache_entry(session, cache_entry)
 
-            with _lock_cache_entry(session, hexdigest, settings) as cache_entry:
-                try:
-                    result = func(*args, **kwargs)
-                    cache_entry.result = json.loads(encode.dumps(result))
-                    return _decode_and_update(session, cache_entry, settings)
-                except encode.EncodeError as ex:
-                    if settings.return_cache_entry:
-                        raise ex
-                    warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
-                    return result
+        result = func(*args, **kwargs)
+        cache_entry = database.CacheEntry(
+            key=hexdigest,
+            expiration=settings.expiration,
+            tag=settings.tag,
+        )
+        try:
+            cache_entry.result = json.loads(encode.dumps(result))
+        except encode.EncodeError as ex:
+            if settings.return_cache_entry:
+                raise ex
+            warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+            return result
+
+        with settings.sessionmaker() as session:
+            session.add(cache_entry)
+            return _decode_and_update(session, cache_entry, settings)
 
     return cast(F, wrapper)

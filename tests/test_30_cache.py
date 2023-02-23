@@ -198,19 +198,5 @@ def test_concurrent(set_cache: str) -> None:
     # Check hits
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    cur.execute("SELECT counter FROM cache_entries", ())
-    assert cur.fetchall() == [(2,)]
-
-
-def test_stale_lock() -> None:
-    first = cached_now()
-
-    with config.get().sessionmaker() as session:
-        # Create stale lock
-        cache_entry = session.query(database.CacheEntry).one()
-        cache_entry.result = "__locked__"
-        session.commit()
-
-    with pytest.warns(UserWarning, match="Stale lock."):
-        second = cached_now()
-    assert second > first
+    cur.execute("SELECT id, counter FROM cache_entries", ())
+    assert cur.fetchall() == [(1, 1), (2, 1)]
