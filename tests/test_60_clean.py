@@ -54,10 +54,7 @@ def test_clean_cache_files(
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
-@pytest.mark.parametrize("add_lock", [True, False])
-def test_delete_unknown_files(
-    tmpdir: pathlib.Path, delete_unknown_files: bool, add_lock: bool
-) -> None:
+def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create file
@@ -69,22 +66,45 @@ def test_delete_unknown_files(
 
     # Add unknown
     fs.put(str(tmpfile), f"{dirname}/unknown.txt")
-    if add_lock:
-        fs.touch(f"{dirname}/unknown.txt.lock")
 
     # Clean one file
     clean.clean_cache_files(1, delete_unknown_files=delete_unknown_files)
-    if delete_unknown_files and not add_lock:
+    if delete_unknown_files:
         file_hash = f"{fs.checksum(tmpfile):x}"
         assert fs.ls(dirname) == [f"{dirname}/{file_hash}.txt"]
     else:
-        if add_lock:
-            assert set(fs.ls(dirname)) == {
-                f"{dirname}/unknown.txt",
-                f"{dirname}/unknown.txt.lock",
-            }
-        else:
-            assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
+        assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
+
+
+@pytest.mark.parametrize("lock_validity_period", [None, 0])
+def test_clean_locked_files(
+    tmpdir: pathlib.Path, lock_validity_period: Optional[float]
+) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+
+    # Copy to cache
+    open_url(tmpfile)
+
+    # Add unknown and lock
+    fs.put(str(tmpfile), f"{dirname}/unknown.txt")
+    fs.touch(f"{dirname}/unknown.txt.lock")
+
+    # Clean one file
+    clean.clean_cache_files(
+        1, delete_unknown_files=True, lock_validity_period=lock_validity_period
+    )
+    if lock_validity_period == 0:
+        file_hash = f"{fs.checksum(tmpfile):x}"
+        assert fs.ls(dirname) == [f"{dirname}/{file_hash}.txt"]
+    else:
+        assert set(fs.ls(dirname)) == {
+            f"{dirname}/unknown.txt",
+            f"{dirname}/unknown.txt.lock",
+        }
 
 
 @pytest.mark.parametrize(

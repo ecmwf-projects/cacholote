@@ -114,7 +114,10 @@ class _Cleaner:
     def delete_unknown_files(self, lock_validity_period: Optional[float]) -> None:
         for urlpath in self.unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
-            with utils._Locker(self.fs, urlpath) as file_exists:
+            if not self.fs.exists(urlpath):
+                continue
+
+            with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
                     self.logger.info(f"Deleting {urlpath!r}")
                     self.fs.rm(urlpath)
