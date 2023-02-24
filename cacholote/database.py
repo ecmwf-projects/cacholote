@@ -39,7 +39,7 @@ class CacheEntry(Base):
         default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow,
     )
-    counter = sqlalchemy.Column(sqlalchemy.Integer, default=0)
+    counter = sqlalchemy.Column(sqlalchemy.Integer)
     tag = sqlalchemy.Column(sqlalchemy.String)
 
     @property
