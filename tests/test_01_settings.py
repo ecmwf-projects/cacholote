@@ -1,24 +1,65 @@
-import contextvars
 import os
 import pathlib
+from typing import Any, Dict
 
-from cacholote import config, database
+import pytest
+
+from cacholote import config
 
 
-def test_change_engine(tmpdir: pathlib.Path) -> None:
+def test_change_cache_db_urlpath(tmpdir: pathlib.Path) -> None:
     old_db = config.get().cache_db_urlpath
     new_db = "sqlite:///" + str(tmpdir / "dummy.db")
-    old_engine = database.ENGINE.get()
 
     with config.set(cache_db_urlpath=new_db):
-        assert database.ENGINE.get() is not old_engine
-        assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
-    assert database.ENGINE.get() is old_engine
-    assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == old_db
+        assert str(config.get().engine.url) == config.get().cache_db_urlpath == new_db
+    assert str(config.get().engine.url) == config.get().cache_db_urlpath == old_db
 
     config.set(cache_db_urlpath=new_db)
-    assert database.ENGINE.get() is not old_engine
-    assert str(database.ENGINE.get().url) == config.get().cache_db_urlpath == new_db
+    assert str(config.get().engine.url) == config.get().cache_db_urlpath == new_db
+
+
+@pytest.mark.parametrize(
+    "key, reset",
+    [
+        ("cache_db_urlpath", True),
+        ("create_engine_kwargs", True),
+        ("cache_files_urlpath", False),
+    ],
+)
+def test_set_engine_and_sessionmaker(
+    tmpdir: pathlib.Path, key: str, reset: bool
+) -> None:
+    old_engine = config.get().engine
+    old_sessionmaker = config.get().sessionmaker
+
+    kwargs: Dict[str, Any] = {}
+    if key == "cache_db_urlpath":
+        kwargs[key] = "sqlite:///" + str(tmpdir / "dummy.db")
+    elif key == "create_engine_kwargs":
+        kwargs[key] = {"pool_recycle": 60}
+    elif key == "cache_files_urlpath":
+        kwargs[key] = str(tmpdir / "dummy_files")
+    else:
+        raise ValueError
+
+    with config.set(**kwargs):
+        if reset:
+            assert config.get().engine is not old_engine
+            assert config.get().sessionmaker is not old_sessionmaker
+        else:
+            assert config.get().engine is old_engine
+            assert config.get().sessionmaker is old_sessionmaker
+    assert config.get().engine is old_engine
+    assert config.get().sessionmaker is old_sessionmaker
+
+    config.set(**kwargs)
+    if reset:
+        assert config.get().engine is not old_engine
+        assert config.get().sessionmaker is not old_sessionmaker
+    else:
+        assert config.get().engine is old_engine
+        assert config.get().sessionmaker is old_sessionmaker
 
 
 def test_env_variables(tmpdir: pathlib.Path) -> None:
@@ -34,20 +75,9 @@ def test_env_variables(tmpdir: pathlib.Path) -> None:
     config.reset(str(dotenv_path))
     try:
         assert config.get().cache_db_urlpath == "sqlite://"
-        assert str(database.ENGINE.get().url) == "sqlite://"
+        assert str(config.get().engine.url) == "sqlite://"
         assert config.get().io_delete_original is True
-        assert str(database.ENGINE.get().url) == "sqlite://"
+        assert str(config.get().engine.url) == "sqlite://"
     finally:
         os.environ.clear()
         os.environ.update(old_environ)
-
-
-def test_contextvar() -> None:
-    def set_tag() -> None:
-        config.set(tag="foo")
-
-    ctx = contextvars.copy_context()
-    ctx.run(set_tag)
-
-    assert config.get().tag is None
-    assert ctx[config._SETTINGS].tag == "foo"

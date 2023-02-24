@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.import hashlib
 
+import datetime
 import hashlib
 import io
 import time
@@ -67,10 +68,16 @@ def copy_buffered_file(
 
 
 class _Locker:
-    def __init__(self, fs: fsspec.AbstractFileSystem, urlpath: str) -> None:
+    def __init__(
+        self,
+        fs: fsspec.AbstractFileSystem,
+        urlpath: str,
+        lock_validity_period: Optional[float] = None,
+    ) -> None:
         self.fs = fs
         self.urlpath = urlpath
         self.lockfile = urlpath + ".lock"
+        self.lock_validity_period = lock_validity_period
 
     @property
     def file_exists(self) -> bool:
@@ -83,9 +90,22 @@ class _Locker:
         if self.fs.exists(self.lockfile):
             self.fs.rm(self.lockfile)
 
+    @property
+    def is_locked(self) -> bool:
+        if not self.fs.exists(self.lockfile):
+            return False
+
+        delta = datetime.datetime.now() - self.fs.modified(self.lockfile)
+        if self.lock_validity_period is None or delta < datetime.timedelta(
+            seconds=self.lock_validity_period
+        ):
+            return True
+
+        return False
+
     def wait_until_released(self) -> None:
         warned = False
-        while self.fs.exists(self.lockfile):
+        while self.is_locked:
             if not warned:
                 warnings.warn(
                     f"can NOT proceed until file is released: {self.lockfile!r}.",

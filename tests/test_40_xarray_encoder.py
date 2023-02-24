@@ -3,7 +3,7 @@ import pathlib
 import fsspec
 import pytest
 
-from cacholote import cache, config, database, decode, encode, extra_encoders, utils
+from cacholote import cache, config, decode, encode, extra_encoders, utils
 
 try:
     import xarray as xr
@@ -87,7 +87,7 @@ def test_xr_cacheable(
     config.set(xarray_cache_type=xarray_cache_type)
 
     # cache-db to check
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
 
     expected = get_grib_ds()

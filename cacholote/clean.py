@@ -14,18 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 import functools
 import json
-import logging
 import posixpath
 from typing import Any, Dict, Literal, Optional, Sequence, Set
 
 import sqlalchemy
 import sqlalchemy.orm
+import structlog
 
-from . import database, extra_encoders, utils
+from . import config, database, extra_encoders, utils
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = structlog.get_logger()
 
 
 def _delete_cache_file(
@@ -34,7 +35,7 @@ def _delete_cache_file(
     cache_entry: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
-    logger: Optional[logging.Logger] = None,
+    logger: Optional[structlog.stdlib.BoundLogger] = None,
 ) -> Any:
     logger = logger or LOGGER
 
@@ -52,20 +53,20 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                logger.info(f"Deleting {cache_entry!r}")
+                logger.info("Deleting cache entry", cache_entry=cache_entry)
                 session.delete(cache_entry)
                 database._commit_or_rollback(session)
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
-                        logger.info(f"Deleting {urlpath!r}")
+                        logger.info("Deleting cache file", urlpath=urlpath)
                         fs.rm(urlpath, recursive=True)
 
     return obj
 
 
 class _Cleaner:
-    def __init__(self, logger: logging.Logger) -> None:
+    def __init__(self, logger: structlog.stdlib.BoundLogger) -> None:
         self.logger = logger
 
         fs, dirname = utils.get_cache_files_fs_dirname()
@@ -81,19 +82,24 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
+        self.logger.info("Checking cache files size", size=self.size)
         return size <= maxsize
 
-    @property
-    def unknown_files(self) -> Set[str]:
+    def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
+        now = datetime.datetime.now()
         files_to_skip = []
         for urlpath in self.sizes:
             if urlpath.endswith(".lock"):
-                files_to_skip.append(urlpath)
-                files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
+                delta = now - self.fs.modified(urlpath)
+                if lock_validity_period is None or delta < datetime.timedelta(
+                    seconds=lock_validity_period
+                ):
+                    files_to_skip.append(urlpath)
+                    files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
 
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
-            with database.SESSION.get()() as session:
+            with config.get().sessionmaker() as session:
                 for cache_entry in session.query(database.CacheEntry):
                     json.loads(
                         cache_entry._result_as_string,
@@ -106,12 +112,15 @@ class _Cleaner:
                     )
         return set(unknown_sizes)
 
-    def delete_unknown_files(self) -> None:
-        for urlpath in self.unknown_files:
+    def delete_unknown_files(self, lock_validity_period: Optional[float]) -> None:
+        for urlpath in self.get_unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
-            with utils._Locker(self.fs, urlpath) as file_exists:
+            if not self.fs.exists(urlpath):
+                continue
+
+            with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
-                    self.logger.info(f"Deleting {urlpath!r}")
+                    self.logger.info("Deleting unkown file", urlpath=urlpath)
                     self.fs.rm(urlpath)
 
     @staticmethod
@@ -169,7 +178,7 @@ class _Cleaner:
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
-        with database.SESSION.get()() as session:
+        with config.get().sessionmaker() as session:
             for cache_entry in (
                 session.query(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
@@ -187,7 +196,7 @@ class _Cleaner:
                     return
 
         raise ValueError(
-            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}."
+            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}. Expected size: {maxsize!r}"
         )
 
 
@@ -195,9 +204,10 @@ def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
+    lock_validity_period: Optional[float] = None,
     tags_to_clean: Optional[Sequence[Optional[str]]] = None,
     tags_to_keep: Optional[Sequence[Optional[str]]] = None,
-    logger: Optional[logging.Logger] = None,
+    logger: Optional[structlog.stdlib.BoundLogger] = None,
 ) -> None:
     """Clean cache files.
 
@@ -210,15 +220,19 @@ def clean_cache_files(
         * LFU: Least Frequently Used
     delete_unknown_files: bool, default: False
         Delete all files that are not registered in the cache database.
+    lock_validity_period: float, optional, default: None
+        Validity period of lock files in seconds. Expired locks will be deleted.
     tags_to_clean, tags_to_keep: sequence of strings/None, optional, default: None
         Tags to clean/keep. If None, delete all cache entries.
         To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
+    logger: optional
+        Python object use to produce logs.
     """
     cleaner = _Cleaner(logger=logger or LOGGER)
 
     if delete_unknown_files:
-        cleaner.delete_unknown_files()
+        cleaner.delete_unknown_files(lock_validity_period)
 
     cleaner.delete_cache_files(
         maxsize=maxsize,

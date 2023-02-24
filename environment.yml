@@ -12,3 +12,4 @@ dependencies:
 - pydantic
 - python-dotenv
 - sqlalchemy==1.4*
+- structlog

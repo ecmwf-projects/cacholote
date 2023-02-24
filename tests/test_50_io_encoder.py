@@ -1,4 +1,3 @@
-import contextvars
 import hashlib
 import importlib
 import io
@@ -10,7 +9,7 @@ import fsspec
 import pytest
 import pytest_httpserver
 
-from cacholote import cache, config, database, decode, encode, extra_encoders, utils
+from cacholote import cache, config, decode, encode, extra_encoders, utils
 
 
 def open_url(url: str) -> fsspec.spec.AbstractBufferedFile:
@@ -89,7 +88,7 @@ def test_copy_from_http_to_cache(
     set_cache: str,
 ) -> None:
     # cache-db to check
-    con = database.ENGINE.get().raw_connection()
+    con = config.get().engine.raw_connection()
     cur = con.cursor()
 
     # http server
@@ -161,8 +160,7 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
         fs.rm(lock)
 
     # Threading
-    ctx = contextvars.copy_context()
-    t1 = threading.Timer(0, cfunc, args=(tmpfile,), kwargs={"__context__": ctx})
+    t1 = threading.Timer(0, cfunc, args=(tmpfile,))
     t2 = threading.Timer(0.1, release_lock, args=(fs, lock))
     with pytest.warns(
         UserWarning, match=f"can NOT proceed until file is released: {lock!r}."
