@@ -17,16 +17,16 @@
 import datetime
 import functools
 import json
-import logging
 import posixpath
 from typing import Any, Dict, Literal, Optional, Sequence, Set
 
 import sqlalchemy
 import sqlalchemy.orm
+import structlog
 
 from . import config, database, extra_encoders, utils
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = structlog.get_logger()
 
 
 def _delete_cache_file(
@@ -35,7 +35,7 @@ def _delete_cache_file(
     cache_entry: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
-    logger: Optional[logging.Logger] = None,
+    logger: Optional[structlog.stdlib.BoundLogger] = None,
 ) -> Any:
     logger = logger or LOGGER
 
@@ -53,20 +53,20 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                logger.info(f"Deleting {cache_entry!r}")
+                logger.info("Deleting cache entry", cache_entry=cache_entry)
                 session.delete(cache_entry)
                 database._commit_or_rollback(session)
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
-                        logger.info(f"Deleting {urlpath!r}")
+                        logger.info("Deleting cache file", urlpath=urlpath)
                         fs.rm(urlpath, recursive=True)
 
     return obj
 
 
 class _Cleaner:
-    def __init__(self, logger: logging.Logger) -> None:
+    def __init__(self, logger: structlog.stdlib.BoundLogger) -> None:
         self.logger = logger
 
         fs, dirname = utils.get_cache_files_fs_dirname()
@@ -82,7 +82,7 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
-        self.logger.info(f"Cache files total size: {size}")
+        self.logger.info("Checking cache files size", size=self.size)
         return size <= maxsize
 
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
@@ -120,7 +120,7 @@ class _Cleaner:
 
             with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
-                    self.logger.info(f"Deleting {urlpath!r}")
+                    self.logger.info("Deleting unkown file", urlpath=urlpath)
                     self.fs.rm(urlpath)
 
     @staticmethod
@@ -196,7 +196,7 @@ class _Cleaner:
                     return
 
         raise ValueError(
-            f"Unable to clean {self.dirname!r}. Cache files total size: {self.size!r}."
+            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}. Expected size: {maxsize!r}"
         )
 
 
@@ -207,7 +207,7 @@ def clean_cache_files(
     lock_validity_period: Optional[float] = None,
     tags_to_clean: Optional[Sequence[Optional[str]]] = None,
     tags_to_keep: Optional[Sequence[Optional[str]]] = None,
-    logger: Optional[logging.Logger] = None,
+    logger: Optional[structlog.stdlib.BoundLogger] = None,
 ) -> None:
     """Clean cache files.
 
