@@ -53,13 +53,13 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
             if session and cache_entry and not dry_run:
-                logger.info("Deleting cache entry", cache_entry=cache_entry)
+                logger.info("Delete cache entry", cache_entry=cache_entry)
                 session.delete(cache_entry)
                 database._commit_or_rollback(session)
             if not dry_run:
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
-                        logger.info("Deleting cache file", urlpath=urlpath)
+                        logger.info("Delete cache file", urlpath=urlpath)
                         fs.rm(urlpath, recursive=True)
 
     return obj
@@ -82,7 +82,7 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
-        self.logger.info("Checking cache files size", size=self.size)
+        self.logger.info("Check cache files size", size=self.size)
         return size <= maxsize
 
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
@@ -120,7 +120,7 @@ class _Cleaner:
 
             with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
-                    self.logger.info("Deleting unkown file", urlpath=urlpath)
+                    self.logger.info("Delete unkown file", urlpath=urlpath)
                     self.fs.rm(urlpath)
 
     @staticmethod
