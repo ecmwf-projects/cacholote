@@ -82,9 +82,10 @@ class _Cleaner:
 
     def stop_cleaning(self, maxsize: int) -> bool:
         size = self.size
+        self.logger.info(f"Cache files total size: {size}")
         return size <= maxsize
 
-    def unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
+    def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
         now = datetime.datetime.now()
         files_to_skip = []
         for urlpath in self.sizes:
@@ -112,7 +113,7 @@ class _Cleaner:
         return set(unknown_sizes)
 
     def delete_unknown_files(self, lock_validity_period: Optional[float]) -> None:
-        for urlpath in self.unknown_files(lock_validity_period):
+        for urlpath in self.get_unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
             if not self.fs.exists(urlpath):
                 continue
@@ -195,7 +196,7 @@ class _Cleaner:
                     return
 
         raise ValueError(
-            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}."
+            f"Unable to clean {self.dirname!r}. Cache files total size: {self.size!r}."
         )
 
 
