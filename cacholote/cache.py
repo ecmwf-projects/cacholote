@@ -94,7 +94,6 @@ def cacheable(func: F) -> F:
                 session.query(database.CacheEntry)
                 .filter(*filters)
                 .order_by(database.CacheEntry.timestamp.desc())
-                .with_for_update()
             ):
                 try:
                     return _decode_and_update(session, cache_entry, settings)
