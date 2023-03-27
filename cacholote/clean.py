@@ -18,13 +18,13 @@ import datetime
 import functools
 import json
 import posixpath
-from typing import Any, Dict, Literal, Optional, Sequence, Set
+from typing import Any, Callable, Dict, Literal, Optional, Sequence, Set, Union
 
 import sqlalchemy
 import sqlalchemy.orm
 import structlog
 
-from . import config, database, extra_encoders, utils
+from . import config, database, encode, extra_encoders, utils
 
 LOGGER = structlog.get_logger()
 
@@ -63,6 +63,27 @@ def _delete_cache_file(
                         fs.rm(urlpath, recursive=True)
 
     return obj
+
+
+def _delete_cache_entry(
+    session: sqlalchemy.orm.Session, cache_entry: database.CacheEntry
+) -> None:
+    # First, delete database entry
+    session.delete(cache_entry)
+    database._commit_or_rollback(session)
+    # Then, delete files
+    json.loads(cache_entry._result_as_string, object_hook=_delete_cache_file)
+
+
+def delete(
+    func_to_del: Union[str, Callable[..., Any]], *args: Any, **kwargs: Any
+) -> None:
+    hexdigest = encode._hexdigestify_python_call(func_to_del, *args, **kwargs)
+    with config.get().sessionmaker() as session:
+        for cache_entry in session.query(database.CacheEntry).filter(
+            database.CacheEntry.key == hexdigest
+        ):
+            _delete_cache_entry(session, cache_entry)
 
 
 class _Cleaner:

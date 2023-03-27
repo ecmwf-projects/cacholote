@@ -25,9 +25,17 @@ import pickle
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from . import config, decode
+from . import config, decode, utils
 
 _JSON_DUMPS_KWARGS: Dict[str, Any] = {"separators": (",", ":"), "skipkeys": False}
+
+
+def _hexdigestify_python_call(
+    func_to_hex: Union[str, Callable[..., Any]],
+    *args: Any,
+    **kwargs: Any,
+) -> str:
+    return utils.hexdigestify(dumps_python_call(func_to_hex, *args, **kwargs))
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
