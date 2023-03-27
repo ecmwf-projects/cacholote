@@ -175,5 +175,8 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
 
     # Delete cache entry
     clean.delete(open_url, tmpfile)
+    assert fs.ls(dirname) == []
+
+    # Cache again
     assert open_url(tmpfile).read() == b"new"
     assert len(fs.ls(dirname)) == 1
