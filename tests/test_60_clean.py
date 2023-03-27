@@ -157,3 +157,23 @@ def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
         match="tags_to_clean/keep must be None or a sequence of str/None.",
     ):
         clean.clean_cache_files(1, tags_to_clean=wrong_type)
+
+
+def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"old")
+
+    # Copy to cache
+    open_url(tmpfile)
+
+    # Change tmp file
+    fsspec.filesystem("file").pipe_file(tmpfile, b"new")
+    assert open_url(tmpfile).read() == b"old"
+
+    # Delete cache entry
+    clean.delete(open_url, tmpfile)
+    assert open_url(tmpfile).read() == b"new"
+    assert len(fs.ls(dirname)) == 1

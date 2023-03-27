@@ -19,12 +19,12 @@ import datetime
 import functools
 import json
 import warnings
-from typing import Any, Callable, TypeVar, Union, cast
+from typing import Any, Callable, TypeVar, cast
 
 import sqlalchemy
 import sqlalchemy.orm
 
-from . import clean, config, database, decode, encode, utils
+from . import clean, config, database, decode, encode
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -45,24 +45,6 @@ def _decode_and_update(
     return result
 
 
-def _delete_cache_entry(
-    session: sqlalchemy.orm.Session, cache_entry: database.CacheEntry
-) -> None:
-    # First, delete database entry
-    session.delete(cache_entry)
-    database._commit_or_rollback(session)
-    # Then, delete files
-    json.loads(cache_entry._result_as_string, object_hook=clean._delete_cache_file)
-
-
-def _hexdigestify_python_call(
-    func_to_hex: Union[str, Callable[..., Any]],
-    *args: Any,
-    **kwargs: Any,
-) -> str:
-    return utils.hexdigestify(encode.dumps_python_call(func_to_hex, *args, **kwargs))
-
-
 def cacheable(func: F) -> F:
     """Make a function cacheable."""
 
@@ -74,7 +56,7 @@ def cacheable(func: F) -> F:
             return func(*args, **kwargs)
 
         try:
-            hexdigest = _hexdigestify_python_call(func, *args, **kwargs)
+            hexdigest = encode._hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as ex:
             if settings.return_cache_entry:
                 raise ex
@@ -99,7 +81,7 @@ def cacheable(func: F) -> F:
                     return _decode_and_update(session, cache_entry, settings)
                 except decode.DecodeError as ex:
                     warnings.warn(str(ex), UserWarning)
-                    _delete_cache_entry(session, cache_entry)
+                    clean._delete_cache_entry(session, cache_entry)
 
         result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(
