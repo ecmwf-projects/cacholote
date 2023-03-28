@@ -3,7 +3,7 @@ import pathlib
 from typing import Any, Dict
 
 import pytest
-import sqlalchemy.pool
+import sqlalchemy
 
 from cacholote import config
 

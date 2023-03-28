@@ -24,7 +24,6 @@ from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 import fsspec
 import pydantic
 import sqlalchemy
-import sqlalchemy.pool
 
 from . import database
 
