@@ -87,3 +87,4 @@ def test_env_variables(tmpdir: pathlib.Path) -> None:
 def test_set_poolclass() -> None:
     config.set(create_engine_kwargs={"poolclass": "NullPool"})
     assert config.get().create_engine_kwargs["poolclass"] == sqlalchemy.pool.NullPool
+    assert isinstance(config.get().engine.pool, sqlalchemy.pool.NullPool)
