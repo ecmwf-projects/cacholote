@@ -24,6 +24,7 @@ from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 import fsspec
 import pydantic
 import sqlalchemy
+import sqlalchemy.pool
 
 from . import database
 
@@ -51,6 +52,15 @@ class Settings(pydantic.BaseSettings):
     expiration: Optional[datetime.datetime] = None
     tag: Optional[str] = None
     return_cache_entry: bool = False
+
+    @pydantic.validator("create_engine_kwargs")
+    def validate_create_engine_kwargs(
+        cls: pydantic.BaseSettings, create_engine_kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        poolclass = create_engine_kwargs.get("poolclass")
+        if isinstance(poolclass, str):
+            create_engine_kwargs["poolclass"] = getattr(sqlalchemy.pool, poolclass)
+        return create_engine_kwargs
 
     @pydantic.validator("return_cache_entry")
     def validate_return_cache_entry(

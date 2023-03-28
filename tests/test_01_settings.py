@@ -3,6 +3,7 @@ import pathlib
 from typing import Any, Dict
 
 import pytest
+import sqlalchemy.pool
 
 from cacholote import config
 
@@ -81,3 +82,8 @@ def test_env_variables(tmpdir: pathlib.Path) -> None:
     finally:
         os.environ.clear()
         os.environ.update(old_environ)
+
+
+def test_pool_class() -> None:
+    config.set(create_engine_kwargs={"poolclass": "NullPool"})
+    assert config.get().create_engine_kwargs["poolclass"] == sqlalchemy.pool.NullPool
