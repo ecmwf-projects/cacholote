@@ -52,7 +52,7 @@ class Settings(pydantic.BaseSettings):
     tag: Optional[str] = None
     return_cache_entry: bool = False
 
-    @pydantic.validator("create_engine_kwargs")
+    @pydantic.validator("create_engine_kwargs", allow_reuse=True)
     def validate_create_engine_kwargs(
         cls: pydantic.BaseSettings, create_engine_kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
@@ -61,7 +61,7 @@ class Settings(pydantic.BaseSettings):
             create_engine_kwargs["poolclass"] = getattr(sqlalchemy.pool, poolclass)
         return create_engine_kwargs
 
-    @pydantic.validator("return_cache_entry")
+    @pydantic.validator("return_cache_entry", allow_reuse=True)
     def validate_return_cache_entry(
         cls: pydantic.BaseSettings, return_cache_entry: bool, values: Dict[str, Any]
     ) -> bool:
