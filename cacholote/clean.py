@@ -95,13 +95,13 @@ class _Cleaner:
         urldir = fs.unstrip_protocol(dirname)
 
         sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
-        for path, size in fs.du(urldir, total=False, withdirs=True).items():
+        for path, size in fs.du(dirname, total=False, withdirs=True).items():
             urlpath = fs.unstrip_protocol(path)
-            basename = urlpath.replace(urldir, "").split("/")[0]
+            basename = urlpath.replace(urldir, "").strip("/").split("/")[0]
             if basename:
                 sizes[posixpath.join(urldir, basename)] += size
 
-        self.sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
+        self.sizes = sizes
         self.fs = fs
         self.dirname = dirname
 
