@@ -97,13 +97,13 @@ class _Cleaner:
         sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
         for path, size in fs.du(dirname, total=False, withdirs=True).items():
             urlpath = fs.unstrip_protocol(path)
-            basename = urlpath.replace(urldir, "").strip("/").split("/")[0]
+            basename, *_ = urlpath.replace(urldir, "").strip("/").split("/")
             if basename:
                 sizes[posixpath.join(urldir, basename)] += size
 
-        self.sizes = sizes
         self.fs = fs
         self.dirname = dirname
+        self.sizes = sizes
 
     @property
     def size(self) -> int:
