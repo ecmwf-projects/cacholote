@@ -95,7 +95,7 @@ class _Cleaner:
         urldir = fs.unstrip_protocol(dirname)
 
         sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
-        for path, size in fs.du(dirname, total=False, withdirs=True).items():
+        for path, size in fs.du(dirname, total=False).items():
             urlpath = fs.unstrip_protocol(path)
             basename, *_ = urlpath.replace(urldir, "").strip("/").split("/")
             if basename:
