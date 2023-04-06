@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import datetime
 import functools
 import json
@@ -91,11 +92,18 @@ class _Cleaner:
         self.logger = logger
 
         fs, dirname = utils.get_cache_files_fs_dirname()
-        sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
+        urldir = fs.unstrip_protocol(dirname)
 
+        sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
+        for path, size in fs.du(urldir, total=False, withdirs=True).items():
+            urlpath = fs.unstrip_protocol(path)
+            basename = urlpath.replace(urldir, "").split("/")[0]
+            if basename:
+                sizes[posixpath.join(urldir, basename)] += size
+
+        self.sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
         self.fs = fs
         self.dirname = dirname
-        self.sizes = sizes
 
     @property
     def size(self) -> int:
