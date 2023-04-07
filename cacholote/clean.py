@@ -61,7 +61,10 @@ def _delete_cache_file(
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
                         logger.info("Delete cache file", urlpath=urlpath)
-                        fs.rm(urlpath, recursive=True)
+                        fs.rm(
+                            urlpath,
+                            recursive=obj["args"][0]["type"] == "application/vnd+zarr",
+                        )
 
     return obj
 
@@ -79,6 +82,17 @@ def _delete_cache_entry(
 def delete(
     func_to_del: Union[str, Callable[..., Any]], *args: Any, **kwargs: Any
 ) -> None:
+    """Delete function previously cached.
+
+    Parameters
+    ----------
+    func_to_del: callable, str
+        Function to delete from cache
+    *args: Any
+        Argument of functions to delete from cache
+    **kwargs: Any
+        Keyword arguments of functions to delete from cache
+    """
     hexdigest = encode._hexdigestify_python_call(func_to_del, *args, **kwargs)
     with config.get().sessionmaker() as session:
         for cache_entry in session.query(database.CacheEntry).filter(
@@ -150,7 +164,9 @@ class _Cleaner:
             self.sizes.pop(urlpath)
             with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
-                    self.logger.info("Delete unknown file", urlpath=urlpath)
+                    self.logger.info(
+                        "Delete unknown", urlpath=urlpath, recursive=recursive
+                    )
                     self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod

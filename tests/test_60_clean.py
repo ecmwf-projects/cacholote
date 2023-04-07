@@ -88,6 +88,7 @@ def test_delete_unknown_dirs(
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
     fs.mkdir(f"{dirname}/unknown")
+    fs.touch(f"{dirname}/unknown/unknown.txt")
     with raises:
         clean.clean_cache_files(0, delete_unknown_files=True, recursive=recursive)
     assert len(fs.ls(dirname)) == final_size
