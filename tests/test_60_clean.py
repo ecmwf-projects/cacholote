@@ -87,7 +87,7 @@ def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) 
     ],
 )
 def test_delete_unknown_dirs(
-    recursive: bool, raises: contextlib.nullcontext[Any], final_size: int
+    recursive: bool, raises: contextlib.nullcontext, final_size: int  # type: ignore[type-arg]
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
     fs.mkdir(f"{dirname}/unknown")
