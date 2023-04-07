@@ -1,3 +1,4 @@
+import contextlib
 import pathlib
 from typing import Any, Literal, Optional, Sequence
 
@@ -5,6 +6,8 @@ import fsspec
 import pytest
 
 from cacholote import cache, clean, config, utils
+
+does_not_raise = contextlib.nullcontext
 
 
 @cache.cacheable
@@ -74,6 +77,20 @@ def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) 
         assert fs.ls(dirname) == [f"{dirname}/{file_hash}.txt"]
     else:
         assert fs.ls(dirname) == [f"{dirname}/unknown.txt"]
+
+
+@pytest.mark.parametrize(
+    "recursive,raises,final_size",
+    [(True, does_not_raise(), 0), (False, pytest.raises(PermissionError), 1)],
+)
+def test_delete_unknown_dirs(
+    recursive: bool, raises: contextlib.nullcontext[Any], final_size: int
+) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs.mkdir(f"{dirname}/unknown")
+    with raises:
+        clean.clean_cache_files(0, delete_unknown_files=True, recursive=recursive)
+    assert len(fs.ls(dirname)) == final_size
 
 
 @pytest.mark.parametrize("lock_validity_period", [None, 0])
@@ -147,15 +164,13 @@ def test_clean_tagged_files_wrong_args() -> None:
 
 @pytest.mark.parametrize("wrong_type", ["1", [1]])
 def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
-    with pytest.raises(
+    raises = pytest.raises(
         TypeError,
         match="tags_to_clean/keep must be None or a sequence of str/None.",
-    ):
+    )
+    with raises:
         clean.clean_cache_files(1, tags_to_keep=wrong_type)
-    with pytest.raises(
-        TypeError,
-        match="tags_to_clean/keep must be None or a sequence of str/None.",
-    ):
+    with raises:
         clean.clean_cache_files(1, tags_to_clean=wrong_type)
 
 
