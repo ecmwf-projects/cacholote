@@ -108,7 +108,7 @@ class _Cleaner:
 
         logger.info("Get disk usage of cache files")
         sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
-        for path, size in fs.du(dirname, total=False, withdirs=True).items():
+        for path, size in fs.du(dirname, total=False).items():
             # Group dirs
             urlpath = fs.unstrip_protocol(path)
             basename, *_ = urlpath.replace(urldir, "", 1).strip("/").split("/")
