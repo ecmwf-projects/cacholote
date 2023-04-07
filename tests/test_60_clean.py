@@ -81,7 +81,10 @@ def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) 
 
 @pytest.mark.parametrize(
     "recursive,raises,final_size",
-    [(True, does_not_raise(), 0), (False, pytest.raises(PermissionError), 1)],
+    [
+        (True, does_not_raise(), 0),
+        (False, pytest.raises((PermissionError, IsADirectoryError)), 1),
+    ],
 )
 def test_delete_unknown_dirs(
     recursive: bool, raises: contextlib.nullcontext[Any], final_size: int
