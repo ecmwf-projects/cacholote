@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import datetime
 import functools
 import json
@@ -60,7 +61,10 @@ def _delete_cache_file(
                 with utils._Locker(fs, urlpath) as file_exists:
                     if file_exists:
                         logger.info("Delete cache file", urlpath=urlpath)
-                        fs.rm(urlpath, recursive=True)
+                        fs.rm(
+                            urlpath,
+                            recursive=obj["args"][0]["type"] == "application/vnd+zarr",
+                        )
 
     return obj
 
@@ -78,6 +82,17 @@ def _delete_cache_entry(
 def delete(
     func_to_del: Union[str, Callable[..., Any]], *args: Any, **kwargs: Any
 ) -> None:
+    """Delete function previously cached.
+
+    Parameters
+    ----------
+    func_to_del: callable, str
+        Function to delete from cache
+    *args: Any
+        Argument of functions to delete from cache
+    **kwargs: Any
+        Keyword arguments of functions to delete from cache
+    """
     hexdigest = encode._hexdigestify_python_call(func_to_del, *args, **kwargs)
     with config.get().sessionmaker() as session:
         for cache_entry in session.query(database.CacheEntry).filter(
@@ -88,25 +103,34 @@ def delete(
 
 class _Cleaner:
     def __init__(self, logger: structlog.stdlib.BoundLogger) -> None:
-        self.logger = logger
-
         fs, dirname = utils.get_cache_files_fs_dirname()
-        sizes = {fs.unstrip_protocol(path): fs.du(path) for path in fs.ls(dirname)}
+        urldir = fs.unstrip_protocol(dirname)
 
+        logger.info("Get disk usage of cache files")
+        sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
+        for path, size in fs.du(dirname, total=False).items():
+            # Group dirs
+            urlpath = fs.unstrip_protocol(path)
+            basename, *_ = urlpath.replace(urldir, "", 1).strip("/").split("/")
+            if basename:
+                sizes[posixpath.join(urldir, basename)] += size
+
+        self.logger = logger
         self.fs = fs
         self.dirname = dirname
         self.sizes = sizes
 
     @property
     def size(self) -> int:
-        return sum(self.sizes.values())
+        sum_sizes = sum(self.sizes.values())
+        self.logger.info("Check cache files total size", size=sum_sizes)
+        return sum_sizes
 
     def stop_cleaning(self, maxsize: int) -> bool:
-        size = self.size
-        self.logger.info("Check cache files size", size=self.size)
-        return size <= maxsize
+        return self.size <= maxsize
 
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
+        self.logger.info("Get unknown files")
         now = datetime.datetime.now()
         files_to_skip = []
         for urlpath in self.sizes:
@@ -133,16 +157,17 @@ class _Cleaner:
                     )
         return set(unknown_sizes)
 
-    def delete_unknown_files(self, lock_validity_period: Optional[float]) -> None:
+    def delete_unknown_files(
+        self, lock_validity_period: Optional[float], recursive: bool
+    ) -> None:
         for urlpath in self.get_unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
-            if not self.fs.exists(urlpath):
-                continue
-
             with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
-                    self.logger.info("Delete unkown file", urlpath=urlpath)
-                    self.fs.rm(urlpath)
+                    self.logger.info(
+                        "Delete unknown", urlpath=urlpath, recursive=recursive
+                    )
+                    self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod
     def check_tags(*args: Any) -> None:
@@ -225,6 +250,7 @@ def clean_cache_files(
     maxsize: int,
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
+    recursive: bool = False,
     lock_validity_period: Optional[float] = None,
     tags_to_clean: Optional[Sequence[Optional[str]]] = None,
     tags_to_keep: Optional[Sequence[Optional[str]]] = None,
@@ -241,6 +267,8 @@ def clean_cache_files(
         * LFU: Least Frequently Used
     delete_unknown_files: bool, default: False
         Delete all files that are not registered in the cache database.
+    recursive: bool, default: False
+        Whether to delete unknown directories or not
     lock_validity_period: float, optional, default: None
         Validity period of lock files in seconds. Expired locks will be deleted.
     tags_to_clean, tags_to_keep: sequence of strings/None, optional, default: None
@@ -253,7 +281,7 @@ def clean_cache_files(
     cleaner = _Cleaner(logger=logger or LOGGER)
 
     if delete_unknown_files:
-        cleaner.delete_unknown_files(lock_validity_period)
+        cleaner.delete_unknown_files(lock_validity_period, recursive)
 
     cleaner.delete_cache_files(
         maxsize=maxsize,
