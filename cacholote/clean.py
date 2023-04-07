@@ -92,7 +92,7 @@ class _Cleaner:
         fs, dirname = utils.get_cache_files_fs_dirname()
         urldir = fs.unstrip_protocol(dirname)
 
-        logger.info("Getting disk usage of cache files")
+        logger.info("Get disk usage of cache files")
         sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
         for path, size in fs.du(dirname, total=False, withdirs=True).items():
             # Group dirs
@@ -116,7 +116,7 @@ class _Cleaner:
         return self.size <= maxsize
 
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
-        self.logger.info("Getting unknown files")
+        self.logger.info("Get unknown files")
         now = datetime.datetime.now()
         files_to_skip = []
         for urlpath in self.sizes:
@@ -150,7 +150,7 @@ class _Cleaner:
             self.sizes.pop(urlpath)
             with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
                 if file_exists:
-                    self.logger.info("Delete unkown file", urlpath=urlpath)
+                    self.logger.info("Delete unknown file", urlpath=urlpath)
                     self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod
