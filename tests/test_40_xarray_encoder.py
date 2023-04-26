@@ -123,6 +123,7 @@ def test_xr_corrupted_files(
     importorskip: str,
 ) -> None:
     pytest.importorskip(importorskip)
+    import dask
 
     config.set(xarray_cache_type=xarray_cache_type)
 
@@ -132,17 +133,23 @@ def test_xr_corrupted_files(
     cfunc = cache.cacheable(get_grib_ds)
     cfunc()
 
+    # Get cached file path
+    with dask.config.set({"tokenize.ensure-deterministic": True}):
+        root = dask.base.tokenize(expected)  # type: ignore[no-untyped-call]
+    cached_path = f"{dirname}/{root}{ext}"
+    assert fs.exists(cached_path)
+
     # Warn if file is corrupted
-    fs.touch(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}", truncate=False)
-    touched_info = fs.info(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}")
+    fs.touch(cached_path, truncate=False)
+    touched_info = fs.info(cached_path)
     with pytest.warns(UserWarning, match="checksum mismatch"):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert fs.info(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}") != touched_info
+    assert fs.info(cached_path) != touched_info
 
     # Warn if file is deleted
-    fs.rm(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}", recursive=True)
+    fs.rm(cached_path, recursive=True)
     with pytest.warns(UserWarning, match="No such file or directory"):
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
-    assert fs.exists(f"{dirname}/b8094ae0691cfa42c9b839679e162e3d{ext}")
+    assert fs.exists(cached_path)
