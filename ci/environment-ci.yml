@@ -26,6 +26,6 @@ dependencies:
 - python-magic
 - requests
 - s3fs
-- sqlalchemy2-stubs
+- sqlalchemy[mypy]
 - xarray>=2022.6.0
 - zarr
