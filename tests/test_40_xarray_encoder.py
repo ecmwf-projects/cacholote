@@ -1,6 +1,5 @@
 import pathlib
 
-import dask
 import fsspec
 import pytest
 
@@ -124,6 +123,7 @@ def test_xr_corrupted_files(
     importorskip: str,
 ) -> None:
     pytest.importorskip(importorskip)
+    import dask
 
     config.set(xarray_cache_type=xarray_cache_type)
 
