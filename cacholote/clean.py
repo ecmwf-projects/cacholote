@@ -21,7 +21,7 @@ import json
 import posixpath
 from typing import Any, Callable, Dict, Literal, Optional, Sequence, Set, Union
 
-import sqlalchemy
+import sqlalchemy as sa
 import sqlalchemy.orm
 import structlog
 
@@ -95,8 +95,8 @@ def delete(
     """
     hexdigest = encode._hexdigestify_python_call(func_to_del, *args, **kwargs)
     with config.get().sessionmaker() as session:
-        for cache_entry in session.query(database.CacheEntry).filter(
-            database.CacheEntry.key == hexdigest
+        for cache_entry in session.scalars(
+            sa.select(database.CacheEntry).filter(database.CacheEntry.key == hexdigest)
         ):
             _delete_cache_entry(session, cache_entry)
 
@@ -145,7 +145,7 @@ class _Cleaner:
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
             with config.get().sessionmaker() as session:
-                for cache_entry in session.query(database.CacheEntry):
+                for cache_entry in session.scalars(sa.select(database.CacheEntry)):
                     json.loads(
                         cache_entry._result_as_string,
                         object_hook=functools.partial(
@@ -225,8 +225,8 @@ class _Cleaner:
         if self.stop_cleaning(maxsize):
             return
         with config.get().sessionmaker() as session:
-            for cache_entry in (
-                session.query(database.CacheEntry).filter(*filters).order_by(*sorters)
+            for cache_entry in session.scalars(
+                sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
                 json.loads(
                     cache_entry._result_as_string,
