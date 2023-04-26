@@ -23,7 +23,8 @@ from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 
 import fsspec
 import pydantic
-import sqlalchemy
+import sqlalchemy as sa
+import sqlalchemy.orm
 
 from . import database
 
@@ -58,7 +59,7 @@ class Settings(pydantic.BaseSettings):
     ) -> Dict[str, Any]:
         poolclass = create_engine_kwargs.get("poolclass")
         if isinstance(poolclass, str):
-            create_engine_kwargs["poolclass"] = getattr(sqlalchemy.pool, poolclass)
+            create_engine_kwargs["poolclass"] = getattr(sa.pool, poolclass)
         return create_engine_kwargs
 
     @pydantic.validator("return_cache_entry", allow_reuse=True)
@@ -90,7 +91,7 @@ class Settings(pydantic.BaseSettings):
             )
 
     @property
-    def engine(self) -> sqlalchemy.engine.Engine:
+    def engine(self) -> sa.engine.Engine:
         if database.ENGINE is None:
             raise ValueError(_CONFIG_NOT_SET_MSG)
         return database.ENGINE

@@ -19,7 +19,7 @@ import datetime
 import functools
 import json
 import posixpath
-from typing import Any, Callable, Dict, Literal, Optional, Sequence, Set, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Union
 
 import sqlalchemy as sa
 import sqlalchemy.orm
@@ -195,7 +195,7 @@ class _Cleaner:
         filters = []
         if tags_to_keep is not None:
             filters.append(
-                sqlalchemy.or_(
+                sa.or_(
                     database.CacheEntry.tag.not_in(tags_to_keep),
                     database.CacheEntry.tag.is_not(None)
                     if None in tags_to_keep
@@ -204,7 +204,7 @@ class _Cleaner:
             )
         elif tags_to_clean is not None:
             filters.append(
-                sqlalchemy.or_(
+                sa.or_(
                     database.CacheEntry.tag.in_(tags_to_clean),
                     database.CacheEntry.tag.is_(None)
                     if None in tags_to_clean
@@ -213,10 +213,11 @@ class _Cleaner:
             )
 
         # Sorters
+        sorters: List[sqlalchemy.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":
-            sorters = [database.CacheEntry.timestamp, database.CacheEntry.counter]
+            sorters.extend([database.CacheEntry.timestamp, database.CacheEntry.counter])
         elif method == "LFU":
-            sorters = [database.CacheEntry.counter, database.CacheEntry.timestamp]
+            sorters.extend([database.CacheEntry.counter, database.CacheEntry.timestamp])
         else:
             raise ValueError("`method` must be 'LRU' or 'LFU'.")
         sorters.append(database.CacheEntry.expiration)
