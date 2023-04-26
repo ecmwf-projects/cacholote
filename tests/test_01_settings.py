@@ -3,7 +3,7 @@ import pathlib
 from typing import Any, Dict, Union
 
 import pytest
-import sqlalchemy
+import sqlalchemy as sa
 
 from cacholote import config
 
@@ -84,9 +84,9 @@ def test_env_variables(tmpdir: pathlib.Path) -> None:
         os.environ.update(old_environ)
 
 
-@pytest.mark.parametrize("poolclass", ("NullPool", sqlalchemy.pool.NullPool))
-def test_set_poolclass(poolclass: Union[str, sqlalchemy.pool.Pool]) -> None:
+@pytest.mark.parametrize("poolclass", ("NullPool", sa.pool.NullPool))
+def test_set_poolclass(poolclass: Union[str, sa.pool.Pool]) -> None:
     config.set(create_engine_kwargs={"poolclass": poolclass})
     settings = config.get()
-    assert settings.create_engine_kwargs["poolclass"] == sqlalchemy.pool.NullPool
-    assert isinstance(settings.engine.pool, sqlalchemy.pool.NullPool)
+    assert settings.create_engine_kwargs["poolclass"] == sa.pool.NullPool
+    assert isinstance(settings.engine.pool, sa.pool.NullPool)
