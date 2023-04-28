@@ -130,12 +130,12 @@ def _get_fs_and_urlpath(
         storage_options = config.get().cache_files_storage_options
 
     if not validate:
-        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
+        fs, *_ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
         return (fs, urlpath)
 
     # Attempt to read from local_path
     try:
-        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
+        fs, *_ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
     except:  # noqa: E722
         pass
     else:
@@ -146,7 +146,7 @@ def _get_fs_and_urlpath(
 
     # Attempt to read from href
     urlpath = file_json["href"]
-    fs, _, _ = fsspec.get_fs_token_paths(urlpath)
+    fs, *_ = fsspec.get_fs_token_paths(urlpath)
     if fs.exists(urlpath):
         return (fs, urlpath)
 
@@ -228,7 +228,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     ext = mimetypes.guess_extension(filetype, strict=False)
     urlpath_out = posixpath.join(config.get().cache_files_urlpath, f"{root}{ext}")
 
-    fs_out, _, _ = fsspec.get_fs_token_paths(
+    fs_out, *_ = fsspec.get_fs_token_paths(
         urlpath_out,
         storage_options=config.get().cache_files_storage_options,
     )
@@ -289,7 +289,7 @@ def _maybe_store_io_object(
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
     cache_files_urlpath = config.get().cache_files_urlpath
-    fs_out, _, _ = fsspec.get_fs_token_paths(
+    fs_out, *_ = fsspec.get_fs_token_paths(
         cache_files_urlpath,
         storage_options=config.get().cache_files_storage_options,
     )
