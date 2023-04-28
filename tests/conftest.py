@@ -35,7 +35,12 @@ def initialize_s3() -> Generator[Dict[str, str], None, None]:
     if "AWS_ACCESS_KEY_ID" not in os.environ:
         os.environ["AWS_ACCESS_KEY_ID"] = "foo"
     port = 5555
-    proc = subprocess.Popen(shlex.split(f"moto_server s3 -p {port}"))
+    proc = subprocess.Popen(
+        shlex.split(f"moto_server s3 -p {port}"),
+        stderr=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+    )
     endpoint_url = f"http://127.0.0.1:{port}/"
     wait_s3_up(endpoint_url)
     try:

@@ -68,6 +68,22 @@ def _add_ext_to_mimetypes() -> None:
 _add_ext_to_mimetypes()
 
 
+def _guess_type(
+    fs: fsspec.AbstractFileSystem,
+    local_path: str,
+    default: str = "application/octet-stream",
+) -> str:
+    content_type: str = fs.info(local_path).get("ContentType", "")
+    if content_type:
+        return content_type
+
+    filetype, *_ = mimetypes.guess_type(local_path, strict=False)
+    if filetype is None and _HAS_MAGIC:
+        with fs.open(local_path, "rb") as f:
+            filetype = magic.from_buffer(f.read(), mime=True)
+    return filetype or default
+
+
 def _requires_xarray_and_dask(func: F) -> F:
     """Raise an error if `xarray` or `dask` are not installed."""
 
@@ -89,21 +105,13 @@ class FileInfoModel(pydantic.BaseModel):
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
-    filetype = mimetypes.guess_type(local_path, strict=False)[0]
-    if filetype is None and _HAS_MAGIC:
-        with fs.open(local_path, "rb") as f:
-            filetype = magic.from_buffer(f.read(), mime=True)
-            if filetype == "application/octet-stream":
-                filetype = None
-    filetype = filetype or "unknown"
-
+    href = posixpath.join(
+        config.get().cache_files_urlpath_readonly or config.get().cache_files_urlpath,
+        posixpath.basename(local_path),
+    )
     file_dict = {
-        "type": filetype,
-        "href": posixpath.join(
-            config.get().cache_files_urlpath_readonly
-            or config.get().cache_files_urlpath,
-            posixpath.basename(local_path),
-        ),
+        "type": _guess_type(fs, local_path),
+        "href": href,
         "file:checksum": fs.checksum(local_path),
         "file:size": fs.size(local_path),
         "file:local_path": local_path,
@@ -122,12 +130,12 @@ def _get_fs_and_urlpath(
         storage_options = config.get().cache_files_storage_options
 
     if not validate:
-        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
+        fs, *_ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
         return (fs, urlpath)
 
     # Attempt to read from local_path
     try:
-        fs, _, _ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
+        fs, *_ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
     except:  # noqa: E722
         pass
     else:
@@ -138,7 +146,7 @@ def _get_fs_and_urlpath(
 
     # Attempt to read from href
     urlpath = file_json["href"]
-    fs, _, _ = fsspec.get_fs_token_paths(urlpath)
+    fs, *_ = fsspec.get_fs_token_paths(urlpath)
     if fs.exists(urlpath):
         return (fs, urlpath)
 
@@ -159,15 +167,15 @@ def decode_xr_dataset(
     if file_json["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
     else:
-        if fsspec.utils.get_protocol(urlpath) == "file":
+        if fs.protocol == "file":
             filename_or_obj = urlpath
         else:
             # Download local copy
-            protocol = fsspec.utils.get_protocol(urlpath)
+            protocols = [fs.protocol] if isinstance(fs.protocol, str) else fs.protocol
             with fsspec.open(
                 f"filecache::{urlpath}",
                 filecache={"same_names": True},
-                **{protocol: fs.storage_options},
+                **{protocol: fs.storage_options for protocol in protocols},
             ) as of:
                 filename_or_obj = of.name
     return xr.open_dataset(filename_or_obj, **kwargs)
@@ -186,36 +194,28 @@ def decode_io_object(
 def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
-    with utils._Locker(fs, urlpath) as file_exists:
-        if not file_exists:
-            if filetype == "application/vnd+zarr":
-                # Write directly on any filesystem
-                mapper = fs.get_mapper(urlpath)
-                obj.to_zarr(mapper, consolidated=True)
+    if filetype == "application/vnd+zarr":
+        # Write directly on any filesystem
+        mapper = fs.get_mapper(urlpath)
+        obj.to_zarr(mapper, consolidated=True)
+    else:
+        # Need a tmp local copy to write on a different filesystem
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
+
+            if filetype == "application/netcdf":
+                obj.to_netcdf(tmpfilename)
+            elif filetype == "application/x-grib":
+                import cfgrib.xarray_to_grib
+
+                cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
             else:
-                # Need a tmp local copy to write on a different filesystem
-                with tempfile.TemporaryDirectory() as tmpdirname:
-                    tmpfilename = str(
-                        pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name
-                    )
+                # Should never get here! xarray_cache_type is checked in config.py
+                raise ValueError(f"type {filetype!r} is NOT supported.")
 
-                    if filetype == "application/netcdf":
-                        obj.to_netcdf(tmpfilename)
-                    elif filetype == "application/x-grib":
-                        import cfgrib.xarray_to_grib
-
-                        cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
-                    else:
-                        # Should never get here! xarray_cache_type is checked in config.py
-                        raise ValueError(f"type {filetype!r} is NOT supported.")
-
-                    if fs == fsspec.filesystem("file"):
-                        fsspec.filesystem("file").mv(tmpfilename, urlpath)
-                    else:
-                        with fsspec.open(tmpfilename, "rb") as f_in, fs.open(
-                            urlpath, "wb"
-                        ) as f_out:
-                            utils.copy_buffered_file(f_in, f_out)
+            _maybe_store_file_object(
+                fsspec.filesystem("file"), tmpfilename, fs, urlpath
+            )
 
 
 @_requires_xarray_and_dask
@@ -228,7 +228,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
     ext = mimetypes.guess_extension(filetype, strict=False)
     urlpath_out = posixpath.join(config.get().cache_files_urlpath, f"{root}{ext}")
 
-    fs_out, _, _ = fsspec.get_fs_token_paths(
+    fs_out, *_ = fsspec.get_fs_token_paths(
         urlpath_out,
         storage_options=config.get().cache_files_storage_options,
     )
@@ -255,18 +255,24 @@ def _maybe_store_file_object(
 ) -> None:
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
+            kwargs = {}
+            content_type = _guess_type(fs_in, urlpath_in)
+            if content_type:
+                kwargs["ContentType"] = content_type
             if fs_in == fs_out:
                 if config.get().io_delete_original:
-                    fs_in.mv(urlpath_in, urlpath_out)
+                    fs_in.mv(urlpath_in, urlpath_out, **kwargs)
                 else:
-                    fs_in.cp(urlpath_in, urlpath_out)
+                    fs_in.cp(urlpath_in, urlpath_out, **kwargs)
+            elif fs_in.protocol == "file":
+                fs_out.put(urlpath_in, urlpath_out, **kwargs)
             else:
                 with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
                     urlpath_out, "wb"
                 ) as f_out:
                     utils.copy_buffered_file(f_in, f_out)
-                if config.get().io_delete_original and fs_in.exists(urlpath_in):
-                    fs_in.rm(urlpath_in)
+    if config.get().io_delete_original and fs_in.exists(urlpath_in):
+        fs_in.rm(urlpath_in)
 
 
 def _maybe_store_io_object(
@@ -283,7 +289,7 @@ def _maybe_store_io_object(
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
     cache_files_urlpath = config.get().cache_files_urlpath
-    fs_out, _, _ = fsspec.get_fs_token_paths(
+    fs_out, *_ = fsspec.get_fs_token_paths(
         cache_files_urlpath,
         storage_options=config.get().cache_files_storage_options,
     )
