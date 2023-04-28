@@ -13,8 +13,8 @@ from cacholote import cache, config, decode, encode, extra_encoders, utils
 
 
 @cache.cacheable
-def cached_open_url(url: str, **kwargs: Any) -> fsspec.spec.AbstractBufferedFile:
-    with fsspec.open(url, **kwargs) as f:
+def cached_open(*args: Any, **kwargs: Any) -> fsspec.spec.AbstractBufferedFile:
+    with fsspec.open(*args, **kwargs) as f:
         return f
 
 
@@ -105,7 +105,7 @@ def test_copy_from_http_to_cache(
     # cache http file
     fs, dirname = utils.get_cache_files_fs_dirname()
     for expected_counter in (1, 2):
-        result = cached_open_url(url)
+        result = cached_open(url)
 
         # Check hits
         cur.execute("SELECT counter FROM cache_entries", ())
@@ -129,26 +129,26 @@ def test_io_corrupted_files(
 
     # cache file
     fs, dirname = utils.get_cache_files_fs_dirname()
-    cached_open_url(url)
+    cached_open(url)
 
     # Warn if file is corrupted
     fs.touch(f"{dirname}/{cached_basename}")
     touched_info = fs.info(f"{dirname}/{cached_basename}")
     with pytest.warns(UserWarning, match="checksum mismatch"):
-        result = cached_open_url(url)
+        result = cached_open(url)
     assert result.read() == b"test"
     assert fs.info(f"{dirname}/{cached_basename}") != touched_info
 
     # Warn if file is deleted
     fs.rm(f"{dirname}/{cached_basename}")
     with pytest.warns(UserWarning, match="No such file or directory"):
-        result = cached_open_url(url)
+        result = cached_open(url)
     assert result.read() == b"test"
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
 def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
-    cached_open_url = cache.cacheable(open)
+    cached_open = cache.cacheable(open)
 
     # Create tmpfile
     tmpfile = tmpdir / "test.txt"
@@ -164,7 +164,7 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
         fs.rm(lock)
 
     # Threading
-    t1 = threading.Timer(0, cached_open_url, args=(tmpfile,))
+    t1 = threading.Timer(0, cached_open, args=(tmpfile,))
     t2 = threading.Timer(0.1, release_lock, args=(fs, lock))
     with pytest.warns(
         UserWarning, match=f"can NOT proceed until file is released: {lock!r}."
@@ -180,5 +180,5 @@ def test_content_type(tmpdir: pathlib.Path, set_cache: str) -> None:
     tmpfile = str(tmpdir / "test.grib")
     fsspec.filesystem("file").touch(tmpfile)
     fs, _ = utils.get_cache_files_fs_dirname()
-    cached_grib = cached_open_url(tmpfile)
+    cached_grib = cached_open(tmpfile)
     assert fs.info(cached_grib)["ContentType"] == "application/x-grib"
