@@ -257,16 +257,16 @@ def _maybe_store_file_object(
 ) -> None:
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
+            kwargs = {}
+            content_type = _guess_type(fs_in, urlpath_in)
+            if content_type:
+                kwargs["ContentType"] = content_type
             if fs_in == fs_out:
                 if config.get().io_delete_original:
-                    fs_in.mv(urlpath_in, urlpath_out)
+                    fs_in.mv(urlpath_in, urlpath_out, **kwargs)
                 else:
-                    fs_in.cp(urlpath_in, urlpath_out)
+                    fs_in.cp(urlpath_in, urlpath_out, **kwargs)
             elif isinstance(fs_in, fsspec.implementations.local.LocalFileSystem):
-                kwargs = {}
-                content_type = _guess_type(fs_in, urlpath_in)
-                if content_type:
-                    kwargs["ContentType"] = content_type
                 fs_out.put(urlpath_in, urlpath_out, **kwargs)
             else:
                 with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
