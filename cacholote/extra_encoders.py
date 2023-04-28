@@ -77,7 +77,7 @@ def _guess_type(
     if content_type:
         return content_type
 
-    filetype = mimetypes.guess_type(local_path, strict=False)[0]
+    filetype, *_ = mimetypes.guess_type(local_path, strict=False)
     if filetype is None and _HAS_MAGIC:
         with fs.open(local_path, "rb") as f:
             filetype = magic.from_buffer(f.read(), mime=True)
