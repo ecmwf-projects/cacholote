@@ -68,6 +68,22 @@ def _add_ext_to_mimetypes() -> None:
 _add_ext_to_mimetypes()
 
 
+def _guess_type(
+    fs: fsspec.AbstractFileSystem,
+    local_path: str,
+    default: str = "application/octet-stream",
+) -> str:
+    content_type: str = fs.info(local_path).get("ContentType", "")
+    if content_type:
+        return content_type
+
+    filetype = mimetypes.guess_type(local_path, strict=False)[0]
+    if filetype is None and _HAS_MAGIC:
+        with fs.open(local_path, "rb") as f:
+            filetype = magic.from_buffer(f.read(), mime=True)
+    return filetype or default
+
+
 def _requires_xarray_and_dask(func: F) -> F:
     """Raise an error if `xarray` or `dask` are not installed."""
 
@@ -89,13 +105,7 @@ class FileInfoModel(pydantic.BaseModel):
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
-    filetype = mimetypes.guess_type(local_path, strict=False)[0]
-    if filetype is None and _HAS_MAGIC:
-        with fs.open(local_path, "rb") as f:
-            filetype = magic.from_buffer(f.read(), mime=True)
-            if filetype == "application/octet-stream":
-                filetype = None
-    filetype = filetype or "unknown"
+    filetype = _guess_type(fs, local_path)
 
     file_dict = {
         "type": filetype,
@@ -186,36 +196,28 @@ def decode_io_object(
 def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
-    with utils._Locker(fs, urlpath) as file_exists:
-        if not file_exists:
-            if filetype == "application/vnd+zarr":
-                # Write directly on any filesystem
-                mapper = fs.get_mapper(urlpath)
-                obj.to_zarr(mapper, consolidated=True)
+    if filetype == "application/vnd+zarr":
+        # Write directly on any filesystem
+        mapper = fs.get_mapper(urlpath)
+        obj.to_zarr(mapper, consolidated=True)
+    else:
+        # Need a tmp local copy to write on a different filesystem
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
+
+            if filetype == "application/netcdf":
+                obj.to_netcdf(tmpfilename)
+            elif filetype == "application/x-grib":
+                import cfgrib.xarray_to_grib
+
+                cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
             else:
-                # Need a tmp local copy to write on a different filesystem
-                with tempfile.TemporaryDirectory() as tmpdirname:
-                    tmpfilename = str(
-                        pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name
-                    )
+                # Should never get here! xarray_cache_type is checked in config.py
+                raise ValueError(f"type {filetype!r} is NOT supported.")
 
-                    if filetype == "application/netcdf":
-                        obj.to_netcdf(tmpfilename)
-                    elif filetype == "application/x-grib":
-                        import cfgrib.xarray_to_grib
-
-                        cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
-                    else:
-                        # Should never get here! xarray_cache_type is checked in config.py
-                        raise ValueError(f"type {filetype!r} is NOT supported.")
-
-                    if fs == fsspec.filesystem("file"):
-                        fsspec.filesystem("file").mv(tmpfilename, urlpath)
-                    else:
-                        with fsspec.open(tmpfilename, "rb") as f_in, fs.open(
-                            urlpath, "wb"
-                        ) as f_out:
-                            utils.copy_buffered_file(f_in, f_out)
+            _maybe_store_file_object(
+                fsspec.filesystem("file"), tmpfilename, fs, urlpath
+            )
 
 
 @_requires_xarray_and_dask
@@ -260,6 +262,12 @@ def _maybe_store_file_object(
                     fs_in.mv(urlpath_in, urlpath_out)
                 else:
                     fs_in.cp(urlpath_in, urlpath_out)
+            elif isinstance(fs_in, fsspec.implementations.local.LocalFileSystem):
+                kwargs = {}
+                content_type = _guess_type(fs_in, urlpath_in)
+                if content_type:
+                    kwargs["ContentType"] = content_type
+                fs_out.put(urlpath_in, urlpath_out, **kwargs)
             else:
                 with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
                     urlpath_out, "wb"

@@ -67,9 +67,14 @@ def test_dictify_bytes_io_object(
     obj_hash = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()
     local_path = f"{tmpdir}/cache_files/{obj_hash}"
     checksum = fsspec.filesystem("file").checksum(local_path)
+    type = (
+        "text/plain"
+        if importlib.util.find_spec("magic")
+        else "application/octet-stream"
+    )
     expected: Tuple[Dict[str, Any], ...] = (
         {
-            "type": "text/plain" if importlib.util.find_spec("magic") else "unknown",
+            "type": type,
             "href": local_path,
             "file:checksum": checksum,
             "file:size": 4,
@@ -169,3 +174,19 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
         t2.start()
         t1.join()
         t2.join()
+
+
+@pytest.mark.xfail
+@pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
+def test_grib_content_type(tmpdir: pathlib.Path, set_cache: str) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    eccodes = pytest.importorskip("eccodes")
+    template = pathlib.Path(eccodes.codes_samples_path()) / "GRIB2.tmpl"
+    gribname = tmpdir / "GRIB2.grib"
+    fsspec.filesystem("file").cp(str(template), str(gribname))
+
+    cfunc = cache.cacheable(open)
+    cfunc(gribname)
+    assert [fs.info(filename)["ContentType"] for filename in fs.ls(dirname)] == [
+        "application/x-grib"
+    ]
