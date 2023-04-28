@@ -271,8 +271,8 @@ def _maybe_store_file_object(
                     urlpath_out, "wb"
                 ) as f_out:
                     utils.copy_buffered_file(f_in, f_out)
-                if config.get().io_delete_original and fs_in.exists(urlpath_in):
-                    fs_in.rm(urlpath_in)
+            if config.get().io_delete_original and fs_in.exists(urlpath_in):
+                fs_in.rm(urlpath_in)
 
 
 def _maybe_store_io_object(
