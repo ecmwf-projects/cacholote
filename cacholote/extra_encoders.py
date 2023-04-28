@@ -167,15 +167,15 @@ def decode_xr_dataset(
     if file_json["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
     else:
-        if fsspec.utils.get_protocol(urlpath) == "file":
+        if fs.protocol == "file":
             filename_or_obj = urlpath
         else:
             # Download local copy
-            protocol = fsspec.utils.get_protocol(urlpath)
+            protocols = [fs.protocol] if isinstance(fs.protocol, str) else fs.protocol
             with fsspec.open(
                 f"filecache::{urlpath}",
                 filecache={"same_names": True},
-                **{protocol: fs.storage_options},
+                **{protocol: fs.storage_options for protocol in protocols},
             ) as of:
                 filename_or_obj = of.name
     return xr.open_dataset(filename_or_obj, **kwargs)
@@ -264,7 +264,7 @@ def _maybe_store_file_object(
                     fs_in.mv(urlpath_in, urlpath_out, **kwargs)
                 else:
                     fs_in.cp(urlpath_in, urlpath_out, **kwargs)
-            elif isinstance(fs_in, fsspec.implementations.local.LocalFileSystem):
+            elif fs_in.protocol == "file":
                 fs_out.put(urlpath_in, urlpath_out, **kwargs)
             else:
                 with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
