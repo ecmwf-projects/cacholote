@@ -105,15 +105,13 @@ class FileInfoModel(pydantic.BaseModel):
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
-    filetype = _guess_type(fs, local_path)
-
+    href = posixpath.join(
+        config.get().cache_files_urlpath_readonly or config.get().cache_files_urlpath,
+        posixpath.basename(local_path),
+    )
     file_dict = {
-        "type": filetype,
-        "href": posixpath.join(
-            config.get().cache_files_urlpath_readonly
-            or config.get().cache_files_urlpath,
-            posixpath.basename(local_path),
-        ),
+        "type": _guess_type(fs, local_path),
+        "href": href,
         "file:checksum": fs.checksum(local_path),
         "file:size": fs.size(local_path),
         "file:local_path": local_path,
