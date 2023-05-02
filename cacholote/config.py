@@ -19,7 +19,7 @@ import datetime
 import pathlib
 import tempfile
 from types import TracebackType
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Literal
 
 import fsspec
 import pydantic
@@ -27,7 +27,7 @@ import sqlalchemy
 
 from . import database
 
-_SETTINGS: Optional[Settings] = None
+_SETTINGS: Settings | None = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 
@@ -39,23 +39,23 @@ _CONFIG_NOT_SET_MSG = (
 class Settings(pydantic.BaseSettings):
     use_cache: bool = True
     cache_db_urlpath: str = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
-    create_engine_kwargs: Dict[str, Any] = {}
+    create_engine_kwargs: dict[str, Any] = {}
     cache_files_urlpath: str = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
-    cache_files_urlpath_readonly: Optional[str] = None
-    cache_files_storage_options: Dict[str, Any] = {}
+    cache_files_urlpath_readonly: str | None = None
+    cache_files_storage_options: dict[str, Any] = {}
     xarray_cache_type: Literal[
         "application/netcdf", "application/x-grib", "application/vnd+zarr"
     ] = "application/netcdf"
     io_delete_original: bool = False
     raise_all_encoding_errors: bool = False
-    expiration: Optional[datetime.datetime] = None
-    tag: Optional[str] = None
+    expiration: datetime.datetime | None = None
+    tag: str | None = None
     return_cache_entry: bool = False
 
     @pydantic.validator("create_engine_kwargs", allow_reuse=True)
     def validate_create_engine_kwargs(
-        cls: pydantic.BaseSettings, create_engine_kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        cls: pydantic.BaseSettings, create_engine_kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
         poolclass = create_engine_kwargs.get("poolclass")
         if isinstance(poolclass, str):
             create_engine_kwargs["poolclass"] = getattr(sqlalchemy.pool, poolclass)
@@ -63,7 +63,7 @@ class Settings(pydantic.BaseSettings):
 
     @pydantic.validator("return_cache_entry", allow_reuse=True)
     def validate_return_cache_entry(
-        cls: pydantic.BaseSettings, return_cache_entry: bool, values: Dict[str, Any]
+        cls: pydantic.BaseSettings, return_cache_entry: bool, values: dict[str, Any]
     ) -> bool:
         if return_cache_entry is True and values["use_cache"] is False:
             raise ValueError(
@@ -159,9 +159,9 @@ class set:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         database.ENGINE = self._old_engine
         database.SESSIONMAKER = self._old_session
@@ -170,7 +170,7 @@ class set:
         _SETTINGS = self._old_settings
 
 
-def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
+def reset(env_file: str | tuple[str] | None = None) -> None:
     """Reset cacholote settings.
 
     Priority:
