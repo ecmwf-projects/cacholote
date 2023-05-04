@@ -21,7 +21,7 @@ import json
 import warnings
 from typing import Any, Callable, TypeVar, cast
 
-import sqlalchemy
+import sqlalchemy as sa
 import sqlalchemy.orm
 
 from . import clean, config, database, decode, encode
@@ -72,8 +72,8 @@ def cacheable(func: F) -> F:
             filters.append(database.CacheEntry.expiration == settings.expiration)
 
         with settings.sessionmaker() as session:
-            for cache_entry in (
-                session.query(database.CacheEntry)
+            for cache_entry in session.scalars(
+                sa.select(database.CacheEntry)
                 .filter(*filters)
                 .order_by(database.CacheEntry.timestamp.desc())
             ):

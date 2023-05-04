@@ -18,11 +18,11 @@ import datetime
 import json
 from typing import Any, Dict, Optional
 
-import sqlalchemy
+import sqlalchemy as sa
 import sqlalchemy.orm
 
-ENGINE: Optional[sqlalchemy.engine.Engine] = None
-SESSIONMAKER: Optional[sqlalchemy.orm.sessionmaker] = None  # type: ignore[type-arg]
+ENGINE: Optional[sa.engine.Engine] = None
+SESSIONMAKER: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
 
 Base = sqlalchemy.orm.declarative_base()
 
@@ -30,17 +30,17 @@ Base = sqlalchemy.orm.declarative_base()
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
 
-    id = sqlalchemy.Column(sqlalchemy.Integer(), primary_key=True)
-    key = sqlalchemy.Column(sqlalchemy.String(32))
-    expiration = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.max)
-    result = sqlalchemy.Column(sqlalchemy.JSON)
-    timestamp = sqlalchemy.Column(
-        sqlalchemy.DateTime,
+    id = sa.Column(sa.Integer(), primary_key=True)
+    key = sa.Column(sa.String(32))
+    expiration = sa.Column(sa.DateTime, default=datetime.datetime.max)
+    result = sa.Column(sa.JSON)
+    timestamp = sa.Column(
+        sa.DateTime,
         default=datetime.datetime.utcnow,
         onupdate=datetime.datetime.utcnow,
     )
-    counter = sqlalchemy.Column(sqlalchemy.Integer)
-    tag = sqlalchemy.Column(sqlalchemy.String)
+    counter = sa.Column(sa.Integer)
+    tag = sa.Column(sa.String)
 
     @property
     def _result_as_string(self) -> str:
@@ -50,10 +50,10 @@ class CacheEntry(Base):
         return f"CacheEntry(id={self.id!r}, key={self.key!r}, expiration={self.expiration!r})"
 
 
-@sqlalchemy.event.listens_for(CacheEntry, "before_insert")  # type: ignore[misc]
+@sa.event.listens_for(CacheEntry, "before_insert")
 def set_expiration_to_max(
-    mapper: sqlalchemy.orm.Mapper,
-    connection: sqlalchemy.engine.Connection,
+    mapper: sqlalchemy.orm.Mapper[CacheEntry],
+    connection: sa.Connection,
     target: CacheEntry,
 ) -> None:
     target.expiration = target.expiration or datetime.datetime.max
@@ -72,8 +72,6 @@ def _set_engine_and_session(
     cache_db_urlpath: str, create_engine_kwargs: Dict[str, Any]
 ) -> None:
     global ENGINE, SESSIONMAKER
-    ENGINE = sqlalchemy.create_engine(
-        cache_db_urlpath, future=True, **create_engine_kwargs
-    )
+    ENGINE = sa.create_engine(cache_db_urlpath, future=True, **create_engine_kwargs)
     Base.metadata.create_all(ENGINE)
     SESSIONMAKER = sqlalchemy.orm.sessionmaker(ENGINE)

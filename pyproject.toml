@@ -15,7 +15,7 @@ classifiers = [
 dependencies = [
   "fsspec",
   "pydantic[dotenv]",
-  "sqlalchemy",
+  "sqlalchemy>=2.0.9",
   "structlog"
 ]
 description = "Efficiently cache calls to functions"
