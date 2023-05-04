@@ -32,7 +32,7 @@ LOGGER = structlog.get_logger()
 
 def _delete_cache_file(
     obj: Dict[str, Any],
-    session: Optional[sqlalchemy.orm.Session] = None,
+    session: Optional[sa.orm.Session] = None,
     cache_entry: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
@@ -70,7 +70,7 @@ def _delete_cache_file(
 
 
 def _delete_cache_entry(
-    session: sqlalchemy.orm.Session, cache_entry: database.CacheEntry
+    session: sa.orm.Session, cache_entry: database.CacheEntry
 ) -> None:
     # First, delete database entry
     session.delete(cache_entry)
@@ -213,7 +213,7 @@ class _Cleaner:
             )
 
         # Sorters
-        sorters: List[sqlalchemy.orm.InstrumentedAttribute[Any]] = []
+        sorters: List[sa.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":
             sorters.extend([database.CacheEntry.timestamp, database.CacheEntry.counter])
         elif method == "LFU":

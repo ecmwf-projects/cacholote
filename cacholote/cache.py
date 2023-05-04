@@ -30,7 +30,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def _decode_and_update(
-    session: sqlalchemy.orm.Session,
+    session: sa.orm.Session,
     cache_entry: Any,
     settings: config.Settings,
 ) -> Any:

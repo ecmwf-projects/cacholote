@@ -24,7 +24,7 @@ import sqlalchemy.orm
 ENGINE: Optional[sa.engine.Engine] = None
 SESSIONMAKER: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
 
-Base = sqlalchemy.orm.declarative_base()
+Base = sa.orm.declarative_base()
 
 
 class CacheEntry(Base):
@@ -52,7 +52,7 @@ class CacheEntry(Base):
 
 @sa.event.listens_for(CacheEntry, "before_insert")
 def set_expiration_to_max(
-    mapper: sqlalchemy.orm.Mapper[CacheEntry],
+    mapper: sa.orm.Mapper[CacheEntry],
     connection: sa.Connection,
     target: CacheEntry,
 ) -> None:
@@ -61,7 +61,7 @@ def set_expiration_to_max(
         raise ValueError("Expiration date has passed.")
 
 
-def _commit_or_rollback(session: sqlalchemy.orm.Session) -> None:
+def _commit_or_rollback(session: sa.orm.Session) -> None:
     try:
         session.commit()
     finally:
@@ -74,4 +74,4 @@ def _set_engine_and_session(
     global ENGINE, SESSIONMAKER
     ENGINE = sa.create_engine(cache_db_urlpath, future=True, **create_engine_kwargs)
     Base.metadata.create_all(ENGINE)
-    SESSIONMAKER = sqlalchemy.orm.sessionmaker(ENGINE)
+    SESSIONMAKER = sa.orm.sessionmaker(ENGINE)

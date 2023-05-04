@@ -97,7 +97,7 @@ class Settings(pydantic.BaseSettings):
         return database.ENGINE
 
     @property
-    def sessionmaker(self) -> sqlalchemy.orm.sessionmaker:  # type: ignore[type-arg]
+    def sessionmaker(self) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
         if database.SESSIONMAKER is None:
             raise ValueError(_CONFIG_NOT_SET_MSG)
         return database.SESSIONMAKER
