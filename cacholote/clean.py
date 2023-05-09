@@ -53,18 +53,18 @@ def _delete_cache_file(
 
         if posixpath.dirname(urlpath) == cache_dirname:
             sizes.pop(urlpath, None)
-            if session and cache_entry and not dry_run:
-                logger.info("Delete cache entry", cache_entry=cache_entry)
-                session.delete(cache_entry)
-                database._commit_or_rollback(session)
             if not dry_run:
-                with utils._Locker(fs, urlpath) as file_exists:
-                    if file_exists:
-                        logger.info("Delete cache file", urlpath=urlpath)
-                        fs.rm(
-                            urlpath,
-                            recursive=obj["args"][0]["type"] == "application/vnd+zarr",
-                        )
+                if session and cache_entry:
+                    logger.info("Delete cache entry", cache_entry=cache_entry)
+                    session.delete(cache_entry)
+                    database._commit_or_rollback(session)
+
+                if fs.exists(urlpath):
+                    logger.info("Delete cache file", urlpath=urlpath)
+                    fs.rm(
+                        urlpath,
+                        recursive=obj["args"][0]["type"] == "application/vnd+zarr",
+                    )
 
     return obj
 
@@ -162,12 +162,9 @@ class _Cleaner:
     ) -> None:
         for urlpath in self.get_unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
-            with utils._Locker(self.fs, urlpath, lock_validity_period) as file_exists:
-                if file_exists:
-                    self.logger.info(
-                        "Delete unknown", urlpath=urlpath, recursive=recursive
-                    )
-                    self.fs.rm(urlpath, recursive=recursive)
+            if self.fs.exists(urlpath):
+                self.logger.info("Delete unknown", urlpath=urlpath, recursive=recursive)
+                self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod
     def check_tags(*args: Any) -> None:
