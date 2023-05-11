@@ -1,3 +1,5 @@
+import contextlib
+import datetime
 import os
 import pathlib
 from typing import Any, Dict, Union
@@ -6,6 +8,8 @@ import pytest
 import sqlalchemy as sa
 
 from cacholote import config
+
+does_not_raise = contextlib.nullcontext
 
 
 def test_change_cache_db_urlpath(tmpdir: pathlib.Path) -> None:
@@ -90,3 +94,25 @@ def test_set_poolclass(poolclass: Union[str, sa.pool.Pool]) -> None:
     settings = config.get()
     assert settings.create_engine_kwargs["poolclass"] == sa.pool.NullPool
     assert isinstance(settings.engine.pool, sa.pool.NullPool)
+
+
+@pytest.mark.parametrize(
+    "expiration,raises",
+    [
+        (
+            datetime.datetime.now(),
+            pytest.raises(ValueError, match="Expiration is missing the timezone info."),
+        ),
+        (
+            datetime.datetime.now().isoformat(),
+            pytest.raises(ValueError, match="Expiration is missing the timezone info."),
+        ),
+        (datetime.datetime.now(tz=datetime.timezone.utc), does_not_raise()),
+        (datetime.datetime.now(tz=datetime.timezone.utc).isoformat(), does_not_raise()),
+    ],
+)
+def test_set_expiration(
+    expiration: datetime.datetime | str, raises: contextlib.nullcontext  # type: ignore[type-arg]
+) -> None:
+    with raises:
+        config.set(expiration=expiration)
