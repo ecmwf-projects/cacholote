@@ -23,7 +23,7 @@ import sqlalchemy.orm
 
 from . import utils
 
-DATETIME_MAX = datetime.datetime(datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc)
+_DATETIME_MAX = datetime.datetime(datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc)
 
 ENGINE: Optional[sa.engine.Engine] = None
 SESSIONMAKER: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
@@ -36,7 +36,7 @@ class CacheEntry(Base):
 
     id = sa.Column(sa.Integer(), primary_key=True)
     key = sa.Column(sa.String(32))
-    expiration = sa.Column(sa.DateTime, default=DATETIME_MAX)
+    expiration = sa.Column(sa.DateTime, default=_DATETIME_MAX)
     result = sa.Column(sa.JSON)
     timestamp = sa.Column(
         sa.DateTime,
@@ -60,7 +60,7 @@ def set_expiration_to_max(
     connection: sa.Connection,
     target: CacheEntry,
 ) -> None:
-    target.expiration = target.expiration or DATETIME_MAX
+    target.expiration = target.expiration or _DATETIME_MAX
     if target.expiration < utils.utcnow():
         raise ValueError(f"Expiration date has passed. {target.expiration=}")
 
