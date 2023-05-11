@@ -23,7 +23,9 @@ import sqlalchemy.orm
 
 from . import utils
 
-_DATETIME_MAX = datetime.datetime(datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc)
+_DATETIME_MAX = datetime.datetime(
+    datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
+)
 
 ENGINE: Optional[sa.engine.Engine] = None
 SESSIONMAKER: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
