@@ -126,3 +126,8 @@ class _Locker:
         exc_tb: Optional[TracebackType],
     ) -> None:
         self.release()
+
+
+def utcnow() -> datetime.datetime:
+    """See https://blog.ganssle.io/articles/2019/11/utcnow.html."""
+    return datetime.datetime.now(tz=datetime.timezone.utc)

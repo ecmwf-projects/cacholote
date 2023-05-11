@@ -36,9 +36,9 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
     cfunc = cache.cacheable(func)
 
     for counter in range(1, 3):
-        before = datetime.datetime.utcnow()
+        before = datetime.datetime.now(tz=datetime.timezone.utc)
         res = cfunc("test")
-        after = datetime.datetime.utcnow()
+        after = datetime.datetime.now(tz=datetime.timezone.utc)
         assert res == {"a": "test", "args": [], "b": None, "kwargs": {}}
 
         cur.execute(
@@ -48,7 +48,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
             (
                 1,
                 "a8260ac3cdc1404aa64a6fb71e853049",
-                "9999-12-31 23:59:59.999999",
+                "9999-12-31 00:00:00.000000",
                 '{"a": "test", "b": null, "args": [], "kwargs": {}}',
                 counter,
             )
@@ -56,7 +56,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
 
         cur.execute("SELECT timestamp FROM cache_entries", ())
         (timestamp,) = cur.fetchone() or []
-        assert before < datetime.datetime.fromisoformat(timestamp) < after
+        assert before < datetime.datetime.fromisoformat(timestamp + "+00:00") < after
 
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
@@ -123,22 +123,27 @@ def test_expiration_and_return_cache_entry() -> None:
     first: database.CacheEntry = cached_now()  # type: ignore[assignment]
     assert first.id == 1
     assert first.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
-    assert first.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
+    assert first.expiration == datetime.datetime(9999, 12, 31)
 
-    expiration = datetime.datetime.utcnow() + datetime.timedelta(seconds=0.1)
+    expiration = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(
+        seconds=0.1
+    )
     with config.set(expiration=expiration):
         second: database.CacheEntry = cached_now()  # type: ignore[assignment]
         assert second.result != first.result
         assert second.id == 2
         assert second.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
-        assert second.expiration == expiration
+        assert (
+            second.expiration is not None
+            and second.expiration.isoformat() + "+00:00" == expiration.isoformat()
+        )
 
     time.sleep(0.1)
     third: database.CacheEntry = cached_now()  # type: ignore[assignment]
     assert third.result == first.result
     assert third.id == 1
     assert third.key == "c3d9e414d0d32337c3672cb29b1b3cc9"
-    assert third.expiration == datetime.datetime(9999, 12, 31, 23, 59, 59, 999999)
+    assert third.expiration == datetime.datetime(9999, 12, 31)
 
 
 def test_tag(tmpdir: pathlib.Path) -> None:
