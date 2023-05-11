@@ -126,3 +126,8 @@ class _Locker:
         exc_tb: Optional[TracebackType],
     ) -> None:
         self.release()
+
+
+def utcnow() -> datetime.datetime:
+    """See https://discuss.python.org/t/deprecating-utcnow-and-utcfromtimestamp/26221."""
+    return datetime.datetime.now(tz=datetime.timezone.utc)

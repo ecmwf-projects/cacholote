@@ -72,6 +72,14 @@ class Settings(pydantic.BaseSettings):
             )
         return return_cache_entry
 
+    @pydantic.validator("expiration", allow_reuse=True)
+    def validate_expiration(
+        cls: pydantic.BaseSettings, expiration: Optional[datetime.datetime]
+    ) -> Optional[datetime.datetime]:
+        if expiration is not None and expiration.tzinfo is None:
+            raise ValueError(f"Expiration is missing the timezone info. {expiration=}")
+        return expiration
+
     def make_cache_dir(self) -> None:
         fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
             self.cache_files_urlpath,

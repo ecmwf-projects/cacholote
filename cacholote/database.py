@@ -21,6 +21,12 @@ from typing import Any, Dict, Optional
 import sqlalchemy as sa
 import sqlalchemy.orm
 
+from . import utils
+
+_DATETIME_MAX = datetime.datetime(
+    datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
+)
+
 ENGINE: Optional[sa.engine.Engine] = None
 SESSIONMAKER: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
 
@@ -32,12 +38,12 @@ class CacheEntry(Base):
 
     id = sa.Column(sa.Integer(), primary_key=True)
     key = sa.Column(sa.String(32))
-    expiration = sa.Column(sa.DateTime, default=datetime.datetime.max)
+    expiration = sa.Column(sa.DateTime, default=_DATETIME_MAX)
     result = sa.Column(sa.JSON)
     timestamp = sa.Column(
         sa.DateTime,
-        default=datetime.datetime.utcnow,
-        onupdate=datetime.datetime.utcnow,
+        default=utils.utcnow,
+        onupdate=utils.utcnow,
     )
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
@@ -56,9 +62,9 @@ def set_expiration_to_max(
     connection: sa.Connection,
     target: CacheEntry,
 ) -> None:
-    target.expiration = target.expiration or datetime.datetime.max
-    if target.expiration < datetime.datetime.utcnow():
-        raise ValueError("Expiration date has passed.")
+    target.expiration = target.expiration or _DATETIME_MAX
+    if target.expiration < utils.utcnow():
+        raise ValueError(f"Expiration date has passed. {target.expiration=}")
 
 
 def _commit_or_rollback(session: sa.orm.Session) -> None:

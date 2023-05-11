@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
 import functools
 import json
 import warnings
@@ -24,7 +23,7 @@ from typing import Any, Callable, TypeVar, cast
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from . import clean, config, database, decode, encode
+from . import clean, config, database, decode, encode, utils
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -65,7 +64,7 @@ def cacheable(func: F) -> F:
 
         filters = [
             database.CacheEntry.key == hexdigest,
-            database.CacheEntry.expiration > datetime.datetime.utcnow(),
+            database.CacheEntry.expiration > utils.utcnow(),
         ]
         if settings.expiration:
             # When expiration is provided, only get entries with matching expiration
