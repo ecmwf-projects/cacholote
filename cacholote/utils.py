@@ -129,5 +129,5 @@ class _Locker:
 
 
 def utcnow() -> datetime.datetime:
-    """See https://blog.ganssle.io/articles/2019/11/utcnow.html."""
+    """See https://discuss.python.org/t/deprecating-utcnow-and-utcfromtimestamp/26221."""
     return datetime.datetime.now(tz=datetime.timezone.utc)
