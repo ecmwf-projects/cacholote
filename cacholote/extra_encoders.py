@@ -112,7 +112,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     file_dict = {
         "type": _guess_type(fs, local_path),
         "href": href,
-        "file:checksum": str(fs.checksum(local_path)),
+        "file:checksum": f"{fs.checksum(local_path):x}",
         "file:size": fs.size(local_path),
         "file:local_path": local_path,
     }
@@ -140,9 +140,11 @@ def _get_fs_and_urlpath(
         pass
     else:
         if fs.exists(urlpath):
-            if fs.checksum(urlpath) == int(file_json["file:checksum"]):
-                return (fs, urlpath)
-            raise ValueError("checksum mismatch")
+            expected = file_json["file:checksum"]
+            actual = f"{fs.checksum(urlpath):x}"
+            if expected != actual:
+                raise ValueError(f"checksum mismatch: {expected=} {actual=}")
+            return (fs, urlpath)
 
     # Attempt to read from href
     urlpath = file_json["href"]
