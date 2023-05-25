@@ -45,7 +45,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
             {
                 "type": "application/netcdf",
                 "href": href,
-                "file:checksum": fsspec.filesystem("file").checksum(local_path),
+                "file:checksum": f"{fsspec.filesystem('file').checksum(local_path):x}",
                 "file:size": 669,
                 "file:local_path": local_path,
             },

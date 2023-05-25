@@ -36,7 +36,6 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
     actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
     href = f"{readonly_dir}/{tmp_hash}.txt"
     local_path = f"{tmpdir}/cache_files/{tmp_hash}.txt"
-    checksum = fsspec.filesystem("file").checksum(local_path)
     expected = {
         "type": "python_call",
         "callable": "cacholote.extra_encoders:decode_io_object",
@@ -44,7 +43,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
             {
                 "type": "text/plain",
                 "href": href,
-                "file:checksum": checksum,
+                "file:checksum": f"{fsspec.filesystem('file').checksum(local_path):x}",
                 "file:size": 4,
                 "file:local_path": local_path,
             },
@@ -67,7 +66,6 @@ def test_dictify_bytes_io_object(
     actual = extra_encoders.dictify_io_object(obj)["args"]
     obj_hash = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()
     local_path = f"{tmpdir}/cache_files/{obj_hash}"
-    checksum = fsspec.filesystem("file").checksum(local_path)
     type = (
         "text/plain"
         if importlib.util.find_spec("magic")
@@ -77,7 +75,7 @@ def test_dictify_bytes_io_object(
         {
             "type": type,
             "href": local_path,
-            "file:checksum": checksum,
+            "file:checksum": f"{fsspec.filesystem('file').checksum(local_path):x}",
             "file:size": 4,
             "file:local_path": local_path,
         },
