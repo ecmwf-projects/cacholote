@@ -44,7 +44,7 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
             {
                 "type": "text/plain",
                 "href": href,
-                "file:checksum": checksum,
+                "file:checksum": str(checksum),
                 "file:size": 4,
                 "file:local_path": local_path,
             },
@@ -77,7 +77,7 @@ def test_dictify_bytes_io_object(
         {
             "type": type,
             "href": local_path,
-            "file:checksum": checksum,
+            "file:checksum": str(checksum),
             "file:size": 4,
             "file:local_path": local_path,
         },

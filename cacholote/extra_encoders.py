@@ -99,7 +99,7 @@ def _requires_xarray_and_dask(func: F) -> F:
 class FileInfoModel(pydantic.BaseModel):
     type: str
     href: str
-    file_checksum: int = pydantic.Field(..., alias="file:checksum")
+    file_checksum: str = pydantic.Field(..., alias="file:checksum")
     file_size: int = pydantic.Field(..., alias="file:size")
     file_local_path: str = pydantic.Field(..., alias="file:local_path")
 
@@ -112,7 +112,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
     file_dict = {
         "type": _guess_type(fs, local_path),
         "href": href,
-        "file:checksum": fs.checksum(local_path),
+        "file:checksum": str(fs.checksum(local_path)),
         "file:size": fs.size(local_path),
         "file:local_path": local_path,
     }
@@ -140,7 +140,7 @@ def _get_fs_and_urlpath(
         pass
     else:
         if fs.exists(urlpath):
-            if fs.checksum(urlpath) == file_json["file:checksum"]:
+            if fs.checksum(urlpath) == int(file_json["file:checksum"]):
                 return (fs, urlpath)
             raise ValueError("checksum mismatch")
 
