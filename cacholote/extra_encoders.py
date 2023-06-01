@@ -285,10 +285,9 @@ def _maybe_store_file_object(
                 elif fs_in.protocol == "file":
                     fs_out.put(urlpath_in, urlpath_out, **kwargs)
                 else:
-                    with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
-                        urlpath_out, "wb"
-                    ) as f_out:
-                        utils.copy_buffered_file(f_in, f_out)
+                    with fs_in.open(urlpath_in, "rb") as f_in:
+                        with fs_out.open(urlpath_out, "wb") as f_out:
+                            utils.copy_buffered_file(f_in, f_out)
     if config.get().io_delete_original and fs_in.exists(urlpath_in):
         with _logging_timer("removing", urlpath=fs_in.unstrip_protocol(urlpath_in)):
             fs_in.rm(urlpath_in)
