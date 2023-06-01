@@ -159,12 +159,11 @@ def test_xr_corrupted_files(
 def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
     config.set(logger=structlog.get_logger())
 
-    # Create tmpfile
+    # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)
     cached_ds = cfunc()
 
     captured = capsys.readouterr().out.splitlines()
-
     assert "Start downloading" in captured[0]
     assert "urlpath=" in captured[0]
 

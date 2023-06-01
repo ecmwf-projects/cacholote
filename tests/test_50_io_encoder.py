@@ -185,13 +185,12 @@ def test_content_type(tmpdir: pathlib.Path, set_cache: str) -> None:
 def test_io_logging(capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path) -> None:
     config.set(logger=structlog.get_logger(), io_delete_original=True)
 
-    # Create tmpfile
+    # Cache file
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
-
     cached_file = cached_open(tmpfile)
-    captured = capsys.readouterr().out.splitlines()
 
+    captured = capsys.readouterr().out.splitlines()
     assert "Start uploading" in captured[0]
     assert f"urlpath=s3://{cached_file.path}" in captured[0]
 
