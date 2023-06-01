@@ -8,6 +8,7 @@ from typing import Any, Dict, Tuple, Union
 import fsspec
 import pytest
 import pytest_httpserver
+import structlog
 
 from cacholote import cache, config, decode, encode, extra_encoders, utils
 
@@ -146,8 +147,6 @@ def test_io_corrupted_files(
 
 
 def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
-    cached_open = cache.cacheable(open)
-
     # Create tmpfile
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
@@ -180,3 +179,29 @@ def test_content_type(tmpdir: pathlib.Path, set_cache: str) -> None:
     fs, _ = utils.get_cache_files_fs_dirname()
     cached_grib = cached_open(tmpfile)
     assert fs.info(cached_grib)["ContentType"] == "application/x-grib"
+
+
+@pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
+def test_io_logging(capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path) -> None:
+    config.set(logger=structlog.get_logger(), io_delete_original=True)
+
+    # Create tmpfile
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").touch(tmpfile)
+
+    cached_file = cached_open(tmpfile)
+    captured = capsys.readouterr().out.splitlines()
+
+    assert "Start uploading" in captured[0]
+    assert f"urlpath=s3://{cached_file.path}" in captured[0]
+
+    assert "End uploading" in captured[1]
+    assert f"urlpath=s3://{cached_file.path}" in captured[1]
+    assert "elapsed_time=" in captured[1]
+
+    assert "Start removing" in captured[2]
+    assert f"urlpath=file://{tmpfile}" in captured[2]
+
+    assert "End removing" in captured[3]
+    assert f"urlpath=file://{tmpfile}" in captured[3]
+    assert "elapsed_time=" in captured[3]
