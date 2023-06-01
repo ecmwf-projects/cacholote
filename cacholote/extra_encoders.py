@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import contextlib
 import functools
 import hashlib
 import inspect
@@ -23,7 +23,8 @@ import mimetypes
 import pathlib
 import posixpath
 import tempfile
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar, Union, cast
+import time
+from typing import Any, Callable, Dict, Generator, Optional, Tuple, TypeVar, Union, cast
 
 import fsspec
 import fsspec.implementations.local
@@ -94,6 +95,16 @@ def _requires_xarray_and_dask(func: F) -> F:
         return func(*args, **kwargs)
 
     return cast(F, wrapper)
+
+
+@contextlib.contextmanager
+def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
+    logger = config.get().logger
+    logger.info(f"Start {event}", **kwargs)
+    tic = time.perf_counter()
+    yield tic
+    toc = time.perf_counter()
+    logger.info(f"End {event}", elapsed_time=toc - tic, **kwargs)
 
 
 class FileInfoModel(pydantic.BaseModel):
@@ -199,21 +210,23 @@ def _maybe_store_xr_dataset(
     if filetype == "application/vnd+zarr":
         # Write directly on any filesystem
         mapper = fs.get_mapper(urlpath)
-        obj.to_zarr(mapper, consolidated=True)
+        with _logging_timer("uploading", urlpath=fs.unstrip_protocol(urlpath)):
+            obj.to_zarr(mapper, consolidated=True)
     else:
         # Need a tmp local copy to write on a different filesystem
         with tempfile.TemporaryDirectory() as tmpdirname:
             tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
 
-            if filetype == "application/netcdf":
-                obj.to_netcdf(tmpfilename)
-            elif filetype == "application/x-grib":
-                import cfgrib.xarray_to_grib
+            with _logging_timer("downloading tmp file", urlpath=tmpfilename):
+                if filetype == "application/netcdf":
+                    obj.to_netcdf(tmpfilename)
+                elif filetype == "application/x-grib":
+                    import cfgrib.xarray_to_grib
 
-                cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
-            else:
-                # Should never get here! xarray_cache_type is checked in config.py
-                raise ValueError(f"type {filetype!r} is NOT supported.")
+                    cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
+                else:
+                    # Should never get here! xarray_cache_type is checked in config.py
+                    raise ValueError(f"type {filetype!r} is NOT supported.")
 
             _maybe_store_file_object(
                 fsspec.filesystem("file"), tmpfilename, fs, urlpath
@@ -261,20 +274,24 @@ def _maybe_store_file_object(
             content_type = _guess_type(fs_in, urlpath_in)
             if content_type:
                 kwargs["ContentType"] = content_type
-            if fs_in == fs_out:
-                if config.get().io_delete_original:
-                    fs_in.mv(urlpath_in, urlpath_out, **kwargs)
+            with _logging_timer(
+                "uploading", urlpath=fs_out.unstrip_protocol(urlpath_out)
+            ):
+                if fs_in == fs_out:
+                    if config.get().io_delete_original:
+                        fs_in.mv(urlpath_in, urlpath_out, **kwargs)
+                    else:
+                        fs_in.cp(urlpath_in, urlpath_out, **kwargs)
+                elif fs_in.protocol == "file":
+                    fs_out.put(urlpath_in, urlpath_out, **kwargs)
                 else:
-                    fs_in.cp(urlpath_in, urlpath_out, **kwargs)
-            elif fs_in.protocol == "file":
-                fs_out.put(urlpath_in, urlpath_out, **kwargs)
-            else:
-                with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
-                    urlpath_out, "wb"
-                ) as f_out:
-                    utils.copy_buffered_file(f_in, f_out)
+                    with fs_in.open(urlpath_in, "rb") as f_in, fs_out.open(
+                        urlpath_out, "wb"
+                    ) as f_out:
+                        utils.copy_buffered_file(f_in, f_out)
     if config.get().io_delete_original and fs_in.exists(urlpath_in):
-        fs_in.rm(urlpath_in)
+        with _logging_timer("removing", urlpath=fs_in.unstrip_protocol(urlpath_in)):
+            fs_in.rm(urlpath_in)
 
 
 def _maybe_store_io_object(
@@ -285,7 +302,10 @@ def _maybe_store_io_object(
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             f_out = fs_out.open(urlpath_out, "wb")
-            utils.copy_buffered_file(f_in, f_out)
+            with _logging_timer(
+                "uploading", urlpath=fs_out.unstrip_protocol(urlpath_out)
+            ):
+                utils.copy_buffered_file(f_in, f_out)
 
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:

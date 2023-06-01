@@ -23,11 +23,8 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, 
 
 import sqlalchemy as sa
 import sqlalchemy.orm
-import structlog
 
 from . import config, database, encode, extra_encoders, utils
-
-LOGGER = structlog.get_logger()
 
 
 def _delete_cache_file(
@@ -36,9 +33,8 @@ def _delete_cache_file(
     cache_entry: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
-    logger: Optional[structlog.stdlib.BoundLogger] = None,
 ) -> Any:
-    logger = logger or LOGGER
+    logger = config.get().logger
 
     if {"type", "callable", "args", "kwargs"} == set(obj) and obj["callable"] in (
         "cacholote.extra_encoders:decode_xr_dataset",
@@ -102,23 +98,20 @@ def delete(
 
 
 class _Cleaner:
-    def __init__(self, logger: structlog.stdlib.BoundLogger) -> None:
-        fs, dirname = utils.get_cache_files_fs_dirname()
-        urldir = fs.unstrip_protocol(dirname)
+    def __init__(self) -> None:
+        self.logger = config.get().logger
+        self.fs, self.dirname = utils.get_cache_files_fs_dirname()
 
-        logger.info("Get disk usage of cache files")
-        sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
-        for path, size in fs.du(dirname, total=False).items():
+        urldir = self.fs.unstrip_protocol(self.dirname)
+
+        self.logger.info("Get disk usage of cache files")
+        self.sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
+        for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
-            urlpath = fs.unstrip_protocol(path)
+            urlpath = self.fs.unstrip_protocol(path)
             basename, *_ = urlpath.replace(urldir, "", 1).strip("/").split("/")
             if basename:
-                sizes[posixpath.join(urldir, basename)] += size
-
-        self.logger = logger
-        self.fs = fs
-        self.dirname = dirname
-        self.sizes = sizes
+                self.sizes[posixpath.join(urldir, basename)] += size
 
     @property
     def size(self) -> int:
@@ -152,7 +145,6 @@ class _Cleaner:
                             _delete_cache_file,
                             sizes=unknown_sizes,
                             dry_run=True,
-                            logger=self.logger,
                         ),
                     )
         return set(unknown_sizes)
@@ -233,7 +225,6 @@ class _Cleaner:
                         session=session,
                         cache_entry=cache_entry,
                         sizes=self.sizes,
-                        logger=self.logger,
                     ),
                 )
                 if self.stop_cleaning(maxsize):
@@ -252,7 +243,6 @@ def clean_cache_files(
     lock_validity_period: Optional[float] = None,
     tags_to_clean: Optional[Sequence[Optional[str]]] = None,
     tags_to_keep: Optional[Sequence[Optional[str]]] = None,
-    logger: Optional[structlog.stdlib.BoundLogger] = None,
 ) -> None:
     """Clean cache files.
 
@@ -273,10 +263,8 @@ def clean_cache_files(
         Tags to clean/keep. If None, delete all cache entries.
         To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
-    logger: optional
-        Python object use to produce logs.
     """
-    cleaner = _Cleaner(logger=logger or LOGGER)
+    cleaner = _Cleaner()
 
     if delete_unknown_files:
         cleaner.delete_unknown_files(lock_validity_period, recursive)
