@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional, Sequence
 
 import fsspec
 import pytest
+import structlog
 
 from cacholote import cache, clean, config, utils
 
@@ -194,3 +195,33 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
     # Cache again
     assert open_url(tmpfile).read() == b"new"
     assert len(fs.ls(dirname)) == 1
+
+
+def test_cleaner_logging(
+    capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path
+) -> None:
+    # Create file
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+
+    # Copy to cache
+    open_url(tmpfile)
+
+    # Clean
+    config.set(logger=structlog.get_logger())
+    clean.clean_cache_files(0)
+
+    captured = capsys.readouterr().out.splitlines()
+    assert "Get disk usage of cache files" in captured[0]
+
+    assert "Check cache files total size" in captured[1]
+    assert "size=1" in captured[1]
+
+    assert "Delete cache entry" in captured[2]
+    assert "cache_entry=" in captured[2]
+
+    assert "Delete cache file" in captured[3]
+    assert "urlpath=" in captured[3]
+
+    assert "Check cache files total size" in captured[4]
+    assert "size=0" in captured[4]
