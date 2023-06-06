@@ -162,18 +162,22 @@ def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
     # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)
     cached_ds = cfunc()
+    captured = iter(capsys.readouterr().out.splitlines())
 
-    captured = capsys.readouterr().out.splitlines()
-    assert "Start downloading" in captured[0]
-    assert "urlpath=" in captured[0]
+    line = next(captured)
+    assert "Start downloading" in line
+    assert "urlpath=" in line
 
-    assert "End downloading" in captured[1]
-    assert "urlpath=" in captured[1]
-    assert "elapsed_time=" in captured[1]
+    line = next(captured)
+    assert "End downloading" in line
+    assert "urlpath=" in line
+    assert "elapsed_time=" in line
 
-    assert "Start uploading" in captured[2]
-    assert f"urlpath=file://{cached_ds.encoding['source']}" in captured[2]
+    line = next(captured)
+    assert "Start uploading" in line
+    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
 
-    assert "End uploading" in captured[3]
-    assert f"urlpath=file://{cached_ds.encoding['source']}" in captured[3]
-    assert "elapsed_time=" in captured[3]
+    line = next(captured)
+    assert "End uploading" in line
+    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
+    assert "elapsed_time=" in line

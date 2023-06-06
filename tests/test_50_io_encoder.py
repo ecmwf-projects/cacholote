@@ -189,18 +189,22 @@ def test_io_logging(capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path) ->
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
     cached_file = cached_open(tmpfile)
+    captured = iter(capsys.readouterr().out.splitlines())
 
-    captured = capsys.readouterr().out.splitlines()
-    assert "Start uploading" in captured[0]
-    assert f"urlpath=s3://{cached_file.path}" in captured[0]
+    line = next(captured)
+    assert "Start uploading" in line
+    assert f"urlpath=s3://{cached_file.path}" in line
 
-    assert "End uploading" in captured[1]
-    assert f"urlpath=s3://{cached_file.path}" in captured[1]
-    assert "elapsed_time=" in captured[1]
+    line = next(captured)
+    assert "End uploading" in line
+    assert f"urlpath=s3://{cached_file.path}" in line
+    assert "elapsed_time=" in line
 
-    assert "Start removing" in captured[2]
-    assert f"urlpath=file://{tmpfile}" in captured[2]
+    line = next(captured)
+    assert "Start removing" in line
+    assert f"urlpath=file://{tmpfile}" in line
 
-    assert "End removing" in captured[3]
-    assert f"urlpath=file://{tmpfile}" in captured[3]
-    assert "elapsed_time=" in captured[3]
+    line = next(captured)
+    assert "End removing" in line
+    assert f"urlpath=file://{tmpfile}" in line
+    assert "elapsed_time=" in line
