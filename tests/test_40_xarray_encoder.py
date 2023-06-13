@@ -2,6 +2,7 @@ import pathlib
 
 import fsspec
 import pytest
+import structlog
 
 from cacholote import cache, config, decode, encode, extra_encoders, utils
 
@@ -153,3 +154,30 @@ def test_xr_corrupted_files(
         actual = cfunc()
     xr.testing.assert_identical(actual, expected)
     assert fs.exists(cached_path)
+
+
+def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
+    config.set(logger=structlog.get_logger())
+
+    # Cache dataset
+    cfunc = cache.cacheable(get_grib_ds)
+    cached_ds = cfunc()
+    captured = iter(capsys.readouterr().out.splitlines())
+
+    line = next(captured)
+    assert "start downloading" in line
+    assert "urlpath=" in line
+
+    line = next(captured)
+    assert "end downloading" in line
+    assert "urlpath=" in line
+    assert "elapsed_time=" in line
+
+    line = next(captured)
+    assert "start uploading" in line
+    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
+
+    line = next(captured)
+    assert "end uploading" in line
+    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
+    assert "elapsed_time=" in line

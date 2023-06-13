@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional, Sequence
 
 import fsspec
 import pytest
+import structlog
 
 from cacholote import cache, clean, config, utils
 
@@ -194,3 +195,46 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
     # Cache again
     assert open_url(tmpfile).read() == b"new"
     assert len(fs.ls(dirname)) == 1
+
+
+def test_cleaner_logging(
+    capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path
+) -> None:
+    # Cache file and create unknown
+    tmpfile = tmpdir / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+    cached_file = open_url(tmpfile)
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs.pipe_file(f"{dirname}/unknown.txt", b"1")
+
+    # Clean
+    config.set(logger=structlog.get_logger())
+    clean.clean_cache_files(0, delete_unknown_files=True)
+    captured = iter(capsys.readouterr().out.splitlines())
+
+    line = next(captured)
+    assert "get disk usage of cache files" in line
+
+    line = next(captured)
+    assert "get unknown files" in line
+
+    line = next(captured)
+    assert "delete unknown" in line
+    assert "recursive=False" in line
+    assert f"urlpath=file://{dirname}/unknown.txt" in line
+
+    line = next(captured)
+    assert "check cache files total size" in line
+    assert "size=1" in line
+
+    line = next(captured)
+    assert "delete cache entry" in line
+    assert "cache_entry=" in line
+
+    line = next(captured)
+    assert "delete cache file" in line
+    assert f"urlpath=file://{cached_file.path}" in line
+
+    line = next(captured)
+    assert "check cache files total size" in line
+    assert "size=0" in line

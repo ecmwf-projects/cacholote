@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import pathlib
 import tempfile
 from types import TracebackType
@@ -25,9 +26,13 @@ import fsspec
 import pydantic
 import sqlalchemy as sa
 import sqlalchemy.orm
+import structlog
 
 from . import database
 
+_LOGGER = structlog.get_logger(
+    wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
+)
 _SETTINGS: Optional[Settings] = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
@@ -52,6 +57,9 @@ class Settings(pydantic.BaseSettings):
     expiration: Optional[datetime.datetime] = None
     tag: Optional[str] = None
     return_cache_entry: bool = False
+    logger: Union[
+        structlog.BoundLogger, structlog._config.BoundLoggerLazyProxy
+    ] = _LOGGER
 
     @pydantic.validator("create_engine_kwargs", allow_reuse=True)
     def validate_create_engine_kwargs(
