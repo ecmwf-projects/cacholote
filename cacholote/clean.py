@@ -51,12 +51,12 @@ def _delete_cache_file(
             sizes.pop(urlpath, None)
             if not dry_run:
                 if session and cache_entry:
-                    logger.info("Delete cache entry", cache_entry=cache_entry)
+                    logger.info("delete cache entry", cache_entry=cache_entry)
                     session.delete(cache_entry)
                     database._commit_or_rollback(session)
 
                 if fs.exists(urlpath):
-                    logger.info("Delete cache file", urlpath=urlpath)
+                    logger.info("delete cache file", urlpath=urlpath)
                     fs.rm(
                         urlpath,
                         recursive=obj["args"][0]["type"] == "application/vnd+zarr",
@@ -104,7 +104,7 @@ class _Cleaner:
 
         urldir = self.fs.unstrip_protocol(self.dirname)
 
-        self.logger.info("Get disk usage of cache files")
+        self.logger.info("get disk usage of cache files")
         self.sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
@@ -116,14 +116,14 @@ class _Cleaner:
     @property
     def size(self) -> int:
         sum_sizes = sum(self.sizes.values())
-        self.logger.info("Check cache files total size", size=sum_sizes)
+        self.logger.info("check cache files total size", size=sum_sizes)
         return sum_sizes
 
     def stop_cleaning(self, maxsize: int) -> bool:
         return self.size <= maxsize
 
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
-        self.logger.info("Get unknown files")
+        self.logger.info("get unknown files")
         now = datetime.datetime.now()
         files_to_skip = []
         for urlpath in self.sizes:
@@ -155,7 +155,7 @@ class _Cleaner:
         for urlpath in self.get_unknown_files(lock_validity_period):
             self.sizes.pop(urlpath)
             if self.fs.exists(urlpath):
-                self.logger.info("Delete unknown", urlpath=urlpath, recursive=recursive)
+                self.logger.info("delete unknown", urlpath=urlpath, recursive=recursive)
                 self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod

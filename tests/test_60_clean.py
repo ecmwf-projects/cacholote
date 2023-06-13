@@ -213,28 +213,28 @@ def test_cleaner_logging(
     captured = iter(capsys.readouterr().out.splitlines())
 
     line = next(captured)
-    assert "Get disk usage of cache files" in line
+    assert "get disk usage of cache files" in line
 
     line = next(captured)
-    assert "Get unknown files" in line
+    assert "get unknown files" in line
 
     line = next(captured)
-    assert "Delete unknown" in line
+    assert "delete unknown" in line
     assert "recursive=False" in line
     assert f"urlpath=file://{dirname}/unknown.txt" in line
 
     line = next(captured)
-    assert "Check cache files total size" in line
+    assert "check cache files total size" in line
     assert "size=1" in line
 
     line = next(captured)
-    assert "Delete cache entry" in line
+    assert "delete cache entry" in line
     assert "cache_entry=" in line
 
     line = next(captured)
-    assert "Delete cache file" in line
+    assert "delete cache file" in line
     assert f"urlpath=file://{cached_file.path}" in line
 
     line = next(captured)
-    assert "Check cache files total size" in line
+    assert "check cache files total size" in line
     assert "size=0" in line

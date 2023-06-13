@@ -100,11 +100,11 @@ def _requires_xarray_and_dask(func: F) -> F:
 @contextlib.contextmanager
 def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
     logger = config.get().logger
-    logger.info(f"Start {event}", **kwargs)
+    logger.info(f"start {event}", **kwargs)
     tic = time.perf_counter()
     yield tic
     toc = time.perf_counter()
-    logger.info(f"End {event}", elapsed_time=toc - tic, **kwargs)
+    logger.info(f"end {event}", elapsed_time=toc - tic, **kwargs)
 
 
 class FileInfoModel(pydantic.BaseModel):
