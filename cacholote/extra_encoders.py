@@ -152,7 +152,11 @@ def _get_fs_and_urlpath(
     else:
         if fs.exists(urlpath):
             expected = file_json["file:checksum"]
-            actual = f"{fs.checksum(urlpath):x}"
+            actual = (
+                fs.checksum(urlpath)  # Just for backward compatibility.
+                if isinstance(expected, int)
+                else f"{fs.checksum(urlpath):x}"
+            )
             if expected != actual:
                 raise ValueError(f"checksum mismatch: {expected=} {actual=}")
             return (fs, urlpath)
