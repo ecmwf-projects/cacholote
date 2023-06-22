@@ -104,7 +104,8 @@ def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
     tic = time.perf_counter()
     yield tic
     toc = time.perf_counter()
-    logger.info(f"end {event}", elapsed_time=toc - tic, **kwargs)
+    kwargs["_".join(event.split() + ["time"])] = toc - tic  # elapsed time
+    logger.info(f"end {event}", **kwargs)
 
 
 class FileInfoModel(pydantic.BaseModel):
@@ -214,14 +215,14 @@ def _maybe_store_xr_dataset(
     if filetype == "application/vnd+zarr":
         # Write directly on any filesystem
         mapper = fs.get_mapper(urlpath)
-        with _logging_timer("uploading", urlpath=fs.unstrip_protocol(urlpath)):
+        with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
             obj.to_zarr(mapper, consolidated=True)
     else:
         # Need a tmp local copy to write on a different filesystem
         with tempfile.TemporaryDirectory() as tmpdirname:
             tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
 
-            with _logging_timer("downloading tmp file", urlpath=tmpfilename):
+            with _logging_timer("download", urlpath=tmpfilename):
                 if filetype == "application/netcdf":
                     obj.to_netcdf(tmpfilename)
                 elif filetype == "application/x-grib":
@@ -279,7 +280,9 @@ def _maybe_store_file_object(
             if content_type:
                 kwargs["ContentType"] = content_type
             with _logging_timer(
-                "uploading", urlpath=fs_out.unstrip_protocol(urlpath_out)
+                "upload",
+                urlpath=fs_out.unstrip_protocol(urlpath_out),
+                size=fs_in.size(urlpath_in),
             ):
                 if fs_in == fs_out:
                     if config.get().io_delete_original:
@@ -293,7 +296,11 @@ def _maybe_store_file_object(
                         with fs_out.open(urlpath_out, "wb") as f_out:
                             utils.copy_buffered_file(f_in, f_out)
     if config.get().io_delete_original and fs_in.exists(urlpath_in):
-        with _logging_timer("removing", urlpath=fs_in.unstrip_protocol(urlpath_in)):
+        with _logging_timer(
+            "remove",
+            urlpath=fs_in.unstrip_protocol(urlpath_in),
+            size=fs_in.size(urlpath_in),
+        ):
             fs_in.rm(urlpath_in)
 
 
@@ -305,9 +312,7 @@ def _maybe_store_io_object(
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             f_out = fs_out.open(urlpath_out, "wb")
-            with _logging_timer(
-                "uploading", urlpath=fs_out.unstrip_protocol(urlpath_out)
-            ):
+            with _logging_timer("upload", urlpath=fs_out.unstrip_protocol(urlpath_out)):
                 utils.copy_buffered_file(f_in, f_out)
 
 

@@ -78,7 +78,7 @@ def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) 
     "recursive,raises,final_size",
     [
         (True, does_not_raise(), 0),
-        (False, pytest.raises((PermissionError, IsADirectoryError)), 1),
+        (False, pytest.raises((PermissionError, IsADirectoryError, ValueError)), 1),
     ],
 )
 def test_delete_unknown_dirs(

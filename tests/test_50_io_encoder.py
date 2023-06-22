@@ -192,19 +192,23 @@ def test_io_logging(capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path) ->
     captured = iter(capsys.readouterr().out.splitlines())
 
     line = next(captured)
-    assert "start uploading" in line
+    assert "start upload" in line
     assert f"urlpath=s3://{cached_file.path}" in line
+    assert "size=0" in line
 
     line = next(captured)
-    assert "end uploading" in line
+    assert "end upload" in line
     assert f"urlpath=s3://{cached_file.path}" in line
-    assert "elapsed_time=" in line
+    assert "upload_time=" in line
+    assert "size=0" in line
 
     line = next(captured)
-    assert "start removing" in line
+    assert "start remove" in line
     assert f"urlpath=file://{tmpfile}" in line
+    assert "size=0" in line
 
     line = next(captured)
-    assert "end removing" in line
+    assert "end remove" in line
     assert f"urlpath=file://{tmpfile}" in line
-    assert "elapsed_time=" in line
+    assert "remove_time=" in line
+    assert "size=0" in line
