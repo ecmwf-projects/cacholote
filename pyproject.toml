@@ -15,7 +15,8 @@ classifiers = [
 ]
 dependencies = [
   "fsspec",
-  "pydantic[dotenv]",
+  "pydantic",
+  "pydantic-settings",
   "sqlalchemy>=2.0.9",
   "structlog"
 ]

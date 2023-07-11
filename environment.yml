@@ -10,6 +10,6 @@ channels:
 dependencies:
 - fsspec
 - pydantic
-- python-dotenv
+- pydantic-settings
 - sqlalchemy>=2.0.9
 - structlog
