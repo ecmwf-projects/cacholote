@@ -9,7 +9,7 @@ channels:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW AS SHOWN IN THE EXAMPLE
 dependencies:
 - fsspec
-- pydantic
+- pydantic==1.*
 - python-dotenv
 - sqlalchemy>=2.0.9
 - structlog
