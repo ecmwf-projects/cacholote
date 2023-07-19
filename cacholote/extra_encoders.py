@@ -213,11 +213,13 @@ def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
     if filetype == "application/vnd+zarr":
-        # Write directly on any filesystem
-        mapper = fs.get_mapper(urlpath)
-        with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
-            obj.to_zarr(mapper, consolidated=True)
-    else:
+        with utils._Locker(fs, urlpath) as file_exists:
+            if not file_exists:
+                # Write directly on any filesystem
+                mapper = fs.get_mapper(urlpath)
+                with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
+                    obj.to_zarr(mapper, consolidated=True)
+    elif not fs.exists(urlpath):
         # Need a tmp local copy to write on a different filesystem
         with tempfile.TemporaryDirectory() as tmpdirname:
             tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
