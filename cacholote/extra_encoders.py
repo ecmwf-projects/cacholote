@@ -236,7 +236,11 @@ def _maybe_store_xr_dataset(
                     raise ValueError(f"type {filetype!r} is NOT supported.")
 
             _maybe_store_file_object(
-                fsspec.filesystem("file"), tmpfilename, fs, urlpath
+                fsspec.filesystem("file"),
+                tmpfilename,
+                fs,
+                urlpath,
+                io_delete_original=True,
             )
 
 
@@ -274,7 +278,10 @@ def _maybe_store_file_object(
     urlpath_in: str,
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
+    io_delete_original: Optional[bool] = None,
 ) -> None:
+    if io_delete_original is None:
+        io_delete_original = config.get().io_delete_original
     with utils._Locker(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             kwargs = {}
@@ -287,7 +294,7 @@ def _maybe_store_file_object(
                 size=fs_in.size(urlpath_in),
             ):
                 if fs_in == fs_out:
-                    if config.get().io_delete_original:
+                    if io_delete_original:
                         fs_in.mv(urlpath_in, urlpath_out, **kwargs)
                     else:
                         fs_in.cp(urlpath_in, urlpath_out, **kwargs)
@@ -297,7 +304,7 @@ def _maybe_store_file_object(
                     with fs_in.open(urlpath_in, "rb") as f_in:
                         with fs_out.open(urlpath_out, "wb") as f_out:
                             utils.copy_buffered_file(f_in, f_out)
-    if config.get().io_delete_original and fs_in.exists(urlpath_in):
+    if io_delete_original and fs_in.exists(urlpath_in):
         with _logging_timer(
             "remove",
             urlpath=fs_in.unstrip_protocol(urlpath_in),
