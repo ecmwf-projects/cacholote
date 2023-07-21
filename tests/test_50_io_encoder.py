@@ -212,3 +212,7 @@ def test_io_logging(capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path) ->
     assert f"urlpath=file://{tmpfile}" in line
     assert "remove_time=" in line
     assert "size=0" in line
+
+    line = next(captured)
+    assert "retrieve cache file" in line
+    assert f"urlpath=s3://{cached_file.path}" in line
