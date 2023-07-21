@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, 
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from . import config, database, encode, extra_encoders, utils
+from . import config, database, decode, encode, extra_encoders, utils
 
 
 def _delete_cache_file(
@@ -275,3 +275,12 @@ def clean_cache_files(
         tags_to_clean=tags_to_clean,
         tags_to_keep=tags_to_keep,
     )
+
+
+def clean_invalid_cache_entries() -> None:
+    with config.get().sessionmaker() as session:
+        for cache_entry in session.scalars(sa.select(database.CacheEntry)):
+            try:
+                decode.loads(cache_entry._result_as_string)
+            except decode.DecodeError:
+                _delete_cache_entry(session, cache_entry)

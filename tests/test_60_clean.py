@@ -197,6 +197,27 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
     assert len(fs.ls(dirname)) == 1
 
 
+def test_clean_invalid_cache_entries(tmpdir: pathlib.Path) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
+    # Create and cache 2 files
+    for i in range(2):
+        filepath = tmpdir / f"{i}.txt"
+        fsspec.filesystem("file").touch(filepath)
+        open_url(filepath)
+
+    # Invalidate one file
+    valid, invalid = fs.ls(dirname)
+    fs.touch(invalid)
+
+    clean.clean_invalid_cache_entries()
+    cur.execute("SELECT * FROM cache_entries", ())
+    assert len(cur.fetchall()) == 1
+    assert fs.ls(dirname) == [valid]
+
+
 def test_cleaner_logging(
     capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path
 ) -> None:
