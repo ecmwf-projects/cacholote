@@ -35,6 +35,7 @@ __all__ = [
     "__version__",
     "cacheable",
     "clean_cache_files",
+    "clean_invalid_cache_entries",
     "config",
     "database",
     "delete",
