@@ -159,7 +159,10 @@ def _get_fs_and_urlpath(
                 else f"{fs.checksum(urlpath):x}"
             )
             if expected != actual:
-                raise ValueError(f"checksum mismatch: {expected=} {actual=}")
+                raise ValueError(f"checksum mismatch: {urlpath=} {expected=} {actual=}")
+            config.get().logger.info(
+                "retrieve cache file", urlpath=fs.unstrip_protocol(urlpath)
+            )
             return (fs, urlpath)
 
     # Attempt to read from href
@@ -224,7 +227,7 @@ def _maybe_store_xr_dataset(
         with tempfile.TemporaryDirectory() as tmpdirname:
             tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
 
-            with _logging_timer("download", urlpath=tmpfilename):
+            with _logging_timer("write tmp file", urlpath=tmpfilename):
                 if filetype == "application/netcdf":
                     obj.to_netcdf(tmpfilename)
                 elif filetype == "application/x-grib":
