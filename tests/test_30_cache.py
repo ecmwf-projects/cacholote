@@ -86,11 +86,15 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
 
-    # cache-db must be empty
+    # Check cache-db
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    cur.execute("SELECT * FROM cache_entries", ())
-    assert cur.fetchall() == []
+    cur.execute("SELECT result FROM cache_entries", ())
+    assert cur.fetchall() == [(None,)]
+
+    cur.execute("SELECT traceback FROM cache_entries", ())
+    (tb,) = cur.fetchone()
+    assert tb.startswith("Traceback") and "AttributeError" in tb
 
 
 def test_same_args_kwargs() -> None:

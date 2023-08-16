@@ -17,6 +17,7 @@
 
 import functools
 import json
+import traceback
 import warnings
 from typing import Any, Callable, TypeVar, cast
 
@@ -56,14 +57,15 @@ def cacheable(func: F) -> F:
 
         try:
             hexdigest = encode._hexdigestify_python_call(func, *args, **kwargs)
-        except encode.EncodeError as ex:
+        except encode.EncodeError as exc:
             if settings.return_cache_entry:
-                raise ex
-            warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
+                raise exc
+            warnings.warn(f"can NOT encode python call: {exc!r}", UserWarning)
             return func(*args, **kwargs)
 
         filters = [
             database.CacheEntry.key == hexdigest,
+            database.CacheEntry.result.isnot(None),
             database.CacheEntry.expiration > utils.utcnow(),
         ]
         if settings.expiration:
@@ -78,22 +80,26 @@ def cacheable(func: F) -> F:
             ):
                 try:
                     return _decode_and_update(session, cache_entry, settings)
-                except decode.DecodeError as ex:
-                    warnings.warn(str(ex), UserWarning)
+                except decode.DecodeError as exc:
+                    warnings.warn(str(exc), UserWarning)
                     clean._delete_cache_entry(session, cache_entry)
 
-        result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(
             key=hexdigest,
             expiration=settings.expiration,
             tag=settings.tag,
         )
         try:
+            result = func(*args, **kwargs)
             cache_entry.result = json.loads(encode.dumps(result))
-        except encode.EncodeError as ex:
-            if settings.return_cache_entry:
-                raise ex
-            warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
+        except Exception as exc:
+            cache_entry.traceback = traceback.format_exc()
+            with settings.sessionmaker() as session:
+                session.add(cache_entry)
+                database._commit_or_rollback(session)
+            if settings.return_cache_entry or not isinstance(exc, encode.EncodeError):
+                raise exc
+            warnings.warn(f"can NOT encode output: {exc!r}", UserWarning)
             return result
 
         with settings.sessionmaker() as session:

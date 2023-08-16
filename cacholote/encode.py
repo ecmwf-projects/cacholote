@@ -151,15 +151,23 @@ def filecache_default(
     """
     if encoders is None:
         encoders = FILECACHE_ENCODERS
+    exceptions = []
     for type_, encoder in reversed(encoders):
         if isinstance(obj, type_):
             try:
                 return encoder(obj)
-            except Exception as ex:
+            except Exception as exc:
+                exceptions.append(exc)
                 if config.get().raise_all_encoding_errors:
-                    raise ex
-                warnings.warn(f"{encoder!r} did not work: {ex!r}")
-    raise EncodeError("can't encode object")
+                    raise exc
+                warnings.warn(f"{encoder!r} did not work: {exc!r}")
+
+    encode_error = EncodeError("can't encode object")
+    try:
+        raise encode_error from ExceptionGroup("all encoders failed", exceptions)
+    except NameError:
+        # python < 3.11
+        raise encode_error from exceptions[0]
 
 
 def dumps(
