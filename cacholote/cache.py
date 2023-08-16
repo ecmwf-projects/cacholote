@@ -45,6 +45,17 @@ def _decode_and_update(
     return result
 
 
+def _add_exception_log(
+    session: sa.orm.Session,
+    cache_entry: Any,
+    settings: config.Settings,
+) -> None:
+    cache_entry.log = {"exception": traceback.format_exc()}
+    with settings.sessionmaker() as session:
+        session.add(cache_entry)
+        database._commit_or_rollback(session)
+
+
 def cacheable(func: F) -> F:
     """Make a function cacheable."""
 
@@ -60,7 +71,7 @@ def cacheable(func: F) -> F:
         except encode.EncodeError as exc:
             if settings.return_cache_entry:
                 raise exc
-            warnings.warn(f"can NOT encode python call: {exc!r}", UserWarning)
+            warnings.warn(f"can't encode python call: {exc!r}", UserWarning)
             return func(*args, **kwargs)
 
         filters = [
@@ -91,15 +102,16 @@ def cacheable(func: F) -> F:
         )
         try:
             result = func(*args, **kwargs)
+        except Exception:
+            _add_exception_log(session, cache_entry, settings)
+            raise
+        try:
             cache_entry.result = json.loads(encode.dumps(result))
         except Exception as exc:
-            cache_entry.traceback = traceback.format_exc()
-            with settings.sessionmaker() as session:
-                session.add(cache_entry)
-                database._commit_or_rollback(session)
+            _add_exception_log(session, cache_entry, settings)
             if settings.return_cache_entry or not isinstance(exc, encode.EncodeError):
-                raise exc
-            warnings.warn(f"can NOT encode output: {exc!r}", UserWarning)
+                raise
+            warnings.warn(f"can't encode output: {exc!r}", UserWarning)
             return result
 
         with settings.sessionmaker() as session:

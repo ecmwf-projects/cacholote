@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import binascii
 import collections.abc
 import datetime
@@ -164,7 +163,7 @@ def filecache_default(
 
     encode_error = EncodeError("can't encode object")
     try:
-        raise encode_error from ExceptionGroup("all encoders failed", exceptions)
+        raise encode_error from ExceptionGroup("encoders failed", exceptions)  # type: ignore[name-defined]
     except NameError:
         # python < 3.11
         raise encode_error from exceptions[0]

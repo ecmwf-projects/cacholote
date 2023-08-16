@@ -199,10 +199,11 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
     assert len(fs.ls(dirname)) == 1
 
 
+@pytest.mark.parametrize("check_result", [True, False])
 @pytest.mark.parametrize("check_expiration", [True, False])
 @pytest.mark.parametrize("try_decode", [True, False])
 def test_clean_invalid_cache_entries(
-    tmpdir: pathlib.Path, check_expiration: bool, try_decode: bool
+    tmpdir: pathlib.Path, check_result: bool, check_expiration: bool, try_decode: bool
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
     con = config.get().engine.raw_connection()
@@ -225,12 +226,18 @@ def test_clean_invalid_cache_entries(
         expired = open_url(tmpdir / "expired.txt").path
     time.sleep(0.1)
 
+    # Exception
+    with pytest.raises(FileNotFoundError):
+        open_url(tmpdir / "non-existent")
+
     # Clean
     clean.clean_invalid_cache_entries(
-        check_expiration=check_expiration, try_decode=try_decode
+        check_result=check_result,
+        check_expiration=check_expiration,
+        try_decode=try_decode,
     )
     cur.execute("SELECT * FROM cache_entries", ())
-    assert len(cur.fetchall()) == 3 - check_expiration - try_decode
+    assert len(cur.fetchall()) == 4 - check_result - check_expiration - try_decode
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)

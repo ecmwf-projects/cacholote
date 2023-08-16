@@ -1,4 +1,5 @@
 import datetime
+import json
 import pathlib
 import time
 from typing import Any
@@ -74,7 +75,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.raises(AttributeError):
             cfunc(inst)
     else:
-        with pytest.warns(UserWarning, match="can NOT encode python call"):
+        with pytest.warns(UserWarning, match="can't encode python call"):
             res = cfunc(inst)
         assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
 
@@ -82,7 +83,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.raises(AttributeError):
             cfunc("test", b=1)
     else:
-        with pytest.warns(UserWarning, match="can NOT encode output"):
+        with pytest.warns(UserWarning, match="can't encode output"):
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
 
@@ -92,9 +93,12 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
     cur.execute("SELECT result FROM cache_entries", ())
     assert cur.fetchall() == [(None,)]
 
-    cur.execute("SELECT traceback FROM cache_entries", ())
-    (tb,) = cur.fetchone()
-    assert tb.startswith("Traceback") and "AttributeError" in tb
+    cur.execute("SELECT result, log FROM cache_entries", ())
+    all = cur.fetchall()
+    assert len(all) == 1
+    result, log = all[0]
+    assert result is None
+    assert "AttributeError" in json.loads(log)["exception"]
 
 
 def test_same_args_kwargs() -> None:
@@ -182,5 +186,9 @@ def test_cached_error() -> None:
     with pytest.raises(ValueError, match="test error"):
         cached_error()
 
-    cur.execute("SELECT * FROM cache_entries", ())
-    assert cur.fetchall() == []
+    cur.execute("SELECT result, log FROM cache_entries", ())
+    all = cur.fetchall()
+    assert len(all) == 1
+    result, log = all[0]
+    assert result is None
+    assert "ValueError" in json.loads(log)["exception"]

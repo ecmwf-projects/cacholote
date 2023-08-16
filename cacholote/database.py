@@ -47,7 +47,7 @@ class CacheEntry(Base):
     )
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
-    traceback = sa.Column(sa.String)
+    log = sa.Column(sa.JSON)
 
     @property
     def _result_as_string(self) -> str:

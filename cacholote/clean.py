@@ -278,24 +278,28 @@ def clean_cache_files(
 
 
 def clean_invalid_cache_entries(
-    check_expiration: bool = True, try_decode: bool = False
+    check_result: bool = True, check_expiration: bool = True, try_decode: bool = False
 ) -> None:
     """Clean invalid cache entries.
 
     Parameters
     ----------
+    check_result: bool
+        Whether or not to delete entries without results
     check_expiration: bool
         Whether or not to delete expired entries
     try_decode: bool
-        Whether or not to delete entries that raise DecodeError (this can be slow!)
+        Whether or not to delete entries that raise DecodeError (can be slow!)
     """
     filters = []
+    if check_result:
+        filters.append(database.CacheEntry.result.is_(None))
     if check_expiration:
         filters.append(database.CacheEntry.expiration <= utils.utcnow())
     if filters:
         with config.get().sessionmaker() as session:
             for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters)
+                sa.select(database.CacheEntry).filter(sa.or_(*filters))
             ):
                 _delete_cache_entry(session, cache_entry)
 
