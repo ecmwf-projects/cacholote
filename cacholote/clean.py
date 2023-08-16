@@ -277,7 +277,7 @@ def clean_cache_files(
     )
 
 
-def clean_invalid_cache_entries(check_expiration=True, try_decode=True) -> None:
+def clean_invalid_cache_entries(check_expiration=True, try_decode=False) -> None:
     """Clean invalid cache entries.
 
     Parameters
