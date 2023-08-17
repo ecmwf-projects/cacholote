@@ -153,19 +153,17 @@ def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
 
     # Acquire lock
     fs, dirname = utils.get_cache_files_fs_dirname()
-    file_hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
-    lock = f"{dirname}/{file_hash}.txt.lock"
-    fs.touch(lock)
+    file_path = f"{dirname}/{fsspec.filesystem('file').checksum(tmpfile):x}.txt"
+    lock_path = f"{file_path}.lock"
+    fs.touch(lock_path)
 
     def release_lock(fs: fsspec.AbstractFileSystem, lock: str) -> None:
         fs.rm(lock)
 
     # Threading
     t1 = threading.Timer(0, cached_open, args=(tmpfile,))
-    t2 = threading.Timer(0.1, release_lock, args=(fs, lock))
-    with pytest.warns(
-        UserWarning, match=f"can NOT proceed until file is released: {lock!r}."
-    ):
+    t2 = threading.Timer(0.1, release_lock, args=(fs, lock_path))
+    with pytest.warns(UserWarning, match="is locked"):
         t1.start()
         t2.start()
         t1.join()

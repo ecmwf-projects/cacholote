@@ -216,7 +216,7 @@ def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
     if filetype == "application/vnd+zarr":
-        with utils._Locker(fs, urlpath) as file_exists:
+        with utils.FileLock(fs, urlpath) as file_exists:
             if not file_exists:
                 # Write directly on any filesystem
                 mapper = fs.get_mapper(urlpath)
@@ -285,7 +285,7 @@ def _maybe_store_file_object(
 ) -> None:
     if io_delete_original is None:
         io_delete_original = config.get().io_delete_original
-    with utils._Locker(fs_out, urlpath_out) as file_exists:
+    with utils.FileLock(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             kwargs = {}
             content_type = _guess_type(fs_in, urlpath_in)
@@ -321,7 +321,7 @@ def _maybe_store_io_object(
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
 ) -> None:
-    with utils._Locker(fs_out, urlpath_out) as file_exists:
+    with utils.FileLock(fs_out, urlpath_out) as file_exists:
         if not file_exists:
             f_out = fs_out.open(urlpath_out, "wb")
             with _logging_timer("upload", urlpath=fs_out.unstrip_protocol(urlpath_out)):

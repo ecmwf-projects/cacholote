@@ -15,7 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.import hashlib
 
+import dataclasses
 import datetime
+import functools
 import hashlib
 import io
 import time
@@ -67,21 +69,25 @@ def copy_buffered_file(
         f_out.write(data if isinstance(data, bytes) else data.encode())
 
 
-class _Locker:
-    def __init__(
-        self,
-        fs: fsspec.AbstractFileSystem,
-        urlpath: str,
-        lock_validity_period: Optional[float] = None,
-    ) -> None:
-        self.fs = fs
-        self.urlpath = urlpath
-        self.lockfile = urlpath + ".lock"
-        self.lock_validity_period = lock_validity_period
+@dataclasses.dataclass
+class FileLock:
+    fs: fsspec.AbstractFileSystem  # fsspec file system
+    urlpath: str  # file to lock
+    lock_validity_period: Optional[float] = None  # lock validity period in seconds
+    lock_timeout: Optional[float] = None  # lock timeout in seconds
+    lock_suffix: str = ".lock"  # suffix for lock file
+
+    @functools.cached_property
+    def lockfile(self) -> str:
+        return self.urlpath + self.lock_suffix
 
     @property
     def file_exists(self) -> bool:
         return bool(self.fs.exists(self.urlpath))
+
+    @property
+    def lock_exists(self) -> bool:
+        return bool(self.fs.exists(self.lockfile))
 
     def acquire(self) -> None:
         self.fs.touch(self.lockfile)
@@ -92,27 +98,28 @@ class _Locker:
 
     @property
     def is_locked(self) -> bool:
-        if not self.fs.exists(self.lockfile):
-            return False
-
-        delta = datetime.datetime.now() - self.fs.modified(self.lockfile)
-        if self.lock_validity_period is None or delta < datetime.timedelta(
-            seconds=self.lock_validity_period
-        ):
-            return True
-
+        if self.lock_exists:
+            if self.lock_validity_period is None:
+                return True
+            delta = datetime.datetime.now() - self.fs.modified(self.lockfile)
+            if delta < datetime.timedelta(seconds=self.lock_validity_period):
+                return True
         return False
 
     def wait_until_released(self) -> None:
         warned = False
+        message = f"{self.urlpath!r} is locked: {self.lockfile!r}"
+        start = time.perf_counter()
         while self.is_locked:
+            if (
+                self.lock_timeout is not None
+                and time.perf_counter() - start > self.lock_timeout
+            ):
+                raise TimeoutError(message)
             if not warned:
-                warnings.warn(
-                    f"can NOT proceed until file is released: {self.lockfile!r}.",
-                    UserWarning,
-                )
+                warnings.warn(message, UserWarning)
                 warned = True
-            time.sleep(1)
+            time.sleep(min(1, self.lock_timeout or 1))
 
     def __enter__(self) -> bool:
         self.wait_until_released()
