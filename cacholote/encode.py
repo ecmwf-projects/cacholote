@@ -14,13 +14,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import binascii
 import collections.abc
 import datetime
 import inspect
 import json
 import pickle
+import sys
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -162,11 +162,9 @@ def filecache_default(
                 warnings.warn(f"{encoder!r} did not work: {exc!r}")
 
     encode_error = EncodeError("can't encode object")
-    try:
-        raise encode_error from ExceptionGroup("encoders failed", exceptions)  # type: ignore[name-defined]
-    except NameError:
-        # python < 3.11
+    if sys.version_info < (3, 11):
         raise encode_error from exceptions[0]
+    raise encode_error from ExceptionGroup("encoders failed", exceptions)  # type: ignore[name-defined]
 
 
 def dumps(
