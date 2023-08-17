@@ -32,7 +32,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 def _decode_and_update(
     session: sa.orm.Session,
-    cache_entry: Any,
+    cache_entry: CacheEntry,
     settings: config.Settings,
 ) -> Any:
     result = decode.loads(cache_entry._result_as_string)
@@ -48,7 +48,7 @@ def _decode_and_update(
 
 def _add_exception_log(
     session: sa.orm.Session,
-    cache_entry: Any,
+    cache_entry: CacheEntry,
     settings: config.Settings,
 ) -> None:
     cache_entry.log = {"exception": traceback.format_exc()}
