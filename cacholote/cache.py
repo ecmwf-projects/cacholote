@@ -71,7 +71,7 @@ def cacheable(func: F) -> F:
             hexdigest = encode._hexdigestify_python_call(func, *args, **kwargs)
         except encode.EncodeError as exc:
             if settings.return_cache_entry:
-                raise exc
+                raise
             warnings.warn(f"can't encode python call: {exc!r}", UserWarning)
             return func(*args, **kwargs)
 

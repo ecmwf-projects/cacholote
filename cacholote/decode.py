@@ -69,7 +69,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
             if result is not None:
                 return result
         except Exception as ex:
-            raise DecodeError(ex) from ex
+            raise DecodeError(ex)
 
     return obj
 

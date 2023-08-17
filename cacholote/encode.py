@@ -158,7 +158,7 @@ def filecache_default(
             except Exception as exc:
                 exceptions.append(exc)
                 if config.get().raise_all_encoding_errors:
-                    raise exc
+                    raise
                 warnings.warn(f"{encoder!r} did not work: {exc!r}")
 
     encode_error = EncodeError("can't encode object")
