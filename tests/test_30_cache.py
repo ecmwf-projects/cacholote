@@ -90,9 +90,6 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
     # Check cache-db
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    cur.execute("SELECT result FROM cache_entries", ())
-    assert cur.fetchall() == [(None,)]
-
     cur.execute("SELECT result, log FROM cache_entries", ())
     all = cur.fetchall()
     assert len(all) == 1
