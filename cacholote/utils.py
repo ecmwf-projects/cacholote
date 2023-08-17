@@ -73,21 +73,11 @@ def copy_buffered_file(
 class FileLock:
     fs: fsspec.AbstractFileSystem  # fsspec file system
     urlpath: str  # file to lock
-    lock_validity_period: Optional[float] = None  # lock validity period in seconds
     lock_timeout: Optional[float] = None  # lock timeout in seconds
-    lock_suffix: str = ".lock"  # suffix for lock file
 
     @functools.cached_property
     def lockfile(self) -> str:
-        return self.urlpath + self.lock_suffix
-
-    @property
-    def file_exists(self) -> bool:
-        return bool(self.fs.exists(self.urlpath))
-
-    @property
-    def lock_exists(self) -> bool:
-        return bool(self.fs.exists(self.lockfile))
+        return self.urlpath + ".lock"
 
     def acquire(self) -> None:
         self.fs.touch(self.lockfile)
@@ -98,13 +88,7 @@ class FileLock:
 
     @property
     def is_locked(self) -> bool:
-        if self.lock_exists:
-            if self.lock_validity_period is None:
-                return True
-            delta = datetime.datetime.now() - self.fs.modified(self.lockfile)
-            if delta < datetime.timedelta(seconds=self.lock_validity_period):
-                return True
-        return False
+        return bool(self.fs.exists(self.lockfile))
 
     def wait_until_released(self) -> None:
         warned = False
@@ -124,7 +108,7 @@ class FileLock:
     def __enter__(self) -> bool:
         self.wait_until_released()
         self.acquire()
-        return self.file_exists
+        return bool(self.fs.exists(self.urlpath))
 
     def __exit__(
         self,

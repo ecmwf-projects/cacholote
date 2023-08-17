@@ -1,9 +1,10 @@
+import contextlib
 import hashlib
 import importlib
 import io
 import pathlib
 import threading
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import fsspec
 import pytest
@@ -146,7 +147,20 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
-def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
+@pytest.mark.parametrize(
+    "lock_timeout, expected",
+    (
+        [None, pytest.warns(UserWarning, match="is locked")],
+        [0, pytest.raises(TimeoutError, match="is locked")],
+    ),
+)
+def test_io_locker_warning(
+    tmpdir: pathlib.Path,
+    lock_timeout: Optional[float],
+    expected: contextlib.nullcontext[Any],
+) -> None:
+    config.set(lock_timeout=lock_timeout)
+
     # Create tmpfile
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
