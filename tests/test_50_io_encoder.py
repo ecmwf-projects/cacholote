@@ -3,7 +3,7 @@ import hashlib
 import importlib
 import io
 import pathlib
-import threading
+import subprocess
 from typing import Any, Dict, Optional, Tuple, Union
 
 import fsspec
@@ -159,8 +159,7 @@ def test_io_locker_warning(
     lock_timeout: Optional[float],
     expected: contextlib.nullcontext[Any],
 ) -> None:
-    config.set(lock_timeout=lock_timeout)
-
+    config.set(lock_timeout=lock_timeout, raise_all_encoding_errors=True)
     # Create tmpfile
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
@@ -171,17 +170,10 @@ def test_io_locker_warning(
     lock_path = f"{file_path}.lock"
     fs.touch(lock_path)
 
-    def release_lock(fs: fsspec.AbstractFileSystem, lock: str) -> None:
-        fs.rm(lock)
-
-    # Threading
-    t1 = threading.Timer(0, cached_open, args=(tmpfile,))
-    t2 = threading.Timer(0.1, release_lock, args=(fs, lock_path))
+    process = subprocess.Popen(f"sleep 0.1; rm {lock_path}", shell=True)
     with expected:
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+        cached_open(tmpfile)
+    assert not process.wait()
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)

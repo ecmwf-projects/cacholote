@@ -73,7 +73,7 @@ def copy_buffered_file(
 class FileLock:
     fs: fsspec.AbstractFileSystem  # fsspec file system
     urlpath: str  # file to lock
-    lock_timeout: Optional[float] = None  # lock timeout in seconds
+    lock_timeout: Optional[float]  # lock timeout in seconds
 
     @functools.cached_property
     def lockfile(self) -> str:
