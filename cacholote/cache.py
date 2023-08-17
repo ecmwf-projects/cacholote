@@ -25,6 +25,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm
 
 from . import clean, config, database, decode, encode, utils
+from .database import CacheEntry
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -75,19 +76,19 @@ def cacheable(func: F) -> F:
             return func(*args, **kwargs)
 
         filters = [
-            database.CacheEntry.key == hexdigest,
-            database.CacheEntry.result.isnot(None),
-            database.CacheEntry.expiration > utils.utcnow(),
+            CacheEntry.key == hexdigest,
+            CacheEntry.result.isnot(None),
+            CacheEntry.expiration > utils.utcnow(),
         ]
         if settings.expiration:
             # When expiration is provided, only get entries with matching expiration
-            filters.append(database.CacheEntry.expiration == settings.expiration)
+            filters.append(CacheEntry.expiration == settings.expiration)
 
         with settings.sessionmaker() as session:
             for cache_entry in session.scalars(
-                sa.select(database.CacheEntry)
+                sa.select(CacheEntry)
                 .filter(*filters)
-                .order_by(database.CacheEntry.timestamp.desc())
+                .order_by(CacheEntry.timestamp.desc())
             ):
                 try:
                     return _decode_and_update(session, cache_entry, settings)
@@ -95,7 +96,7 @@ def cacheable(func: F) -> F:
                     warnings.warn(str(exc), UserWarning)
                     clean._delete_cache_entry(session, cache_entry)
 
-        cache_entry = database.CacheEntry(
+        cache_entry = CacheEntry(
             key=hexdigest,
             expiration=settings.expiration,
             tag=settings.tag,

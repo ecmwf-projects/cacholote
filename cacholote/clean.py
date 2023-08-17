@@ -25,12 +25,17 @@ import sqlalchemy as sa
 import sqlalchemy.orm
 
 from . import config, database, decode, encode, extra_encoders, utils
+from .database import CacheEntry
+
+FILTERS_T = List[
+    Union[sa.sql.elements.ColumnElement[bool], sa.sql.elements.BinaryExpression[bool]]
+]
 
 
 def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sa.orm.Session] = None,
-    cache_entry: Optional[database.CacheEntry] = None,
+    cache_entry: Optional[CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
 ) -> Any:
@@ -65,14 +70,13 @@ def _delete_cache_file(
     return obj
 
 
-def _delete_cache_entry(
-    session: sa.orm.Session, cache_entry: database.CacheEntry
-) -> None:
+def _delete_cache_entry(session: sa.orm.Session, cache_entry: CacheEntry) -> None:
     # First, delete database entry
     session.delete(cache_entry)
     database._commit_or_rollback(session)
-    # Then, delete files
-    json.loads(cache_entry._result_as_string, object_hook=_delete_cache_file)
+    if cache_entry.result:
+        # Then, delete files
+        json.loads(cache_entry._result_as_string, object_hook=_delete_cache_file)
 
 
 def delete(
@@ -92,7 +96,7 @@ def delete(
     hexdigest = encode._hexdigestify_python_call(func_to_del, *args, **kwargs)
     with config.get().sessionmaker() as session:
         for cache_entry in session.scalars(
-            sa.select(database.CacheEntry).filter(database.CacheEntry.key == hexdigest)
+            sa.select(CacheEntry).filter(CacheEntry.key == hexdigest)
         ):
             _delete_cache_entry(session, cache_entry)
 
@@ -138,7 +142,9 @@ class _Cleaner:
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
             with config.get().sessionmaker() as session:
-                for cache_entry in session.scalars(sa.select(database.CacheEntry)):
+                for cache_entry in session.scalars(
+                    sa.select(CacheEntry).filter(CacheEntry.result.isnot(None))
+                ):
                     json.loads(
                         cache_entry._result_as_string,
                         object_hook=functools.partial(
@@ -181,42 +187,42 @@ class _Cleaner:
         self.check_tags(tags_to_clean, tags_to_keep)
 
         # Filters
-        filters = []
+        filters: FILTERS_T = [CacheEntry.result.isnot(None)]
         if tags_to_keep is not None:
             filters.append(
                 sa.or_(
-                    database.CacheEntry.tag.not_in(tags_to_keep),
-                    database.CacheEntry.tag.is_not(None)
+                    CacheEntry.tag.not_in(tags_to_keep),
+                    CacheEntry.tag.isnot(None)
                     if None in tags_to_keep
-                    else database.CacheEntry.tag.is_(None),
+                    else CacheEntry.tag.is_(None),
                 )
             )
         elif tags_to_clean is not None:
             filters.append(
                 sa.or_(
-                    database.CacheEntry.tag.in_(tags_to_clean),
-                    database.CacheEntry.tag.is_(None)
+                    CacheEntry.tag.in_(tags_to_clean),
+                    CacheEntry.tag.is_(None)
                     if None in tags_to_clean
-                    else database.CacheEntry.tag.is_not(None),
+                    else CacheEntry.tag.isnot(None),
                 )
             )
 
         # Sorters
         sorters: List[sa.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":
-            sorters.extend([database.CacheEntry.timestamp, database.CacheEntry.counter])
+            sorters.extend([CacheEntry.timestamp, CacheEntry.counter])
         elif method == "LFU":
-            sorters.extend([database.CacheEntry.counter, database.CacheEntry.timestamp])
+            sorters.extend([CacheEntry.counter, CacheEntry.timestamp])
         else:
             raise ValueError(f"{method=} is invalid. Choose either 'LRU' or 'LFU'.")
-        sorters.append(database.CacheEntry.expiration)
+        sorters.append(CacheEntry.expiration)
 
         # Clean database files
         if self.stop_cleaning(maxsize):
             return
         with config.get().sessionmaker() as session:
             for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
+                sa.select(CacheEntry).filter(*filters).order_by(*sorters)
             ):
                 json.loads(
                     cache_entry._result_as_string,
@@ -291,21 +297,21 @@ def clean_invalid_cache_entries(
     try_decode: bool
         Whether or not to delete entries that raise DecodeError (can be slow!)
     """
-    filters = []
+    filters: FILTERS_T = []
     if check_result:
-        filters.append(database.CacheEntry.result.is_(None))
+        filters.append(CacheEntry.result.is_(None))
     if check_expiration:
-        filters.append(database.CacheEntry.expiration <= utils.utcnow())
+        filters.append(CacheEntry.expiration <= utils.utcnow())
     if filters:
         with config.get().sessionmaker() as session:
             for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(sa.or_(*filters))
+                sa.select(CacheEntry).filter(sa.or_(*filters))
             ):
                 _delete_cache_entry(session, cache_entry)
 
     if try_decode:
         with config.get().sessionmaker() as session:
-            for cache_entry in session.scalars(sa.select(database.CacheEntry)):
+            for cache_entry in session.scalars(sa.select(CacheEntry)):
                 try:
                     decode.loads(cache_entry._result_as_string)
                 except decode.DecodeError:
