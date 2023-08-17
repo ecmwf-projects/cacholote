@@ -177,7 +177,7 @@ def test_io_locker_warning(
     # Threading
     t1 = threading.Timer(0, cached_open, args=(tmpfile,))
     t2 = threading.Timer(0.1, release_lock, args=(fs, lock_path))
-    with pytest.warns(UserWarning, match="is locked"):
+    with expected:
         t1.start()
         t2.start()
         t1.join()
