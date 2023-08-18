@@ -205,9 +205,9 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
 def test_clean_invalid_cache_entries(
     tmpdir: pathlib.Path, check_result: bool, check_expiration: bool, try_decode: bool
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
     con = config.get().engine.raw_connection()
     cur = con.cursor()
+    fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Valid cache file
     fsspec.filesystem("file").touch(tmpdir / "valid.txt")
@@ -230,14 +230,15 @@ def test_clean_invalid_cache_entries(
     with pytest.raises(FileNotFoundError):
         open_url(tmpdir / "non-existent")
 
-    # Clean
+    # Clean and check
     clean.clean_invalid_cache_entries(
         check_result=check_result,
         check_expiration=check_expiration,
         try_decode=try_decode,
     )
     cur.execute("SELECT * FROM cache_entries", ())
-    assert len(cur.fetchall()) == 4 - check_result - check_expiration - try_decode
+    nrows = len(cur.fetchall())
+    assert nrows == 4 - check_result - check_expiration - try_decode
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)

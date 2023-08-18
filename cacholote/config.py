@@ -60,6 +60,7 @@ class Settings(pydantic.BaseSettings):
     logger: Union[
         structlog.BoundLogger, structlog._config.BoundLoggerLazyProxy
     ] = _DEFAULT_LOGGER
+    lock_timeout: Optional[float] = None
 
     @pydantic.validator("create_engine_kwargs", allow_reuse=True)
     def validate_create_engine_kwargs(
