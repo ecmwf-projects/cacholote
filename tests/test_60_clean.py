@@ -223,7 +223,7 @@ def test_clean_invalid_cache_entries(
     expiration = datetime.datetime.now(tz=datetime.timezone.utc) + dt
     with config.set(expiration=expiration):
         expired = open_url(tmpdir / "expired.txt").path
-    time.sleep(0.1)
+    time.sleep(0.2)
 
     # Clean and check
     clean.clean_invalid_cache_entries(
