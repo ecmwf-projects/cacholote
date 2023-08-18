@@ -232,7 +232,8 @@ def test_clean_invalid_cache_entries(
     con = config.get().engine.raw_connection()
     cur = con.cursor()
     cur.execute("SELECT * FROM cache_entries", ())
-    assert len(cur.fetchall()) == 3 - check_expiration - try_decode
+    nrows = len(cur.fetchall())
+    assert nrows == 3 - check_expiration - try_decode
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
