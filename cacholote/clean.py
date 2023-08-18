@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, 
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from . import config, database, encode, extra_encoders, utils
+from . import config, database, decode, encode, extra_encoders, utils
 
 
 def _delete_cache_file(
@@ -208,7 +208,7 @@ class _Cleaner:
         elif method == "LFU":
             sorters.extend([database.CacheEntry.counter, database.CacheEntry.timestamp])
         else:
-            raise ValueError("`method` must be 'LRU' or 'LFU'.")
+            raise ValueError(f"{method=} is invalid. Choose either 'LRU' or 'LFU'.")
         sorters.append(database.CacheEntry.expiration)
 
         # Clean database files
@@ -275,3 +275,34 @@ def clean_cache_files(
         tags_to_clean=tags_to_clean,
         tags_to_keep=tags_to_keep,
     )
+
+
+def clean_invalid_cache_entries(
+    check_expiration: bool = True, try_decode: bool = False
+) -> None:
+    """Clean invalid cache entries.
+
+    Parameters
+    ----------
+    check_expiration: bool
+        Whether or not to delete expired entries
+    try_decode: bool
+        Whether or not to delete entries that raise DecodeError (this can be slow!)
+    """
+    filters = []
+    if check_expiration:
+        filters.append(database.CacheEntry.expiration <= utils.utcnow())
+    if filters:
+        with config.get().sessionmaker() as session:
+            for cache_entry in session.scalars(
+                sa.select(database.CacheEntry).filter(*filters)
+            ):
+                _delete_cache_entry(session, cache_entry)
+
+    if try_decode:
+        with config.get().sessionmaker() as session:
+            for cache_entry in session.scalars(sa.select(database.CacheEntry)):
+                try:
+                    decode.loads(cache_entry._result_as_string)
+                except decode.DecodeError:
+                    _delete_cache_entry(session, cache_entry)

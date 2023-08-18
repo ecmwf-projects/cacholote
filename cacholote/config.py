@@ -31,12 +31,12 @@ import structlog
 
 from . import database
 
-_LOGGER = structlog.get_logger(
-    wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
-)
 _SETTINGS: Optional[Settings] = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
+_DEFAULT_LOGGER = structlog.get_logger(
+    wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
+)
 
 _CONFIG_NOT_SET_MSG = (
     "Configuration settings have not been set. Run `cacholote.config.reset()`."
@@ -60,7 +60,8 @@ class Settings(pydantic_settings.BaseSettings):
     return_cache_entry: bool = False
     logger: Union[
         structlog.BoundLogger, structlog._config.BoundLoggerLazyProxy
-    ] = _LOGGER
+    ] = _DEFAULT_LOGGER
+    lock_timeout: Optional[float] = None
 
     @pydantic.field_validator("create_engine_kwargs")
     def validate_create_engine_kwargs(

@@ -159,7 +159,10 @@ def _get_fs_and_urlpath(
                 else f"{fs.checksum(urlpath):x}"
             )
             if expected != actual:
-                raise ValueError(f"checksum mismatch: {expected=} {actual=}")
+                raise ValueError(f"checksum mismatch: {urlpath=} {expected=} {actual=}")
+            config.get().logger.info(
+                "retrieve cache file", urlpath=fs.unstrip_protocol(urlpath)
+            )
             return (fs, urlpath)
 
     # Attempt to read from href
@@ -213,16 +216,20 @@ def _maybe_store_xr_dataset(
     obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
 ) -> None:
     if filetype == "application/vnd+zarr":
-        # Write directly on any filesystem
-        mapper = fs.get_mapper(urlpath)
-        with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
-            obj.to_zarr(mapper, consolidated=True)
-    else:
+        with utils.FileLock(
+            fs, urlpath, timeout=config.get().lock_timeout
+        ) as file_exists:
+            if not file_exists:
+                # Write directly on any filesystem
+                mapper = fs.get_mapper(urlpath)
+                with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
+                    obj.to_zarr(mapper, consolidated=True)
+    elif not fs.exists(urlpath):
         # Need a tmp local copy to write on a different filesystem
         with tempfile.TemporaryDirectory() as tmpdirname:
             tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
 
-            with _logging_timer("download", urlpath=tmpfilename):
+            with _logging_timer("write tmp file", urlpath=tmpfilename):
                 if filetype == "application/netcdf":
                     obj.to_netcdf(tmpfilename)
                 elif filetype == "application/x-grib":
@@ -234,7 +241,11 @@ def _maybe_store_xr_dataset(
                     raise ValueError(f"type {filetype!r} is NOT supported.")
 
             _maybe_store_file_object(
-                fsspec.filesystem("file"), tmpfilename, fs, urlpath
+                fsspec.filesystem("file"),
+                tmpfilename,
+                fs,
+                urlpath,
+                io_delete_original=True,
             )
 
 
@@ -272,8 +283,13 @@ def _maybe_store_file_object(
     urlpath_in: str,
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
+    io_delete_original: Optional[bool] = None,
 ) -> None:
-    with utils._Locker(fs_out, urlpath_out) as file_exists:
+    if io_delete_original is None:
+        io_delete_original = config.get().io_delete_original
+    with utils.FileLock(
+        fs_out, urlpath_out, timeout=config.get().lock_timeout
+    ) as file_exists:
         if not file_exists:
             kwargs = {}
             content_type = _guess_type(fs_in, urlpath_in)
@@ -285,7 +301,7 @@ def _maybe_store_file_object(
                 size=fs_in.size(urlpath_in),
             ):
                 if fs_in == fs_out:
-                    if config.get().io_delete_original:
+                    if io_delete_original:
                         fs_in.mv(urlpath_in, urlpath_out, **kwargs)
                     else:
                         fs_in.cp(urlpath_in, urlpath_out, **kwargs)
@@ -295,7 +311,7 @@ def _maybe_store_file_object(
                     with fs_in.open(urlpath_in, "rb") as f_in:
                         with fs_out.open(urlpath_out, "wb") as f_out:
                             utils.copy_buffered_file(f_in, f_out)
-    if config.get().io_delete_original and fs_in.exists(urlpath_in):
+    if io_delete_original and fs_in.exists(urlpath_in):
         with _logging_timer(
             "remove",
             urlpath=fs_in.unstrip_protocol(urlpath_in),
@@ -309,7 +325,9 @@ def _maybe_store_io_object(
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
 ) -> None:
-    with utils._Locker(fs_out, urlpath_out) as file_exists:
+    with utils.FileLock(
+        fs_out, urlpath_out, timeout=config.get().lock_timeout
+    ) as file_exists:
         if not file_exists:
             f_out = fs_out.open(urlpath_out, "wb")
             with _logging_timer("upload", urlpath=fs_out.unstrip_protocol(urlpath_out)):

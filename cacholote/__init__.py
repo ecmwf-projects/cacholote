@@ -17,7 +17,7 @@
 
 from . import config, database, extra_encoders, utils
 from .cache import cacheable
-from .clean import clean_cache_files, delete
+from .clean import clean_cache_files, clean_invalid_cache_entries, delete
 from .decode import loads
 from .encode import dumps
 
@@ -35,6 +35,7 @@ __all__ = [
     "__version__",
     "cacheable",
     "clean_cache_files",
+    "clean_invalid_cache_entries",
     "config",
     "database",
     "delete",
