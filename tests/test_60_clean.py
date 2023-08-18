@@ -42,15 +42,13 @@ def test_clean_cache_files(
 
     # Do not clean
     clean.clean_cache_files(2, method=method)
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
-    assert nrows == fs.du(dirname) == 2
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (fs.du(dirname),) == (2,)
 
     # Delete one file
     clean.clean_cache_files(1, method=method)
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
-    assert nrows == fs.du(dirname) == 1
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (fs.du(dirname),) == (1,)
     assert not fs.exists(lru_path if method == "LRU" else lfu_path)
 
 
@@ -229,9 +227,8 @@ def test_clean_invalid_cache_entries(
     clean.clean_invalid_cache_entries(
         check_expiration=check_expiration, try_decode=try_decode
     )
-    cur.execute("SELECT result FROM cache_entries", ())
-    results = cur.fetchall()
-    assert len(results) == 3 - check_expiration - try_decode, results
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (3 - check_expiration - try_decode,)
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
