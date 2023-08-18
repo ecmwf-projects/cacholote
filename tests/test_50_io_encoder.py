@@ -1,9 +1,10 @@
+import contextlib
 import hashlib
 import importlib
 import io
 import pathlib
-import threading
-from typing import Any, Dict, Tuple, Union
+import subprocess
+from typing import Any, Dict, Optional, Tuple, Union
 
 import fsspec
 import pytest
@@ -146,30 +147,32 @@ def test_io_corrupted_files(
     assert fs.exists(f"{dirname}/{cached_basename}")
 
 
-def test_io_locker_warning(tmpdir: pathlib.Path) -> None:
+@pytest.mark.parametrize(
+    "lock_timeout, raises_or_warns",
+    (
+        [None, pytest.warns(UserWarning, match="is locked")],
+        [0, pytest.raises(TimeoutError, match="is locked")],
+    ),
+)
+def test_io_locker(
+    tmpdir: pathlib.Path,
+    lock_timeout: Optional[float],
+    raises_or_warns: contextlib.nullcontext,  # type: ignore[type-arg]
+) -> None:
+    config.set(lock_timeout=lock_timeout, raise_all_encoding_errors=True)
     # Create tmpfile
     tmpfile = tmpdir / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
 
     # Acquire lock
     fs, dirname = utils.get_cache_files_fs_dirname()
-    file_hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
-    lock = f"{dirname}/{file_hash}.txt.lock"
-    fs.touch(lock)
+    file_path = f"{dirname}/{fsspec.filesystem('file').checksum(tmpfile):x}.txt"
+    fs.touch(f"{file_path}.lock")
 
-    def release_lock(fs: fsspec.AbstractFileSystem, lock: str) -> None:
-        fs.rm(lock)
-
-    # Threading
-    t1 = threading.Timer(0, cached_open, args=(tmpfile,))
-    t2 = threading.Timer(0.1, release_lock, args=(fs, lock))
-    with pytest.warns(
-        UserWarning, match=f"can NOT proceed until file is released: {lock!r}."
-    ):
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+    process = subprocess.Popen(f"sleep 0.1; rm {file_path}.lock", shell=True)
+    with raises_or_warns:
+        cached_open(tmpfile)
+    assert process.wait() == 0
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
