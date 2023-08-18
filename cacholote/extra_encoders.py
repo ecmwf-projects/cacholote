@@ -217,7 +217,7 @@ def _maybe_store_xr_dataset(
 ) -> None:
     if filetype == "application/vnd+zarr":
         with utils.FileLock(
-            fs, urlpath, lock_timeout=config.get().lock_timeout
+            fs, urlpath, timeout=config.get().lock_timeout
         ) as file_exists:
             if not file_exists:
                 # Write directly on any filesystem
@@ -288,7 +288,7 @@ def _maybe_store_file_object(
     if io_delete_original is None:
         io_delete_original = config.get().io_delete_original
     with utils.FileLock(
-        fs_out, urlpath_out, lock_timeout=config.get().lock_timeout
+        fs_out, urlpath_out, timeout=config.get().lock_timeout
     ) as file_exists:
         if not file_exists:
             kwargs = {}
@@ -326,7 +326,7 @@ def _maybe_store_io_object(
     urlpath_out: str,
 ) -> None:
     with utils.FileLock(
-        fs_out, urlpath_out, lock_timeout=config.get().lock_timeout
+        fs_out, urlpath_out, timeout=config.get().lock_timeout
     ) as file_exists:
         if not file_exists:
             f_out = fs_out.open(urlpath_out, "wb")

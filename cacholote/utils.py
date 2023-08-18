@@ -73,7 +73,7 @@ def copy_buffered_file(
 class FileLock:
     fs: fsspec.AbstractFileSystem  # fsspec file system
     urlpath: str  # file to lock
-    lock_timeout: Optional[float]  # lock timeout in seconds
+    timeout: Optional[float]  # lock timeout in seconds
 
     @functools.cached_property
     def lockfile(self) -> str:
@@ -95,15 +95,12 @@ class FileLock:
         message = f"{self.urlpath!r} is locked: {self.lockfile!r}"
         start = time.perf_counter()
         while self.is_locked:
-            if (
-                self.lock_timeout is not None
-                and time.perf_counter() - start > self.lock_timeout
-            ):
+            if self.timeout is not None and time.perf_counter() - start > self.timeout:
                 raise TimeoutError(message)
             if not warned:
                 warnings.warn(message, UserWarning)
                 warned = True
-            time.sleep(min(1, self.lock_timeout or 1))
+            time.sleep(min(1, self.timeout or 1))
 
     def __enter__(self) -> bool:
         self.wait_until_released()

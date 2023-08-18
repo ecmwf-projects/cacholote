@@ -148,16 +148,16 @@ def test_io_corrupted_files(
 
 
 @pytest.mark.parametrize(
-    "lock_timeout, expected",
+    "lock_timeout, raises_or_warns",
     (
         [None, pytest.warns(UserWarning, match="is locked")],
         [0, pytest.raises(TimeoutError, match="is locked")],
     ),
 )
-def test_io_locker_warning(
+def test_io_locker(
     tmpdir: pathlib.Path,
     lock_timeout: Optional[float],
-    expected: contextlib.nullcontext[Any],
+    raises_or_warns: contextlib.nullcontext,  # type: ignore[type-arg]
 ) -> None:
     config.set(lock_timeout=lock_timeout, raise_all_encoding_errors=True)
     # Create tmpfile
@@ -167,13 +167,12 @@ def test_io_locker_warning(
     # Acquire lock
     fs, dirname = utils.get_cache_files_fs_dirname()
     file_path = f"{dirname}/{fsspec.filesystem('file').checksum(tmpfile):x}.txt"
-    lock_path = f"{file_path}.lock"
-    fs.touch(lock_path)
+    fs.touch(f"{file_path}.lock")
 
-    process = subprocess.Popen(f"sleep 0.1; rm {lock_path}", shell=True)
-    with expected:
+    process = subprocess.Popen(f"sleep 0.1; rm {file_path}.lock", shell=True)
+    with raises_or_warns:
         cached_open(tmpfile)
-    assert not process.wait()
+    assert process.wait() == 0
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
