@@ -202,8 +202,6 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
 def test_clean_invalid_cache_entries(
     tmpdir: pathlib.Path, check_expiration: bool, try_decode: bool
 ) -> None:
-    con = config.get().engine.raw_connection()
-    cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Valid cache file
@@ -223,12 +221,12 @@ def test_clean_invalid_cache_entries(
         expired = open_url(tmpdir / "expired.txt").path
     time.sleep(0.1)
 
-    # Clean and check
+    # Clean
     clean.clean_invalid_cache_entries(
         check_expiration=check_expiration, try_decode=try_decode
     )
-    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
-    assert cur.fetchone() == (3 - check_expiration - try_decode,)
+
+    # Check files
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
@@ -236,6 +234,12 @@ def test_clean_invalid_cache_entries(
     assert (
         expired not in fs.ls(dirname) if check_expiration else expired in fs.ls(dirname)
     )
+
+    # Check database
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (3 - check_expiration - try_decode,)
 
 
 def test_cleaner_logging(
