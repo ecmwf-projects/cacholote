@@ -42,15 +42,13 @@ def test_clean_cache_files(
 
     # Do not clean
     clean.clean_cache_files(2, method=method)
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
-    assert nrows == fs.du(dirname) == 2
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (fs.du(dirname),) == (2,)
 
     # Delete one file
     clean.clean_cache_files(1, method=method)
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
-    assert nrows == fs.du(dirname) == 1
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (fs.du(dirname),) == (1,)
     assert not fs.exists(lru_path if method == "LRU" else lfu_path)
 
 
@@ -204,8 +202,6 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
 def test_clean_invalid_cache_entries(
     tmpdir: pathlib.Path, check_expiration: bool, try_decode: bool
 ) -> None:
-    con = config.get().engine.raw_connection()
-    cur = con.cursor()
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Valid cache file
@@ -223,15 +219,14 @@ def test_clean_invalid_cache_entries(
     expiration = datetime.datetime.now(tz=datetime.timezone.utc) + dt
     with config.set(expiration=expiration):
         expired = open_url(tmpdir / "expired.txt").path
-    time.sleep(0.2)
+    time.sleep(0.1)
 
-    # Clean and check
+    # Clean
     clean.clean_invalid_cache_entries(
         check_expiration=check_expiration, try_decode=try_decode
     )
-    cur.execute("SELECT * FROM cache_entries", ())
-    nrows = len(cur.fetchall())
-    assert nrows == 3 - check_expiration - try_decode
+
+    # Check files
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
@@ -239,6 +234,12 @@ def test_clean_invalid_cache_entries(
     assert (
         expired not in fs.ls(dirname) if check_expiration else expired in fs.ls(dirname)
     )
+
+    # Check database
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (3 - check_expiration - try_decode,)
 
 
 def test_cleaner_logging(

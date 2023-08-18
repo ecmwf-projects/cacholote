@@ -89,8 +89,8 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
     # cache-db must be empty
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    cur.execute("SELECT * FROM cache_entries", ())
-    assert cur.fetchall() == []
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (0,)
 
 
 def test_same_args_kwargs() -> None:
@@ -178,5 +178,5 @@ def test_cached_error() -> None:
     with pytest.raises(ValueError, match="test error"):
         cached_error()
 
-    cur.execute("SELECT * FROM cache_entries", ())
-    assert cur.fetchall() == []
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (0,)
