@@ -205,8 +205,6 @@ def test_clean_invalid_cache_entries(
     tmpdir: pathlib.Path, check_expiration: bool, try_decode: bool
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
-    con = config.get().engine.raw_connection()
-    cur = con.cursor()
 
     # Valid cache file
     fsspec.filesystem("file").touch(tmpdir / "valid.txt")
@@ -229,6 +227,10 @@ def test_clean_invalid_cache_entries(
     clean.clean_invalid_cache_entries(
         check_expiration=check_expiration, try_decode=try_decode
     )
+
+    # Check database
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
     cur.execute("SELECT * FROM cache_entries", ())
     assert len(cur.fetchall()) == 3 - check_expiration - try_decode
     assert valid in fs.ls(dirname)
