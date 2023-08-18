@@ -226,7 +226,7 @@ def test_clean_invalid_cache_entries(
     with pytest.raises(FileNotFoundError):
         open_url(tmpdir / "non-existent")
 
-    # Clean and check
+    # Clean
     clean.clean_invalid_cache_entries(
         check_result=check_result,
         check_expiration=check_expiration,
