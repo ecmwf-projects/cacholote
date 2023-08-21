@@ -46,8 +46,7 @@ def _decode_and_update(
     return result
 
 
-def _log_exception_and_reraise(
-    session: sa.orm.Session,
+def _log_exception_and_return_or_raise(
     cache_entry: CacheEntry,
     settings: config.Settings,
 ) -> CacheEntry:
@@ -110,7 +109,7 @@ def cacheable(func: F) -> F:
             cache_entry.result = json.loads(encode.dumps(result))
         except Exception as exc:
             try:
-                return _log_exception_and_reraise(session, cache_entry, settings)
+                return _log_exception_and_return_or_raise(cache_entry, settings)
             except encode.EncodeError:
                 warnings.warn(f"can't encode output: {exc!r}", UserWarning)
                 return result
