@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, 
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from . import config, database, decode, encode, extra_encoders, utils
+from . import config, decode, encode, extra_encoders, utils
 from .database import CacheEntry
 
 FILTERS_T = List[
@@ -58,7 +58,7 @@ def _delete_cache_file(
                 if session and cache_entry:
                     logger.info("delete cache entry", cache_entry=cache_entry)
                     session.delete(cache_entry)
-                    database._commit_or_rollback(session)
+                    session.commit()
 
                 if fs.exists(urlpath):
                     logger.info("delete cache file", urlpath=urlpath)
@@ -73,7 +73,7 @@ def _delete_cache_file(
 def _delete_cache_entry(session: sa.orm.Session, cache_entry: CacheEntry) -> None:
     # First, delete database entry
     session.delete(cache_entry)
-    database._commit_or_rollback(session)
+    session.commit()
     if cache_entry.result:
         # Then, delete files
         json.loads(cache_entry._result_as_string, object_hook=_delete_cache_file)

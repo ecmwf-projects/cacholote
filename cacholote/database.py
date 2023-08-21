@@ -68,13 +68,6 @@ def set_expiration_to_max(
         raise ValueError(f"Expiration date has passed. {target.expiration=}")
 
 
-def _commit_or_rollback(session: sa.orm.Session) -> None:
-    try:
-        session.commit()
-    finally:
-        session.rollback()
-
-
 def _set_engine_and_session(
     cache_db_urlpath: str, create_engine_kwargs: Dict[str, Any]
 ) -> None:

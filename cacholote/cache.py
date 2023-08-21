@@ -24,7 +24,7 @@ from typing import Any, Callable, TypeVar, cast
 import sqlalchemy as sa
 import sqlalchemy.orm
 
-from . import clean, config, database, decode, encode, utils
+from . import clean, config, decode, encode, utils
 from .database import CacheEntry
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -39,25 +39,11 @@ def _decode_and_update(
     cache_entry.counter = (cache_entry.counter or 0) + 1
     if settings.tag is not None:
         cache_entry.tag = settings.tag
-    database._commit_or_rollback(session)
+    session.commit()
     if settings.return_cache_entry:
         session.refresh(cache_entry)
         return cache_entry
     return result
-
-
-def _log_exception_and_return_or_raise(
-    cache_entry: CacheEntry,
-    settings: config.Settings,
-) -> CacheEntry:
-    cache_entry.log = {"exception": traceback.format_exc()}
-    with settings.sessionmaker() as session:
-        session.add(cache_entry)
-        database._commit_or_rollback(session)
-        if settings.return_cache_entry:
-            session.refresh(cache_entry)
-            return cache_entry
-    raise
 
 
 def cacheable(func: F) -> F:
@@ -108,11 +94,17 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             cache_entry.result = json.loads(encode.dumps(result))
         except Exception as exc:
-            try:
-                return _log_exception_and_return_or_raise(cache_entry, settings)
-            except encode.EncodeError:
+            cache_entry.log = {"exception": traceback.format_exc()}
+            with settings.sessionmaker() as session:
+                session.add(cache_entry)
+                session.commit()
+                if settings.return_cache_entry:
+                    session.refresh(cache_entry)
+                    return cache_entry
+            if isinstance(exc, encode.EncodeError):
                 warnings.warn(f"can't encode output: {exc!r}", UserWarning)
                 return result
+            raise
 
         with settings.sessionmaker() as session:
             session.add(cache_entry)
