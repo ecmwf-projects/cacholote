@@ -1,3 +1,4 @@
+import contextlib
 import datetime
 import json
 import pathlib
@@ -7,6 +8,8 @@ from typing import Any
 import pytest
 
 from cacholote import cache, config, database
+
+does_not_raise = contextlib.nullcontext
 
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
@@ -176,12 +179,23 @@ def test_tag(tmpdir: pathlib.Path) -> None:
     assert cur.fetchall() == [("2", 4)]
 
 
-def test_cached_error() -> None:
+@pytest.mark.parametrize(
+    "return_cache_entry,raises",
+    [(True, does_not_raise()), (False, pytest.raises(ValueError, match="test error"))],
+)
+def test_cached_error(
+    return_cache_entry: bool, raises: contextlib.nullcontext  # type: ignore[type-arg]
+) -> None:
+    config.set(return_cache_entry=return_cache_entry)
+
     con = config.get().engine.raw_connection()
     cur = con.cursor()
 
-    with pytest.raises(ValueError, match="test error"):
-        cached_error()
+    with raises:
+        cache_entry = cached_error()
+        assert isinstance(cache_entry, database.CacheEntry)
+        assert cache_entry.result is None
+        assert "ValueError" in cache_entry.log["exception"]
 
     cur.execute("SELECT result, log FROM cache_entries", ())
     all = cur.fetchall()

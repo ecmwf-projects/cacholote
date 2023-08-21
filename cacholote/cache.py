@@ -46,15 +46,19 @@ def _decode_and_update(
     return result
 
 
-def _add_exception_log(
+def _log_exception_and_raise_or_return(
     session: sa.orm.Session,
     cache_entry: CacheEntry,
     settings: config.Settings,
-) -> None:
+) -> CacheEntry:
     cache_entry.log = {"exception": traceback.format_exc()}
     with settings.sessionmaker() as session:
         session.add(cache_entry)
         database._commit_or_rollback(session)
+        if settings.return_cache_entry:
+            session.refresh(cache_entry)
+            return cache_entry
+    raise
 
 
 def cacheable(func: F) -> F:
@@ -101,19 +105,22 @@ def cacheable(func: F) -> F:
             expiration=settings.expiration,
             tag=settings.tag,
         )
+
         try:
             result = func(*args, **kwargs)
         except Exception:
-            _add_exception_log(session, cache_entry, settings)
-            raise
+            return _log_exception_and_raise_or_return(session, cache_entry, settings)
+
         try:
             cache_entry.result = json.loads(encode.dumps(result))
         except Exception as exc:
-            _add_exception_log(session, cache_entry, settings)
-            if settings.return_cache_entry or not isinstance(exc, encode.EncodeError):
-                raise
-            warnings.warn(f"can't encode output: {exc!r}", UserWarning)
-            return result
+            try:
+                cache_entry = _log_exception_and_raise_or_return(
+                    session, cache_entry, settings
+                )
+            except encode.EncodeError:
+                warnings.warn(f"can't encode output: {exc!r}", UserWarning)
+                return result
 
         with settings.sessionmaker() as session:
             session.add(cache_entry)
