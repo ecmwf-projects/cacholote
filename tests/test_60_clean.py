@@ -227,6 +227,7 @@ def test_clean_invalid_cache_entries(
     )
 
     # Check files
+    fs.clear_instance_cache()
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
