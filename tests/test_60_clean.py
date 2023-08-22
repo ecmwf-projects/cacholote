@@ -222,6 +222,7 @@ def test_clean_invalid_cache_entries(
     time.sleep(0.1)
 
     # Clean
+    fs.invalidate_cache(dirname)
     clean.clean_invalid_cache_entries(
         check_expiration=check_expiration, try_decode=try_decode
     )
