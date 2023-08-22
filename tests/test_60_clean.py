@@ -227,7 +227,6 @@ def test_clean_invalid_cache_entries(
         open_url(tmpdir / "non-existent")
 
     # Clean
-    fs.invalidate_cache(dirname)
     clean.clean_invalid_cache_entries(
         check_result=check_result,
         check_expiration=check_expiration,
@@ -235,7 +234,7 @@ def test_clean_invalid_cache_entries(
     )
 
     # Check files
-    fs.invalidate_cache(dirname)
+    fs, dirname = utils.get_cache_files_fs_dirname()
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
