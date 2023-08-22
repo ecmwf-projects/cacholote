@@ -18,7 +18,6 @@
 import functools
 import json
 import traceback
-import warnings
 from typing import Any, Callable, TypeVar, cast
 
 import sqlalchemy as sa
@@ -58,10 +57,10 @@ def cacheable(func: F) -> F:
 
         try:
             hexdigest = encode._hexdigestify_python_call(func, *args, **kwargs)
-        except encode.EncodeError as exc:
+        except encode.EncodeError:
             if settings.return_cache_entry:
                 raise
-            warnings.warn(f"can't encode python call: {exc!r}", UserWarning)
+            utils._warn_with_traceback("can't encode python call")
             return func(*args, **kwargs)
 
         filters = [
@@ -81,8 +80,8 @@ def cacheable(func: F) -> F:
             ):
                 try:
                     return _decode_and_update(session, cache_entry, settings)
-                except decode.DecodeError as exc:
-                    warnings.warn(str(exc), UserWarning)
+                except decode.DecodeError:
+                    utils._warn_with_traceback("can't decode cached result")
                     clean._delete_cache_entry(session, cache_entry)
 
         cache_entry = CacheEntry(
@@ -94,15 +93,17 @@ def cacheable(func: F) -> F:
             result = func(*args, **kwargs)
             cache_entry.result = json.loads(encode.dumps(result))
         except Exception as exc:
+            warning_message = "can't encode output"
             cache_entry.log = {"exception": traceback.format_exc()}
             with settings.sessionmaker() as session:
                 session.add(cache_entry)
                 session.commit()
                 if settings.return_cache_entry:
+                    utils._warn_with_traceback(warning_message)
                     session.refresh(cache_entry)
                     return cache_entry
             if isinstance(exc, encode.EncodeError):
-                warnings.warn(f"can't encode output: {exc!r}", UserWarning)
+                utils._warn_with_traceback(warning_message)
                 return result
             raise
 

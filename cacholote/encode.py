@@ -21,7 +21,6 @@ import inspect
 import json
 import pickle
 import sys
-import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from . import config, decode, utils
@@ -159,7 +158,7 @@ def filecache_default(
                 exceptions.append(exc)
                 if config.get().raise_all_encoding_errors:
                     raise
-                warnings.warn(f"{encoder!r} did not work: {exc!r}")
+                utils._warn_with_traceback(f"{encoder!r} did not work")
 
     encode_error = EncodeError("can't encode object")
     if sys.version_info < (3, 11):

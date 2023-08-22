@@ -21,6 +21,7 @@ import functools
 import hashlib
 import io
 import time
+import traceback
 import warnings
 from types import TracebackType
 from typing import Any, Optional, Tuple, Type
@@ -119,3 +120,9 @@ class FileLock:
 def utcnow() -> datetime.datetime:
     """See https://discuss.python.org/t/deprecating-utcnow-and-utcfromtimestamp/26221."""
     return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+def _warn_with_traceback(message: str, **kwargs: Any) -> None:
+    kwargs.setdefault("category", UserWarning)
+    message = "\n".join([message, traceback.format_exc()])
+    warnings.warn(message, **kwargs)

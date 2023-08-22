@@ -9,8 +9,6 @@ import pytest
 
 from cacholote import cache, config, database
 
-does_not_raise = contextlib.nullcontext
-
 
 def func(a: Any, *args: Any, b: Any = None, **kwargs: Any) -> Any:
     if b is None:
@@ -78,7 +76,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.raises(AttributeError):
             cfunc(inst)
     else:
-        with pytest.warns(UserWarning, match="can't encode python call"):
+        with pytest.warns(UserWarning, match="AttributeError"):
             res = cfunc(inst)
         assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
 
@@ -86,7 +84,7 @@ def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) ->
         with pytest.raises(AttributeError):
             cfunc("test", b=1)
     else:
-        with pytest.warns(UserWarning, match="can't encode output"):
+        with pytest.warns(UserWarning, match="AttributeError"):
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
 
@@ -180,18 +178,21 @@ def test_tag(tmpdir: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "return_cache_entry,raises",
-    [(True, does_not_raise()), (False, pytest.raises(ValueError, match="test error"))],
+    "return_cache_entry,raises_or_warns",
+    [
+        (True, pytest.warns(UserWarning, match="ValueError.*test error")),
+        (False, pytest.raises(ValueError, match="test error")),
+    ],
 )
 def test_cached_error(
-    return_cache_entry: bool, raises: contextlib.nullcontext  # type: ignore[type-arg]
+    return_cache_entry: bool, raises_or_warns: contextlib.nullcontext  # type: ignore[type-arg]
 ) -> None:
     config.set(return_cache_entry=return_cache_entry)
 
     con = config.get().engine.raw_connection()
     cur = con.cursor()
 
-    with raises:
+    with raises_or_warns:
         cache_entry = cached_error()
         assert isinstance(cache_entry, database.CacheEntry)
         assert cache_entry.result is None
