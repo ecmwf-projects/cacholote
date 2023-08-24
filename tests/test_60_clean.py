@@ -196,7 +196,7 @@ def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
     assert open_url(tmpfile).read() == b"new"
     assert len(fs.ls(dirname)) == 1
 
-
+@pytest.mark.repeat(10)
 @pytest.mark.parametrize("check_expiration", [True, False])
 @pytest.mark.parametrize("try_decode", [True, False])
 def test_clean_invalid_cache_entries(
