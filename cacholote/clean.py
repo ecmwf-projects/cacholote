@@ -136,8 +136,7 @@ class _Cleaner:
         files_to_skip = []
         for urlpath in self.sizes:
             if urlpath.endswith(".lock"):
-                mtime = self.fs.modified(urlpath)
-                delta = utcnow - mtime
+                delta = utcnow - self.fs.modified(urlpath)
                 if lock_validity_period is None or delta < datetime.timedelta(
                     seconds=lock_validity_period
                 ):
