@@ -22,7 +22,7 @@ import posixpath
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Union
 
 import fsspec
-import packaging
+import packaging.version
 import sqlalchemy as sa
 import sqlalchemy.orm
 
