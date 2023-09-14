@@ -125,10 +125,12 @@ class _Cleaner:
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
         self.logger.info("get unknown files")
         now = datetime.datetime.now()
+        utcnow = utils.utcnow()
         files_to_skip = []
         for urlpath in self.sizes:
             if urlpath.endswith(".lock"):
-                delta = now - self.fs.modified(urlpath)
+                mtime = self.fs.modified(urlpath)
+                delta = (utcnow if mtime.tzinfo else now) - mtime
                 if lock_validity_period is None or delta < datetime.timedelta(
                     seconds=lock_validity_period
                 ):
