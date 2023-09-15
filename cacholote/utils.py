@@ -43,6 +43,7 @@ def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
         config.get().cache_files_urlpath,
         storage_options=config.get().cache_files_storage_options,
     )
+    fs.invalidate_cache()
     return (fs, path)
 
 

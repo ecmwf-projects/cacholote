@@ -241,7 +241,7 @@ def _maybe_store_xr_dataset(
                     raise ValueError(f"type {filetype!r} is NOT supported.")
 
             _maybe_store_file_object(
-                fsspec.filesystem("file"),
+                fs if fs.protocol == "file" else fsspec.filesystem("file"),
                 tmpfilename,
                 fs,
                 urlpath,

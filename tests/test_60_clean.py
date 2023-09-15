@@ -206,21 +206,19 @@ def test_clean_invalid_cache_entries(
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Valid cache file
-    fsspec.filesystem("file").touch(tmpdir / "valid.txt")
+    fsspec.filesystem("file").pipe_file(tmpdir / "valid.txt", b"1")
     valid = open_url(tmpdir / "valid.txt").path
 
     # Corrupted cache file
-    fsspec.filesystem("file").touch(tmpdir / "corrupted.txt")
+    fsspec.filesystem("file").pipe_file(tmpdir / "corrupted.txt", b"1")
     corrupted = open_url(tmpdir / "corrupted.txt").path
     fs.touch(corrupted)
 
     # Expired cache file
-    fsspec.filesystem("file").touch(tmpdir / "expired.txt")
-    dt = datetime.timedelta(seconds=0.1)
-    expiration = datetime.datetime.now(tz=datetime.timezone.utc) + dt
-    with config.set(expiration=expiration):
+    fsspec.filesystem("file").pipe_file(tmpdir / "expired.txt", b"1")
+    with config.set(expiration=utils.utcnow() + datetime.timedelta(seconds=0.2)):
         expired = open_url(tmpdir / "expired.txt").path
-    time.sleep(0.1)
+    time.sleep(0.2)
 
     # Exception
     with pytest.raises(FileNotFoundError):
