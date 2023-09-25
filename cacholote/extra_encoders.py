@@ -129,7 +129,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
         "file:local_path": local_path,
     }
 
-    return FileInfoModel(**file_dict).dict(by_alias=True)
+    return FileInfoModel(**file_dict).model_dump(by_alias=True)
 
 
 def _get_fs_and_urlpath(
