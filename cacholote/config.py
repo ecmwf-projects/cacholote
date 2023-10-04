@@ -76,7 +76,7 @@ class Settings(pydantic_settings.BaseSettings):
     def validate_return_cache_entry(
         cls: pydantic_settings.BaseSettings,
         return_cache_entry: bool,
-        info: pydantic.FieldValidationInfo,
+        info: pydantic.ValidationInfo,
     ) -> bool:
         if return_cache_entry is True and info.data["use_cache"] is False:
             raise ValueError(
