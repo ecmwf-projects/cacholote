@@ -174,7 +174,7 @@ jobs:
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publish
     if: |
-      always() &&
+      github.repository_public &&
       needs.unit-tests.result == 'success' &&
       needs.type-check.result == 'success' &&
       needs.docs-build.result == 'success' &&
