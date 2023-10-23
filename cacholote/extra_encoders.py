@@ -97,6 +97,10 @@ def _requires_xarray_and_dask(func: F) -> F:
     return cast(F, wrapper)
 
 
+def _filesystem_is_local(fs: fsspec.AbstractFileSystem) -> bool:
+    return isinstance(fs, fsspec.get_filesystem_class("file"))
+
+
 @contextlib.contextmanager
 def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
     logger = config.get().logger
@@ -188,11 +192,11 @@ def decode_xr_dataset(
     if file_json["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
     else:
-        if fs.protocol == "file":
+        if _filesystem_is_local(fs):
             filename_or_obj = urlpath
         else:
             # Download local copy
-            protocols = [fs.protocol] if isinstance(fs.protocol, str) else fs.protocol
+            protocols = (fs.protocol,) if isinstance(fs.protocol, str) else fs.protocol
             with fsspec.open(
                 f"filecache::{urlpath}",
                 filecache={"same_names": True},
@@ -241,7 +245,7 @@ def _maybe_store_xr_dataset(
                     raise ValueError(f"type {filetype!r} is NOT supported.")
 
             _maybe_store_file_object(
-                fs if fs.protocol == "file" else fsspec.filesystem("file"),
+                fs if _filesystem_is_local(fs) else fsspec.filesystem("file"),
                 tmpfilename,
                 fs,
                 urlpath,
@@ -305,7 +309,7 @@ def _maybe_store_file_object(
                         fs_in.mv(urlpath_in, urlpath_out, **kwargs)
                     else:
                         fs_in.cp(urlpath_in, urlpath_out, **kwargs)
-                elif fs_in.protocol == "file":
+                elif _filesystem_is_local(fs_in):
                     fs_out.put(urlpath_in, urlpath_out, **kwargs)
                 else:
                     with fs_in.open(urlpath_in, "rb") as f_in:
