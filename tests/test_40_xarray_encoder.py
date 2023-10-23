@@ -157,7 +157,7 @@ def test_xr_corrupted_files(
 
 
 def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
-    config.set(logger=structlog.get_logger())
+    config.set(logger=structlog.get_logger(), raise_all_encoding_errors=True)
 
     # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)

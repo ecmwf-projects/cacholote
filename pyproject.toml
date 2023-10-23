@@ -38,8 +38,10 @@ strict = true
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
 module = [
+  "botocore.*",
   "cfgrib.*",
-  "fsspec.*"
+  "fsspec.*",
+  "moto.*"
 ]
 
 [tool.ruff]
