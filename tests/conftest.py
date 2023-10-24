@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import Any, Generator, Iterator
+from typing import Any, Iterator
 
 import botocore.session
 import psycopg
@@ -12,7 +12,7 @@ from cacholote import config
 
 
 @pytest.fixture(scope="session")
-def s3_base() -> Iterator[ThreadedMotoServer]:
+def s3_server() -> Iterator[ThreadedMotoServer]:
     if "AWS_SECRET_ACCESS_KEY" not in os.environ:
         os.environ["AWS_SECRET_ACCESS_KEY"] = "foo"
     if "AWS_ACCESS_KEY_ID" not in os.environ:
@@ -23,27 +23,28 @@ def s3_base() -> Iterator[ThreadedMotoServer]:
     server.stop()
 
 
+def create_test_bucket(
+    server: ThreadedMotoServer, test_bucket_name: str
+) -> dict[str, Any]:
+    endpoint_url = f"http://{server._ip_address}:{server._port}/"
+    client_kwargs = {"endpoint_url": endpoint_url}
+    requests.post(f"{endpoint_url}moto-api/reset")
+    session = botocore.session.Session()
+    client = session.create_client("s3", **client_kwargs)
+    client.create_bucket(Bucket=test_bucket_name)
+    return client_kwargs
+
+
 @pytest.fixture(autouse=True)
 def set_cache(
     tmp_path: pathlib.Path,
     postgresql: psycopg.Connection[Any],
     request: pytest.FixtureRequest,
-    s3_base: ThreadedMotoServer,
-) -> Generator[str, None, None]:
-    if not hasattr(request, "param") or request.param == "file":
-        with config.set(
-            cache_db_urlpath="sqlite:///" + str(tmp_path / "cacholote.db"),
-            cache_files_urlpath=str(tmp_path / "cache_files"),
-        ):
-            yield "file"
-    elif request.param == "cads":
-        endpoint_url = f"http://{s3_base._ip_address}:{s3_base._port}/"
-        client_kwargs = {"endpoint_url": endpoint_url}
+    s3_server: ThreadedMotoServer,
+) -> Iterator[str]:
+    if hasattr(request, "param") and request.param.lower() == "cads":
         test_bucket_name = "test-bucket"
-        requests.post(f"{endpoint_url}moto-api/reset")
-        session = botocore.session.Session()
-        client = session.create_client("s3", **client_kwargs)
-        client.create_bucket(Bucket=test_bucket_name)
+        client_kwargs = create_test_bucket(s3_server, test_bucket_name)
         with config.set(
             cache_db_urlpath=(
                 f"postgresql+psycopg2://{postgresql.info.user}:@{postgresql.info.host}:"
@@ -54,4 +55,8 @@ def set_cache(
         ):
             yield request.param
     else:
-        raise ValueError
+        with config.set(
+            cache_db_urlpath="sqlite:///" + str(tmp_path / "cacholote.db"),
+            cache_files_urlpath=str(tmp_path / "cache_files"),
+        ):
+            yield "file"
