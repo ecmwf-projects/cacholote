@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import Any, Iterator
+from typing import Any, Dict, Iterator
 
 import botocore.session
 import psycopg
@@ -25,7 +25,7 @@ def s3_server() -> Iterator[ThreadedMotoServer]:
 
 def create_test_bucket(
     server: ThreadedMotoServer, test_bucket_name: str
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     endpoint_url = f"http://{server._ip_address}:{server._port}/"
     client_kwargs = {"endpoint_url": endpoint_url}
     requests.post(f"{endpoint_url}moto-api/reset")
