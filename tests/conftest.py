@@ -42,7 +42,8 @@ def set_cache(
     request: pytest.FixtureRequest,
     s3_server: ThreadedMotoServer,
 ) -> Iterator[str]:
-    if hasattr(request, "param") and request.param.lower() == "cads":
+    param = getattr(request, "param", "file")
+    if param.lower() == "cads":
         test_bucket_name = "test-bucket"
         client_kwargs = create_test_bucket(s3_server, test_bucket_name)
         with config.set(
@@ -53,10 +54,12 @@ def set_cache(
             cache_files_urlpath=f"s3://{test_bucket_name}",
             cache_files_storage_options={"client_kwargs": client_kwargs},
         ):
-            yield request.param
-    else:
+            yield "cads"
+    elif param.lower() in ("file", "local"):
         with config.set(
             cache_db_urlpath="sqlite:///" + str(tmp_path / "cacholote.db"),
             cache_files_urlpath=str(tmp_path / "cache_files"),
         ):
             yield "file"
+    else:
+        raise ValueError(f"{param=}")

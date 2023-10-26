@@ -24,11 +24,11 @@ def get_grib_ds() -> "xr.Dataset":
 @pytest.mark.filterwarnings(
     "ignore:distutils Version classes are deprecated. Use packaging.version instead."
 )
-def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
+def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
     # Define readonly dir
-    readonly_dir = str(tmpdir / "readonly")
+    readonly_dir = str(tmp_path / "readonly")
     fsspec.filesystem("file").mkdir(readonly_dir)
     config.set(cache_files_urlpath_readonly=readonly_dir)
 
@@ -38,7 +38,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     # Check dict
     actual = extra_encoders.dictify_xr_dataset(ds)
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
-    local_path = f"{tmpdir}/cache_files/247fd17e087ae491996519c097e70e48.nc"
+    local_path = f"{tmp_path}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
         "type": "python_call",
         "callable": "cacholote.extra_encoders:decode_xr_dataset",
@@ -77,7 +77,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     "ignore:distutils Version classes are deprecated. Use packaging.version instead."
 )
 def test_xr_cacheable(
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     xarray_cache_type: str,
     ext: str,
     importorskip: str,

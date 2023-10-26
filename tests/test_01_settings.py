@@ -12,9 +12,9 @@ from cacholote import config
 does_not_raise = contextlib.nullcontext
 
 
-def test_change_cache_db_urlpath(tmpdir: pathlib.Path) -> None:
+def test_change_cache_db_urlpath(tmp_path: pathlib.Path) -> None:
     old_db = config.get().cache_db_urlpath
-    new_db = "sqlite:///" + str(tmpdir / "dummy.db")
+    new_db = "sqlite:///" + str(tmp_path / "dummy.db")
 
     with config.set(cache_db_urlpath=new_db):
         assert str(config.get().engine.url) == config.get().cache_db_urlpath == new_db
@@ -33,18 +33,18 @@ def test_change_cache_db_urlpath(tmpdir: pathlib.Path) -> None:
     ],
 )
 def test_set_engine_and_sessionmaker(
-    tmpdir: pathlib.Path, key: str, reset: bool
+    tmp_path: pathlib.Path, key: str, reset: bool
 ) -> None:
     old_engine = config.get().engine
     old_sessionmaker = config.get().sessionmaker
 
     kwargs: Dict[str, Any] = {}
     if key == "cache_db_urlpath":
-        kwargs[key] = "sqlite:///" + str(tmpdir / "dummy.db")
+        kwargs[key] = "sqlite:///" + str(tmp_path / "dummy.db")
     elif key == "create_engine_kwargs":
         kwargs[key] = {"pool_recycle": 60}
     elif key == "cache_files_urlpath":
-        kwargs[key] = str(tmpdir / "dummy_files")
+        kwargs[key] = str(tmp_path / "dummy_files")
     else:
         raise ValueError
 
@@ -67,13 +67,13 @@ def test_set_engine_and_sessionmaker(
         assert config.get().sessionmaker is old_sessionmaker
 
 
-def test_env_variables(tmpdir: pathlib.Path) -> None:
+def test_env_variables(tmp_path: pathlib.Path) -> None:
     # env variables
     old_environ = dict(os.environ)
     os.environ["CACHOLOTE_CACHE_DB_URLPATH"] = "sqlite://"
 
     # env file
-    dotenv_path = tmpdir / ".env.cacholote"
+    dotenv_path = tmp_path / ".env.cacholote"
     with dotenv_path.open("w") as f:
         f.write("CACHOLOTE_IO_DELETE_ORIGINAL=TRUE")
 

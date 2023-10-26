@@ -21,23 +21,23 @@ def cached_open(*args: Any, **kwargs: Any) -> fsspec.spec.AbstractBufferedFile:
 
 
 @pytest.mark.parametrize("io_delete_original", [True, False])
-def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> None:
+def test_dictify_io_object(tmp_path: pathlib.Path, io_delete_original: bool) -> None:
     # Define readonly dir
-    readonly_dir = str(tmpdir / "readonly")
+    readonly_dir = str(tmp_path / "readonly")
     fsspec.filesystem("file").mkdir(readonly_dir)
     config.set(
         io_delete_original=io_delete_original, cache_files_urlpath_readonly=readonly_dir
     )
 
     # Create file
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"test")
     tmp_hash = f"{fsspec.filesystem('file').checksum(tmpfile):x}"
 
     # Check dict and cached file
     actual = extra_encoders.dictify_io_object(open(tmpfile, "rb"))
     href = f"{readonly_dir}/{tmp_hash}.txt"
-    local_path = f"{tmpdir}/cache_files/{tmp_hash}.txt"
+    local_path = f"{tmp_path}/cache_files/{tmp_hash}.txt"
     expected = {
         "type": "python_call",
         "callable": "cacholote.extra_encoders:decode_io_object",
@@ -63,11 +63,11 @@ def test_dictify_io_object(tmpdir: pathlib.Path, io_delete_original: bool) -> No
 
 @pytest.mark.parametrize("obj", [io.BytesIO(b"test"), io.StringIO("test")])
 def test_dictify_bytes_io_object(
-    tmpdir: pathlib.Path, obj: Union[io.BytesIO, io.StringIO]
+    tmp_path: pathlib.Path, obj: Union[io.BytesIO, io.StringIO]
 ) -> None:
     actual = extra_encoders.dictify_io_object(obj)["args"]
     obj_hash = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()
-    local_path = f"{tmpdir}/cache_files/{obj_hash}"
+    local_path = f"{tmp_path}/cache_files/{obj_hash}"
     type = (
         "text/plain"
         if importlib.util.find_spec("magic")
@@ -89,7 +89,7 @@ def test_dictify_bytes_io_object(
 
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_copy_from_http_to_cache(
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     httpserver: pytest_httpserver.HTTPServer,
     set_cache: str,
 ) -> None:
@@ -120,7 +120,7 @@ def test_copy_from_http_to_cache(
 
 
 def test_io_corrupted_files(
-    tmpdir: pathlib.Path, httpserver: pytest_httpserver.HTTPServer
+    tmp_path: pathlib.Path, httpserver: pytest_httpserver.HTTPServer
 ) -> None:
     # http server
     httpserver.expect_request("/test").respond_with_data(b"test")
@@ -155,13 +155,13 @@ def test_io_corrupted_files(
     ),
 )
 def test_io_locker(
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     lock_timeout: Optional[float],
     raises_or_warns: contextlib.nullcontext,  # type: ignore[type-arg]
 ) -> None:
     config.set(lock_timeout=lock_timeout, raise_all_encoding_errors=True)
     # Create tmpfile
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
 
     # Acquire lock
@@ -176,8 +176,8 @@ def test_io_locker(
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
-def test_content_type(tmpdir: pathlib.Path, set_cache: str) -> None:
-    tmpfile = str(tmpdir / "test.grib")
+def test_content_type(tmp_path: pathlib.Path, set_cache: str) -> None:
+    tmpfile = str(tmp_path / "test.grib")
     fsspec.filesystem("file").touch(tmpfile)
     fs, _ = utils.get_cache_files_fs_dirname()
     cached_grib = cached_open(tmpfile)
@@ -185,11 +185,11 @@ def test_content_type(tmpdir: pathlib.Path, set_cache: str) -> None:
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
-def test_io_logging(capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path) -> None:
+def test_io_logging(capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path) -> None:
     config.set(logger=structlog.get_logger(), io_delete_original=True)
 
     # Cache file
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
     cached_file = cached_open(tmpfile)
     captured = iter(capsys.readouterr().out.splitlines())

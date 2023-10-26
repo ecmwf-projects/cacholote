@@ -29,7 +29,7 @@ def cached_error() -> None:
     raise ValueError("test error")
 
 
-def test_cacheable(tmpdir: pathlib.Path) -> None:
+def test_cacheable(tmp_path: pathlib.Path) -> None:
     con = config.get().engine.raw_connection()
     cur = con.cursor()
 
@@ -60,7 +60,7 @@ def test_cacheable(tmpdir: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
-def test_encode_errors(tmpdir: pathlib.Path, raise_all_encoding_errors: bool) -> None:
+def test_encode_errors(tmp_path: pathlib.Path, raise_all_encoding_errors: bool) -> None:
     config.set(raise_all_encoding_errors=raise_all_encoding_errors)
 
     cfunc = cache.cacheable(func)
@@ -145,7 +145,7 @@ def test_expiration_and_return_cache_entry() -> None:
     assert third.expiration == datetime.datetime(9999, 12, 31)
 
 
-def test_tag(tmpdir: pathlib.Path) -> None:
+def test_tag(tmp_path: pathlib.Path) -> None:
     con = config.get().engine.raw_connection()
     cur = con.cursor()
 
