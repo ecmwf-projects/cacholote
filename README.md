@@ -49,10 +49,11 @@ True
 
 ### Cache Xarray datasets
 
-<!--pytest-codeblocks:importorskip(xarray)-->
-
 ```python
 >>> import cacholote
+
+>>> import pytest
+>>> xr = pytest.importorskip("xarray")
 
 >>> import tempfile
 >>> tmpdir = tempfile.TemporaryDirectory().name
@@ -64,7 +65,6 @@ True
 
 >>> @cacholote.cacheable
 ... def dataset_from_dict(ds_dict):
-...     import xarray as xr
 ...     return xr.Dataset(ds_dict)
 
 >>> ds = dataset_from_dict({"foo": 0})

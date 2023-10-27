@@ -22,7 +22,6 @@ dependencies:
 - postgresql
 - psycopg
 - psycopg2
-- pytest-codeblocks
 - pytest-httpserver
 - pytest-postgresql
 - python-magic
