@@ -49,7 +49,7 @@ True
 
 ### Cache Xarray datasets
 
-<!--pytest-codeblocks:importorskip(sympy)-->
+<!--pytest-codeblocks:importorskip(xarray)-->
 
 ```python
 >>> import cacholote
