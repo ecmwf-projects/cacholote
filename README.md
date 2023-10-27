@@ -52,6 +52,9 @@ True
 ```python
 >>> import cacholote
 
+>>> import pytest
+>>> xr = pytest.importorskip("xarray")
+
 >>> import tempfile
 >>> tmpdir = tempfile.TemporaryDirectory().name
 >>> cacholote.config.set(
@@ -62,7 +65,6 @@ True
 
 >>> @cacholote.cacheable
 ... def dataset_from_dict(ds_dict):
-...     import xarray as xr
 ...     return xr.Dataset(ds_dict)
 
 >>> ds = dataset_from_dict({"foo": 0})

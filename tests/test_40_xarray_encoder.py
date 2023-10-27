@@ -1,4 +1,5 @@
 import pathlib
+from typing import Union
 
 import fsspec
 import pytest
@@ -36,7 +37,7 @@ def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
     ds = xr.Dataset({"foo": [0]}, attrs={})
 
     # Check dict
-    actual = extra_encoders.dictify_xr_dataset(ds)
+    actual = extra_encoders.dictify_xr_object(ds)
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
     local_path = f"{tmp_path}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
@@ -187,3 +188,23 @@ def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
     line = next(captured)
     assert "retrieve cache file" in line
     assert f"urlpath=file://{cached_ds.encoding['source']}" in line
+
+
+@pytest.mark.parametrize(
+    "original_obj",
+    (
+        xr.DataArray([0], name="foo"),
+        xr.DataArray([0], name="foo").to_dataset(),
+    ),
+)
+def test_xr_roundtrip(original_obj: Union[xr.Dataset, xr.DataArray]) -> None:
+    @cache.cacheable
+    def cache_xr_obj(
+        obj: Union[xr.Dataset, xr.DataArray]
+    ) -> Union[xr.Dataset, xr.DataArray]:
+        return obj
+
+    cached_obj = cache_xr_obj(original_obj)
+    xr.testing.assert_identical(cached_obj, original_obj)
+    assert original_obj.encoding.get("source") is None
+    assert cached_obj.encoding.get("source") is not None

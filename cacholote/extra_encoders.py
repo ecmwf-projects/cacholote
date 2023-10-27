@@ -24,7 +24,19 @@ import pathlib
 import posixpath
 import tempfile
 import time
-from typing import Any, Callable, Dict, Generator, Optional, Tuple, TypeVar, Union, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Literal,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 import fsspec
 import fsspec.implementations.local
@@ -181,10 +193,33 @@ def _get_fs_and_urlpath(
     )
 
 
-@_requires_xarray_and_dask
-def decode_xr_dataset(
-    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+@overload
+def decode_xr_object(
+    file_json: Dict[str, Any],
+    storage_options: Dict[str, Any],
+    xr_type: Literal["DataArray"],
+    **kwargs: Any,
+) -> "xr.DataArray":
+    ...
+
+
+@overload
+def decode_xr_object(
+    file_json: Dict[str, Any],
+    storage_options: Dict[str, Any],
+    xr_type: Literal["Dataset"],
+    **kwargs: Any,
 ) -> "xr.Dataset":
+    ...
+
+
+@_requires_xarray_and_dask
+def decode_xr_object(
+    file_json: Dict[str, Any],
+    storage_options: Dict[str, Any],
+    xr_type: Literal["Dataset", "DataArray"],
+    **kwargs: Any,
+) -> Union["xr.Dataset", "xr.DataArray"]:
     fs, urlpath = _get_fs_and_urlpath(
         file_json, storage_options=storage_options, validate=True
     )
@@ -203,7 +238,21 @@ def decode_xr_dataset(
                 **{protocol: fs.storage_options for protocol in protocols},
             ) as of:
                 filename_or_obj = of.name
-    return xr.open_dataset(filename_or_obj, **kwargs)
+    if xr_type == "Dataset":
+        return xr.open_dataset(filename_or_obj, **kwargs)
+    return xr.open_dataarray(filename_or_obj, **kwargs)
+
+
+def decode_xr_dataset(
+    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+) -> "xr.Dataset":
+    return decode_xr_object(file_json, storage_options, "Dataset", **kwargs)
+
+
+def decode_xr_dataarray(
+    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+) -> "xr.DataArray":
+    return decode_xr_object(file_json, storage_options, "DataArray", **kwargs)
 
 
 def decode_io_object(
@@ -216,8 +265,11 @@ def decode_io_object(
 
 
 @_requires_xarray_and_dask
-def _maybe_store_xr_dataset(
-    obj: "xr.Dataset", fs: fsspec.AbstractFileSystem, urlpath: str, filetype: str
+def _maybe_store_xr_object(
+    obj: Union["xr.Dataset", "xr.DataArray"],
+    fs: fsspec.AbstractFileSystem,
+    urlpath: str,
+    filetype: str,
 ) -> None:
     if filetype == "application/vnd+zarr":
         with utils.FileLock(
@@ -254,7 +306,7 @@ def _maybe_store_xr_dataset(
 
 
 @_requires_xarray_and_dask
-def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
+def dictify_xr_object(obj: Union["xr.Dataset", "xr.DataArray"]) -> Dict[str, Any]:
     """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
@@ -267,7 +319,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
         urlpath_out,
         storage_options=config.get().cache_files_storage_options,
     )
-    _maybe_store_xr_dataset(obj, fs_out, urlpath_out, filetype)
+    _maybe_store_xr_object(obj, fs_out, urlpath_out, filetype)
 
     file_json = _dictify_file(fs_out, urlpath_out)
     kwargs: Dict[str, Any] = {"chunks": {}}
@@ -275,7 +327,7 @@ def dictify_xr_dataset(obj: "xr.Dataset") -> Dict[str, Any]:
         kwargs.update({"engine": "zarr", "consolidated": True})
 
     return encode.dictify_python_call(
-        decode_xr_dataset,
+        decode_xr_dataset if isinstance(obj, xr.Dataset) else decode_xr_dataarray,
         file_json,
         storage_options=config.get().cache_files_storage_options,
         **kwargs,
@@ -381,4 +433,5 @@ def register_all() -> None:
     ):
         encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))
     if _HAS_XARRAY_AND_DASK:
-        encode.FILECACHE_ENCODERS.append((xr.Dataset, dictify_xr_dataset))
+        for type_ in (xr.Dataset, xr.DataArray):
+            encode.FILECACHE_ENCODERS.append((type_, dictify_xr_object))
