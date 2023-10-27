@@ -33,7 +33,7 @@ False
 >>> cacholote.config.set(
 ...    cache_db_urlpath="sqlite://",
 ...    cache_files_urlpath=tmpdir,
-...    )
+... )
 <cacholote.config.set ...
 
 >>> cached_open = cacholote.cacheable(open)
@@ -47,7 +47,7 @@ True
 
 ```
 
-### Cache xarray datasets
+### Cache Xarray datasets
 
 ```python
 >>> import cacholote
@@ -57,7 +57,7 @@ True
 >>> cacholote.config.set(
 ...    cache_db_urlpath="sqlite://",
 ...    cache_files_urlpath=tmpdir,
-...    )
+... )
 <cacholote.config.set ...
 
 >>> @cacholote.cacheable
