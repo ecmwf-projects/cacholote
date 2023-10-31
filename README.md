@@ -47,7 +47,7 @@ True
 
 ```
 
-### Cache Xarray datasets
+### Cache Xarray objects
 
 ```python
 >>> import cacholote
