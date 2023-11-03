@@ -24,6 +24,7 @@ from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
 
 import fsspec
 import pydantic
+import pydantic_settings
 import sqlalchemy as sa
 import sqlalchemy.orm
 import structlog
@@ -42,7 +43,7 @@ _CONFIG_NOT_SET_MSG = (
 )
 
 
-class Settings(pydantic.BaseSettings):
+class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
     cache_db_urlpath: str = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
     create_engine_kwargs: Dict[str, Any] = {}
@@ -62,28 +63,30 @@ class Settings(pydantic.BaseSettings):
     ] = _DEFAULT_LOGGER
     lock_timeout: Optional[float] = None
 
-    @pydantic.validator("create_engine_kwargs", allow_reuse=True)
+    @pydantic.field_validator("create_engine_kwargs")
     def validate_create_engine_kwargs(
-        cls: pydantic.BaseSettings, create_engine_kwargs: Dict[str, Any]
+        cls: pydantic_settings.BaseSettings, create_engine_kwargs: Dict[str, Any]
     ) -> Dict[str, Any]:
         poolclass = create_engine_kwargs.get("poolclass")
         if isinstance(poolclass, str):
             create_engine_kwargs["poolclass"] = getattr(sa.pool, poolclass)
         return create_engine_kwargs
 
-    @pydantic.validator("return_cache_entry", allow_reuse=True)
+    @pydantic.field_validator("return_cache_entry")
     def validate_return_cache_entry(
-        cls: pydantic.BaseSettings, return_cache_entry: bool, values: Dict[str, Any]
+        cls: pydantic_settings.BaseSettings,
+        return_cache_entry: bool,
+        info: pydantic.ValidationInfo,
     ) -> bool:
-        if return_cache_entry is True and values["use_cache"] is False:
+        if return_cache_entry is True and info.data["use_cache"] is False:
             raise ValueError(
                 "`use_cache` must be True when `return_cache_entry` is True"
             )
         return return_cache_entry
 
-    @pydantic.validator("expiration", allow_reuse=True)
+    @pydantic.field_validator("expiration")
     def validate_expiration(
-        cls: pydantic.BaseSettings, expiration: Optional[datetime.datetime]
+        cls: pydantic_settings.BaseSettings, expiration: Optional[datetime.datetime]
     ) -> Optional[datetime.datetime]:
         if expiration is not None and expiration.tzinfo is None:
             raise ValueError(f"Expiration is missing the timezone info. {expiration=}")
@@ -119,9 +122,9 @@ class Settings(pydantic.BaseSettings):
             raise ValueError(_CONFIG_NOT_SET_MSG)
         return database.SESSIONMAKER
 
-    class Config:
-        case_sensitive = False
-        env_prefix = "cacholote_"
+    model_config = pydantic_settings.SettingsConfigDict(
+        case_sensitive=False, env_prefix="cacholote_"
+    )
 
 
 class set:
@@ -168,7 +171,7 @@ class set:
         self._old_settings = get()
 
         global _SETTINGS
-        _SETTINGS = Settings(**{**self._old_settings.dict(), **kwargs})
+        _SETTINGS = Settings(**{**self._old_settings.model_dump(), **kwargs})
         _SETTINGS.make_cache_dir()
         _SETTINGS.set_engine_and_session(
             self._old_settings.create_engine_kwargs != _SETTINGS.create_engine_kwargs
@@ -212,7 +215,7 @@ def get() -> Settings:
     """Get cacholote settings."""
     if _SETTINGS is None:
         raise ValueError(_CONFIG_NOT_SET_MSG)
-    return _SETTINGS.copy()
+    return _SETTINGS.model_copy()
 
 
 reset()

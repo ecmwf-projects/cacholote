@@ -6,6 +6,7 @@ dependencies:
 - make
 - mypy
 - myst-parser
+- pip
 - pre-commit
 - pydata-sphinx-theme
 - pytest
@@ -27,5 +28,6 @@ dependencies:
 - requests
 - s3fs
 - sqlalchemy[mypy]
+- types-requests
 - xarray>=2022.6.0
 - zarr

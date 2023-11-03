@@ -23,6 +23,62 @@ False
 
 ```
 
+### Cache files
+
+```python
+>>> import cacholote
+
+>>> import tempfile
+>>> tmpdir = tempfile.TemporaryDirectory().name
+>>> cacholote.config.set(
+...     cache_db_urlpath="sqlite://",
+...     cache_files_urlpath=tmpdir,
+... )
+<cacholote.config.set ...
+
+>>> cached_open = cacholote.cacheable(open)
+>>> cached_file = cached_open("README.md")
+>>> cached_file.name.startswith(tmpdir)
+True
+
+>>> import filecmp
+>>> filecmp.cmp("README.md", cached_file.name)
+True
+
+```
+
+### Cache Xarray objects
+
+```python
+>>> import cacholote
+
+>>> import pytest
+>>> xr = pytest.importorskip("xarray")
+
+>>> import tempfile
+>>> tmpdir = tempfile.TemporaryDirectory().name
+>>> cacholote.config.set(
+...     cache_db_urlpath="sqlite://",
+...     cache_files_urlpath=tmpdir,
+... )
+<cacholote.config.set ...
+
+>>> @cacholote.cacheable
+... def dataset_from_dict(ds_dict):
+...     return xr.Dataset(ds_dict)
+
+>>> ds = dataset_from_dict({"foo": 0})
+>>> ds
+<xarray.Dataset>
+Dimensions:  ()
+Data variables:
+    foo      int64 ...
+
+>>> ds.encoding["source"].startswith(tmpdir)
+True
+
+```
+
 ## Configuration
 
 Configuration settings can be accessed using `cacholote.config.get()` and modified using `cacholote.config.set(**kwargs)`. It is possible to use `cacholote.config.set` either as a context manager, or to configure global settings. See `help(cacholote.config.set)`.

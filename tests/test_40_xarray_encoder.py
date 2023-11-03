@@ -1,4 +1,5 @@
 import pathlib
+from typing import Union
 
 import fsspec
 import pytest
@@ -24,11 +25,11 @@ def get_grib_ds() -> "xr.Dataset":
 @pytest.mark.filterwarnings(
     "ignore:distutils Version classes are deprecated. Use packaging.version instead."
 )
-def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
+def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
     pytest.importorskip("netCDF4")
 
     # Define readonly dir
-    readonly_dir = str(tmpdir / "readonly")
+    readonly_dir = str(tmp_path / "readonly")
     fsspec.filesystem("file").mkdir(readonly_dir)
     config.set(cache_files_urlpath_readonly=readonly_dir)
 
@@ -36,9 +37,9 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     ds = xr.Dataset({"foo": [0]}, attrs={})
 
     # Check dict
-    actual = extra_encoders.dictify_xr_dataset(ds)
+    actual = extra_encoders.dictify_xr_object(ds)
     href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
-    local_path = f"{tmpdir}/cache_files/247fd17e087ae491996519c097e70e48.nc"
+    local_path = f"{tmp_path}/cache_files/247fd17e087ae491996519c097e70e48.nc"
     expected = {
         "type": "python_call",
         "callable": "cacholote.extra_encoders:decode_xr_dataset",
@@ -77,7 +78,7 @@ def test_dictify_xr_dataset(tmpdir: pathlib.Path) -> None:
     "ignore:distutils Version classes are deprecated. Use packaging.version instead."
 )
 def test_xr_cacheable(
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     xarray_cache_type: str,
     ext: str,
     importorskip: str,
@@ -157,7 +158,7 @@ def test_xr_corrupted_files(
 
 
 def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
-    config.set(logger=structlog.get_logger())
+    config.set(logger=structlog.get_logger(), raise_all_encoding_errors=True)
 
     # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)
@@ -187,3 +188,23 @@ def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
     line = next(captured)
     assert "retrieve cache file" in line
     assert f"urlpath=file://{cached_ds.encoding['source']}" in line
+
+
+@pytest.mark.parametrize(
+    "original_obj",
+    (
+        xr.DataArray([0], name="foo"),
+        xr.DataArray([0], name="foo").to_dataset(),
+    ),
+)
+def test_xr_roundtrip(original_obj: Union[xr.Dataset, xr.DataArray]) -> None:
+    @cache.cacheable
+    def cache_xr_obj(
+        obj: Union[xr.Dataset, xr.DataArray]
+    ) -> Union[xr.Dataset, xr.DataArray]:
+        return obj
+
+    cached_obj = cache_xr_obj(original_obj)
+    xr.testing.assert_identical(cached_obj, original_obj)
+    assert original_obj.encoding.get("source") is None
+    assert cached_obj.encoding.get("source") is not None

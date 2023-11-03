@@ -22,7 +22,7 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_clean_cache_files(
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     set_cache: str,
     method: Literal["LRU", "LFU"],
 ) -> None:
@@ -32,12 +32,12 @@ def test_clean_cache_files(
 
     # Create files
     for algorithm in ("LRU", "LFU"):
-        filename = tmpdir / f"{algorithm}.txt"
+        filename = tmp_path / f"{algorithm}.txt"
         fsspec.filesystem("file").pipe_file(filename, b"1")
 
     # Copy to cache
-    (lru_path,) = {open_url(tmpdir / "LRU.txt").path for _ in range(2)}
-    lfu_path = open_url(tmpdir / "LFU.txt").path
+    (lru_path,) = {open_url(tmp_path / "LRU.txt").path for _ in range(2)}
+    lfu_path = open_url(tmp_path / "LFU.txt").path
     assert set(fs.ls(dirname)) == {lru_path, lfu_path}
 
     # Do not clean
@@ -53,11 +53,13 @@ def test_clean_cache_files(
 
 
 @pytest.mark.parametrize("delete_unknown_files", [True, False])
-def test_delete_unknown_files(tmpdir: pathlib.Path, delete_unknown_files: bool) -> None:
+def test_delete_unknown_files(
+    tmp_path: pathlib.Path, delete_unknown_files: bool
+) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create file
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"1")
 
     # Copy to cache
@@ -94,12 +96,12 @@ def test_delete_unknown_dirs(
 
 @pytest.mark.parametrize("lock_validity_period", [None, 0])
 def test_clean_locked_files(
-    tmpdir: pathlib.Path, lock_validity_period: Optional[float]
+    tmp_path: pathlib.Path, lock_validity_period: Optional[float]
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create file
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"1")
 
     # Copy to cache
@@ -134,7 +136,7 @@ def test_clean_locked_files(
     ],
 )
 def test_clean_tagged_files(
-    tmpdir: pathlib.Path,
+    tmp_path: pathlib.Path,
     tags_to_clean: Optional[Sequence[Optional[str]]],
     tags_to_keep: Optional[Sequence[Optional[str]]],
     cleaned: Sequence[Optional[str]],
@@ -143,7 +145,7 @@ def test_clean_tagged_files(
 
     expected_ls = []
     for tag in [None, "1", "2"]:
-        tmpfile = tmpdir / f"test_{tag}.txt"
+        tmpfile = tmp_path / f"test_{tag}.txt"
         fsspec.filesystem("file").pipe_file(tmpfile, b"1")
         with config.set(tag=tag):
             cached_file = open_url(tmpfile).path
@@ -174,11 +176,11 @@ def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
         clean.clean_cache_files(1, tags_to_clean=wrong_type)
 
 
-def test_delete_cache_entry_and_files(tmpdir: pathlib.Path) -> None:
+def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Create file
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"old")
 
     # Copy to cache
@@ -206,18 +208,18 @@ def test_clean_invalid_cache_entries(
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Valid cache file
-    fsspec.filesystem("file").pipe_file(tmpdir / "valid.txt", b"1")
-    valid = open_url(tmpdir / "valid.txt").path
+    fsspec.filesystem("file").pipe_file(tmp_path / "valid.txt", b"1")
+    valid = open_url(tmp_path / "valid.txt").path
 
     # Corrupted cache file
-    fsspec.filesystem("file").pipe_file(tmpdir / "corrupted.txt", b"1")
-    corrupted = open_url(tmpdir / "corrupted.txt").path
+    fsspec.filesystem("file").pipe_file(tmp_path / "corrupted.txt", b"1")
+    corrupted = open_url(tmp_path / "corrupted.txt").path
     fs.touch(corrupted)
 
     # Expired cache file
-    fsspec.filesystem("file").pipe_file(tmpdir / "expired.txt", b"1")
+    fsspec.filesystem("file").pipe_file(tmp_path / "expired.txt", b"1")
     with config.set(expiration=utils.utcnow() + datetime.timedelta(seconds=0.2)):
-        expired = open_url(tmpdir / "expired.txt").path
+        expired = open_url(tmp_path / "expired.txt").path
     time.sleep(0.2)
 
     # Exception
@@ -249,10 +251,10 @@ def test_clean_invalid_cache_entries(
 
 
 def test_cleaner_logging(
-    capsys: pytest.CaptureFixture[str], tmpdir: pathlib.Path
+    capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path
 ) -> None:
     # Cache file and create unknown
-    tmpfile = tmpdir / "test.txt"
+    tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, b"1")
     cached_file = open_url(tmpfile)
     fs, dirname = utils.get_cache_files_fs_dirname()

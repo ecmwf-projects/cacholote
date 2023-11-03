@@ -12,16 +12,16 @@ def test_hexdigestify() -> None:
     assert res == expected
 
 
-def test_get_cache_files(tmpdir: pathlib.Path) -> None:
+def test_get_cache_files(tmp_path: pathlib.Path) -> None:
     assert utils.get_cache_files_fs_dirname() == (
         fsspec.filesystem("file"),
-        str(tmpdir / "cache_files"),
+        str(tmp_path / "cache_files"),
     )
 
 
-def test_copy_buffered_file(tmpdir: pathlib.Path) -> None:
-    src = tmpdir / "test0"
-    dst = tmpdir / "test1"
+def test_copy_buffered_file(tmp_path: pathlib.Path) -> None:
+    src = tmp_path / "test0"
+    dst = tmp_path / "test1"
     with open(src, "wb") as f:
         f.write(b"test")
     with open(src, "rb") as f_src, open(dst, "wb") as f_dst:
