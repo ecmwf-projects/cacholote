@@ -203,7 +203,7 @@ def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
 @pytest.mark.parametrize("check_expiration", [True, False])
 @pytest.mark.parametrize("try_decode", [True, False])
 def test_clean_invalid_cache_entries(
-    tmpdir: pathlib.Path, check_result: bool, check_expiration: bool, try_decode: bool
+    tmp_path: pathlib.Path, check_result: bool, check_expiration: bool, try_decode: bool
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -224,7 +224,7 @@ def test_clean_invalid_cache_entries(
 
     # Exception
     with pytest.raises(FileNotFoundError):
-        open_url(tmpdir / "non-existent")
+        open_url(tmp_path / "non-existent")
 
     # Clean
     clean.clean_invalid_cache_entries(
