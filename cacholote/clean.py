@@ -39,6 +39,7 @@ def _delete_cache_file(
     logger = config.get().logger
 
     if {"type", "callable", "args", "kwargs"} == set(obj) and obj["callable"] in (
+        "cacholote.extra_encoders:decode_xr_dataarray",
         "cacholote.extra_encoders:decode_xr_dataset",
         "cacholote.extra_encoders:decode_io_object",
     ):
