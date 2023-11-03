@@ -21,8 +21,6 @@ import json
 import posixpath
 from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Union
 
-import fsspec
-import packaging.version
 import sqlalchemy as sa
 import sqlalchemy.orm
 
@@ -128,16 +126,14 @@ class _Cleaner:
     def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
         self.logger.info("get unknown files")
 
-        utcnow = (
-            utils.utcnow()
-            if packaging.version.parse(fsspec.__version__)
-            >= packaging.version.parse("2023.9.0")
-            else datetime.datetime.utcnow()
-        )
+        utcnow = utils.utcnow()
         files_to_skip = []
         for urlpath in self.sizes:
             if urlpath.endswith(".lock"):
-                delta = utcnow - self.fs.modified(urlpath)
+                modified = self.fs.modified(urlpath)
+                if modified.tzinfo is None:
+                    modified = modified.replace(tzinfo=datetime.timezone.utc)
+                delta = utcnow - modified
                 if lock_validity_period is None or delta < datetime.timedelta(
                     seconds=lock_validity_period
                 ):
