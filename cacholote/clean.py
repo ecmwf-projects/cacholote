@@ -184,6 +184,8 @@ class _Cleaner:
         tags_to_keep: Optional[Sequence[Optional[str]]],
     ) -> None:
         self.check_tags(tags_to_clean, tags_to_keep)
+        if self.stop_cleaning(maxsize):
+            return
 
         # Filters
         filters = []
@@ -216,24 +218,33 @@ class _Cleaner:
             raise ValueError(f"{method=} is invalid. Choose either 'LRU' or 'LFU'.")
         sorters.append(database.CacheEntry.expiration)
 
-        # Clean database files
-        if self.stop_cleaning(maxsize):
-            return
+        # Get filtered & sorted ids
+        query_timestamp = utils.utcnow()
         with config.get().sessionmaker() as session:
-            for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
-            ):
-                json.loads(
-                    cache_entry._result_as_string,
-                    object_hook=functools.partial(
-                        _delete_cache_file,
-                        session=session,
-                        cache_entry=cache_entry,
-                        sizes=self.sizes,
-                    ),
-                )
-                if self.stop_cleaning(maxsize):
-                    return
+            cache_entry_ids = session.scalars(
+                sa.select(database.CacheEntry.id).filter(*filters).order_by(*sorters)
+            )
+
+        # Delete cache entries
+        for cache_entry_id in cache_entry_ids:
+            with config.get().sessionmaker() as session:
+                for cache_entry in session.scalars(
+                    sa.select(database.CacheEntry).filter(
+                        database.CacheEntry.id == cache_entry_id,
+                        database.CacheEntry.timestamp < query_timestamp,
+                    )
+                ):
+                    json.loads(
+                        cache_entry._result_as_string,
+                        object_hook=functools.partial(
+                            _delete_cache_file,
+                            session=session,
+                            cache_entry=cache_entry,
+                            sizes=self.sizes,
+                        ),
+                    )
+                    if self.stop_cleaning(maxsize):
+                        return
 
         raise ValueError(
             f"Unable to clean {self.dirname!r}. Final size: {self.size!r}. Expected size: {maxsize!r}"
