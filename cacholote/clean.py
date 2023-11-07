@@ -19,8 +19,9 @@ import datetime
 import functools
 import json
 import posixpath
-from typing import Any, Callable, Dict, List, Literal, Optional, Sequence, Set, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Set, Union
 
+import pydantic
 import sqlalchemy as sa
 import sqlalchemy.orm
 
@@ -170,30 +171,14 @@ class _Cleaner:
                 self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod
-    def check_tags(*args: Any) -> None:
-        if None not in args:
+    @pydantic.validate_call
+    def _tag_filters(
+        tags_to_clean: Optional[List[Optional[str]]],
+        tags_to_keep: Optional[List[Optional[str]]],
+    ) -> FILTERS_T:
+        if (tags_to_clean is not None) and (tags_to_keep is not None):
             raise ValueError("tags_to_clean/keep are mutually exclusive.")
-        for tags in args:
-            if tags is not None and (
-                not isinstance(tags, (list, set, tuple))
-                or not all(tag is None or isinstance(tag, str) for tag in tags)
-            ):
-                raise TypeError(
-                    "tags_to_clean/keep must be None or a sequence of str/None."
-                )
 
-    def delete_cache_files(
-        self,
-        maxsize: int,
-        method: Literal["LRU", "LFU"],
-        tags_to_clean: Optional[Sequence[Optional[str]]],
-        tags_to_keep: Optional[Sequence[Optional[str]]],
-    ) -> None:
-        self.check_tags(tags_to_clean, tags_to_keep)
-        if self.stop_cleaning(maxsize):
-            return
-
-        # Filters
         filters: FILTERS_T = [CacheEntry.result.isnot(None)]
         if tags_to_keep is not None:
             filters.append(
@@ -213,32 +198,53 @@ class _Cleaner:
                     else CacheEntry.tag.isnot(None),
                 )
             )
+        return filters
 
-        # Sorters
+    @staticmethod
+    @pydantic.validate_call
+    def _method_sorters(
+        method: Literal["LRU", "LFU"]
+    ) -> List[sa.orm.InstrumentedAttribute[Any]]:
         sorters: List[sa.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":
             sorters.extend([CacheEntry.timestamp, CacheEntry.counter])
         elif method == "LFU":
             sorters.extend([CacheEntry.counter, CacheEntry.timestamp])
         else:
-            raise ValueError(f"{method=} is invalid. Choose either 'LRU' or 'LFU'.")
+            raise ValueError(f"{method=}")
         sorters.append(CacheEntry.expiration)
+        return sorters
 
-        # Get filtered & sorted ids
-        query_timestamp = utils.utcnow()
+    def delete_cache_files(
+        self,
+        maxsize: int,
+        method: Literal["LRU", "LFU"],
+        tags_to_clean: Optional[List[Optional[str]]],
+        tags_to_keep: Optional[List[Optional[str]]],
+    ) -> None:
+        filters = self._tag_filters(tags_to_clean, tags_to_keep)
+        sorters = self._method_sorters(method)
+
+        if self.stop_cleaning(maxsize):
+            return
+        start_timestamp = utils.utcnow()
+
+        # Get entries to clean
         with config.get().sessionmaker() as session:
             cache_entry_ids = session.scalars(
                 sa.select(CacheEntry.id).filter(*filters).order_by(*sorters)
             )
 
-        # Delete cache entries
+        # Loop over entries
         for cache_entry_id in cache_entry_ids:
             with config.get().sessionmaker() as session:
+                filters = [
+                    CacheEntry.id == cache_entry_id,
+                    # skip entries updated while cleaning
+                    CacheEntry.timestamp < start_timestamp,
+                ]
                 for cache_entry in session.scalars(
-                    sa.select(CacheEntry).filter(
-                        CacheEntry.id == cache_entry_id,
-                        CacheEntry.timestamp < query_timestamp,
-                    )
+                    sa.select(CacheEntry).filter(*filters)
                 ):
                     json.loads(
                         cache_entry._result_as_string,
@@ -263,8 +269,8 @@ def clean_cache_files(
     delete_unknown_files: bool = False,
     recursive: bool = False,
     lock_validity_period: Optional[float] = None,
-    tags_to_clean: Optional[Sequence[Optional[str]]] = None,
-    tags_to_keep: Optional[Sequence[Optional[str]]] = None,
+    tags_to_clean: Optional[List[Optional[str]]] = None,
+    tags_to_keep: Optional[List[Optional[str]]] = None,
 ) -> None:
     """Clean cache files.
 
@@ -281,9 +287,9 @@ def clean_cache_files(
         Whether to delete unknown directories or not
     lock_validity_period: float, optional, default: None
         Validity period of lock files in seconds. Expired locks will be deleted.
-    tags_to_clean, tags_to_keep: sequence of strings/None, optional, default: None
+    tags_to_clean, tags_to_keep: list of strings/None, optional, default: None
         Tags to clean/keep. If None, delete all cache entries.
-        To delete/keep untagged entries, add None in the sequence (e.g., [None, 'tag1', ...]).
+        To delete/keep untagged entries, add None in the list (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
     """
     cleaner = _Cleaner()

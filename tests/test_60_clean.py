@@ -2,9 +2,10 @@ import contextlib
 import datetime
 import pathlib
 import time
-from typing import Any, Literal, Optional, Sequence
+from typing import Any, List, Literal, Optional
 
 import fsspec
+import pydantic
 import pytest
 import structlog
 
@@ -128,19 +129,19 @@ def test_clean_locked_files(
 @pytest.mark.parametrize(
     "tags_to_clean, tags_to_keep, cleaned",
     [
-        ({None, "1"}, None, {None, "1"}),
-        ({None, "2"}, None, {None, "2"}),
-        ({"1", "2"}, None, {"1", "2"}),
-        (None, {None}, {"1", "2"}),
-        (None, {"1"}, {None, "2"}),
-        (None, {"2"}, {None, "1"}),
+        ([None, "1"], None, [None, "1"]),
+        ([None, "2"], None, [None, "2"]),
+        (["1", "2"], None, ["1", "2"]),
+        (None, [None], ["1", "2"]),
+        (None, ["1"], [None, "2"]),
+        (None, ["2"], [None, "1"]),
     ],
 )
 def test_clean_tagged_files(
     tmp_path: pathlib.Path,
-    tags_to_clean: Optional[Sequence[Optional[str]]],
-    tags_to_keep: Optional[Sequence[Optional[str]]],
-    cleaned: Sequence[Optional[str]],
+    tags_to_clean: Optional[List[Optional[str]]],
+    tags_to_keep: Optional[List[Optional[str]]],
+    cleaned: List[Optional[str]],
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -162,19 +163,15 @@ def test_clean_tagged_files_wrong_args() -> None:
         ValueError,
         match="tags_to_clean/keep are mutually exclusive.",
     ):
-        clean.clean_cache_files(1, tags_to_keep=[], tags_to_clean=[])
+        clean.clean_cache_files(0, tags_to_keep=[], tags_to_clean=[])
 
 
 @pytest.mark.parametrize("wrong_type", ["1", [1]])
 def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
-    raises = pytest.raises(
-        TypeError,
-        match="tags_to_clean/keep must be None or a sequence of str/None.",
-    )
-    with raises:
-        clean.clean_cache_files(1, tags_to_keep=wrong_type)
-    with raises:
-        clean.clean_cache_files(1, tags_to_clean=wrong_type)
+    with pytest.raises(pydantic.ValidationError):
+        clean.clean_cache_files(0, tags_to_keep=wrong_type)
+    with pytest.raises(pydantic.ValidationError):
+        clean.clean_cache_files(0, tags_to_clean=wrong_type)
 
 
 def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
