@@ -172,7 +172,7 @@ class _Cleaner:
 
     @staticmethod
     @pydantic.validate_call
-    def _tag_filters(
+    def _get_tag_filters(
         tags_to_clean: Optional[List[Optional[str]]],
         tags_to_keep: Optional[List[Optional[str]]],
     ) -> FILTERS_T:
@@ -202,7 +202,7 @@ class _Cleaner:
 
     @staticmethod
     @pydantic.validate_call
-    def _method_sorters(
+    def _get_method_sorters(
         method: Literal["LRU", "LFU"]
     ) -> List[sa.orm.InstrumentedAttribute[Any]]:
         sorters: List[sa.orm.InstrumentedAttribute[Any]] = []
@@ -222,8 +222,8 @@ class _Cleaner:
         tags_to_clean: Optional[List[Optional[str]]],
         tags_to_keep: Optional[List[Optional[str]]],
     ) -> None:
-        filters = self._tag_filters(tags_to_clean, tags_to_keep)
-        sorters = self._method_sorters(method)
+        filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
+        sorters = self._get_method_sorters(method)
 
         if self.stop_cleaning(maxsize):
             return
