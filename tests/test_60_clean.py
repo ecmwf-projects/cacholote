@@ -95,8 +95,9 @@ def test_delete_unknown_dirs(
 
 
 @pytest.mark.parametrize("lock_validity_period", [None, 0])
+@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_clean_locked_files(
-    tmp_path: pathlib.Path, lock_validity_period: Optional[float]
+    tmp_path: pathlib.Path, set_cache: str, lock_validity_period: Optional[float]
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
