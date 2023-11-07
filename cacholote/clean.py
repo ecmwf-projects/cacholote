@@ -219,7 +219,7 @@ class _Cleaner:
         sorters.append(database.CacheEntry.expiration)
 
         # Get filtered & sorted ids
-        now = utils.utcnow()
+        query_timestamp = utils.utcnow()
         with config.get().sessionmaker() as session:
             cache_entry_ids = session.scalars(
                 sa.select(database.CacheEntry.id).filter(*filters).order_by(*sorters)
@@ -231,7 +231,7 @@ class _Cleaner:
                 for cache_entry in session.scalars(
                     sa.select(database.CacheEntry).filter(
                         database.CacheEntry.id == cache_entry_id,
-                        database.CacheEntry.timestamp < now,
+                        database.CacheEntry.timestamp < query_timestamp,
                     )
                 ):
                     json.loads(
