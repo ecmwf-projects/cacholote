@@ -53,7 +53,11 @@ class CacheEntry(Base):
         return json.dumps(self.result)
 
     def __repr__(self) -> str:
-        return f"CacheEntry(id={self.id!r}, key={self.key!r}, expiration={self.expiration!r})"
+        public_attrs = [
+            f"{attr}={getattr(self, attr)}"
+            for attr in ("id", "key", "expiration", "timestamp", "counter", "tag")
+        ]
+        return f"CacheEntry({', '.join(public_attrs)})"
 
 
 @sa.event.listens_for(CacheEntry, "before_insert")

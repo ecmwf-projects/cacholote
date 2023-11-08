@@ -180,3 +180,19 @@ def test_cached_error() -> None:
 
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (0,)
+
+
+def test_cache_entry_repr() -> None:
+    with config.set(return_cache_entry=True):
+        cache_entry = cached_now()
+
+    assert repr(cache_entry) == (
+        "CacheEntry("
+        "id=1, "
+        "key=c3d9e414d0d32337c3672cb29b1b3cc9, "
+        "expiration=9999-12-31 00:00:00, "
+        f"timestamp={cache_entry.timestamp}, "
+        "counter=1, "
+        "tag=None"
+        ")"
+    )
