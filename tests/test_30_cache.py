@@ -189,9 +189,9 @@ def test_cache_entry_repr() -> None:
     assert repr(cache_entry) == (
         "CacheEntry("
         "id=1, "
-        "key=c3d9e414d0d32337c3672cb29b1b3cc9, "
-        "expiration=9999-12-31 00:00:00, "
-        f"timestamp={cache_entry.timestamp}, "
+        "key='c3d9e414d0d32337c3672cb29b1b3cc9', "
+        "expiration=datetime.datetime(9999, 12, 31, 0, 0), "
+        f"timestamp={cache_entry.timestamp!r}, "
         "counter=1, "
         "tag=None"
         ")"
