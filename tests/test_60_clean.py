@@ -266,6 +266,7 @@ def test_cleaner_logging(
     assert "delete unknown" in line
     assert "recursive=False" in line
     assert f"urlpath=file://{dirname}/unknown.txt" in line
+    assert "size=1" in line
 
     line = next(captured)
     assert "check cache files total size" in line
@@ -278,6 +279,7 @@ def test_cleaner_logging(
     line = next(captured)
     assert "delete cache file" in line
     assert f"urlpath=file://{cached_file.path}" in line
+    assert "size=1" in line
 
     line = next(captured)
     assert "check cache files total size" in line

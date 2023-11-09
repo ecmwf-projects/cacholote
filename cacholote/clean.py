@@ -50,7 +50,7 @@ def _delete_cache_file(
         urlpath = fs.unstrip_protocol(urlpath)
 
         if posixpath.dirname(urlpath) == cache_dirname:
-            sizes.pop(urlpath, None)
+            size = sizes.pop(urlpath, 0)
             if not dry_run:
                 if session and cache_entry:
                     logger.info("delete cache entry", cache_entry=cache_entry)
@@ -58,7 +58,7 @@ def _delete_cache_file(
                     database._commit_or_rollback(session)
 
                 if fs.exists(urlpath):
-                    logger.info("delete cache file", urlpath=urlpath)
+                    logger.info("delete cache file", urlpath=urlpath, size=size)
                     fs.rm(
                         urlpath,
                         recursive=obj["args"][0]["type"] == "application/vnd+zarr",
@@ -159,9 +159,11 @@ class _Cleaner:
         self, lock_validity_period: Optional[float], recursive: bool
     ) -> None:
         for urlpath in self.get_unknown_files(lock_validity_period):
-            self.sizes.pop(urlpath)
+            size = self.sizes.pop(urlpath)
             if self.fs.exists(urlpath):
-                self.logger.info("delete unknown", urlpath=urlpath, recursive=recursive)
+                self.logger.info(
+                    "delete unknown", urlpath=urlpath, size=size, recursive=recursive
+                )
                 self.fs.rm(urlpath, recursive=recursive)
 
     @staticmethod
