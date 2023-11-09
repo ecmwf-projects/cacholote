@@ -204,3 +204,19 @@ def test_cached_error(
     result, log = all[0]
     assert result is None
     assert "ValueError" in json.loads(log)["exception"]
+
+
+def test_cache_entry_repr() -> None:
+    with config.set(return_cache_entry=True):
+        cache_entry = cached_now()
+
+    assert repr(cache_entry) == (
+        "CacheEntry("
+        "id=1, "
+        "key='c3d9e414d0d32337c3672cb29b1b3cc9', "
+        "expiration=datetime.datetime(9999, 12, 31, 0, 0), "
+        f"timestamp={cache_entry.timestamp!r}, "
+        "counter=1, "
+        "tag=None"
+        ")"
+    )
