@@ -112,7 +112,8 @@ def test_set_poolclass(poolclass: Union[str, sa.pool.Pool]) -> None:
     ],
 )
 def test_set_expiration(
-    expiration: Union[datetime.datetime, str], raises: contextlib.nullcontext  # type: ignore[type-arg]
+    expiration: Union[datetime.datetime, str],
+    raises: contextlib.nullcontext,  # type: ignore[type-arg]
 ) -> None:
     with raises:
         config.set(expiration=expiration)
