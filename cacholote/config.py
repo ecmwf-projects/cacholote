@@ -214,6 +214,8 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
 def get() -> Settings:
     """Get cacholote settings."""
     if _SETTINGS is None:
-        reset()
-        assert _SETTINGS is not None
+        raise ValueError(_CONFIG_NOT_SET_MSG)
     return _SETTINGS.model_copy()
+
+
+reset()
