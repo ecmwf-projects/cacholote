@@ -4,7 +4,7 @@ WORKDIR /src/cacholote
 
 COPY environment.yml /src/cacholote/
 
-RUN conda install -c conda-forge gcc python=3.10 \
+RUN conda install -c conda-forge gcc python=3.11 \
     && conda env update -n base -f environment.yml
 
 COPY . /src/cacholote
