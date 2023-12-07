@@ -209,7 +209,7 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> Settings:
     global _SETTINGS
     _SETTINGS = Settings(_env_file=env_file)  # type: ignore[call-arg]
     set()
-    return get()
+    return _SETTINGS.model_copy()
 
 
 def get() -> Settings:
