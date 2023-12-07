@@ -193,7 +193,7 @@ class set:
         _SETTINGS = self._old_settings
 
 
-def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
+def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> Settings:
     """Reset cacholote settings.
 
     Priority:
@@ -209,13 +209,11 @@ def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
     global _SETTINGS
     _SETTINGS = Settings(_env_file=env_file)  # type: ignore[call-arg]
     set()
+    return get()
 
 
 def get() -> Settings:
     """Get cacholote settings."""
     if _SETTINGS is None:
-        raise ValueError(_CONFIG_NOT_SET_MSG)
+        return reset()
     return _SETTINGS.model_copy()
-
-
-reset()
