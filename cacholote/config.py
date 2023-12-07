@@ -215,6 +215,5 @@ def get() -> Settings:
     """Get cacholote settings."""
     if _SETTINGS is None:
         reset()
-        if _SETTINGS is None:
-            raise RuntimeError("reset() did not work properly")
+        assert _SETTINGS is not None, "reset() did not work properly"
     return _SETTINGS.model_copy()
