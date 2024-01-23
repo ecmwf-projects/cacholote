@@ -199,7 +199,7 @@ class _Cleaner:
     @staticmethod
     @pydantic.validate_call
     def _get_method_sorters(
-        method: Literal["LRU", "LFU"]
+        method: Literal["LRU", "LFU"],
     ) -> List[sa.orm.InstrumentedAttribute[Any]]:
         sorters: List[sa.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":

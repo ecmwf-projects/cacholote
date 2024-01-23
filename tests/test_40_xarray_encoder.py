@@ -200,7 +200,7 @@ def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
 def test_xr_roundtrip(original_obj: Union[xr.Dataset, xr.DataArray]) -> None:
     @cache.cacheable
     def cache_xr_obj(
-        obj: Union[xr.Dataset, xr.DataArray]
+        obj: Union[xr.Dataset, xr.DataArray],
     ) -> Union[xr.Dataset, xr.DataArray]:
         return obj
 
