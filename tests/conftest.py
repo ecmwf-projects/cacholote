@@ -61,5 +61,7 @@ def set_cache(
             cache_files_urlpath=str(tmp_path / "cache_files"),
         ):
             yield "file"
+    elif param.lower() == "off":
+        yield "off"
     else:
         raise ValueError(f"{param=}")

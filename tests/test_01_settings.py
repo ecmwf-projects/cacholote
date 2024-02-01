@@ -7,7 +7,7 @@ from typing import Any, Dict, Union
 import pytest
 import sqlalchemy as sa
 
-from cacholote import config
+from cacholote import config, database
 
 does_not_raise = contextlib.nullcontext
 
@@ -117,3 +117,11 @@ def test_set_expiration(
 ) -> None:
     with raises:
         config.set(expiration=expiration)
+
+
+@pytest.mark.parametrize("set_cache", ["off"], indirect=True)
+def test_engine_and_session_are_initialized() -> None:
+    with config.set():
+        pass
+    assert database.SESSIONMAKER is not None
+    assert database.ENGINE is not None
