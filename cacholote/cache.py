@@ -51,7 +51,7 @@ def cacheable(func: F) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         settings = config.get()
 
-        if not settings.use_cache:
+        if not settings.use_cache and not settings.return_cache_entry:
             return func(*args, **kwargs)
 
         try:
@@ -62,25 +62,26 @@ def cacheable(func: F) -> F:
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)
 
-        filters = [
-            database.CacheEntry.key == hexdigest,
-            database.CacheEntry.expiration > utils.utcnow(),
-        ]
-        if settings.expiration:
-            # When expiration is provided, only get entries with matching expiration
-            filters.append(database.CacheEntry.expiration == settings.expiration)
+        if settings.use_cache:
+            filters = [
+                database.CacheEntry.key == hexdigest,
+                database.CacheEntry.expiration > utils.utcnow(),
+            ]
+            if settings.expiration:
+                # When expiration is provided, only get entries with matching expiration
+                filters.append(database.CacheEntry.expiration == settings.expiration)
 
-        with settings.sessionmaker() as session:
-            for cache_entry in session.scalars(
-                sa.select(database.CacheEntry)
-                .filter(*filters)
-                .order_by(database.CacheEntry.timestamp.desc())
-            ):
-                try:
-                    return _decode_and_update(session, cache_entry, settings)
-                except decode.DecodeError as ex:
-                    warnings.warn(str(ex), UserWarning)
-                    clean._delete_cache_entry(session, cache_entry)
+            with settings.sessionmaker() as session:
+                for cache_entry in session.scalars(
+                    sa.select(database.CacheEntry)
+                    .filter(*filters)
+                    .order_by(database.CacheEntry.timestamp.desc())
+                ):
+                    try:
+                        return _decode_and_update(session, cache_entry, settings)
+                    except decode.DecodeError as ex:
+                        warnings.warn(str(ex), UserWarning)
+                        clean._delete_cache_entry(session, cache_entry)
 
         result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(

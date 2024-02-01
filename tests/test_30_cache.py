@@ -109,13 +109,21 @@ def test_same_args_kwargs() -> None:
 
 
 @pytest.mark.parametrize("use_cache", [True, False])
-def test_use_cache(use_cache: bool) -> None:
-    config.set(use_cache=use_cache)
+@pytest.mark.parametrize("return_cache_entry", [True, False])
+def test_use_cache(use_cache: bool, return_cache_entry: bool) -> None:
+    config.set(use_cache=use_cache, return_cache_entry=return_cache_entry)
 
-    if use_cache:
-        assert cached_now() == cached_now()
+    first = cached_now()
+    second = cached_now()
+
+    if return_cache_entry:
+        assert isinstance(first, database.CacheEntry)
+        assert isinstance(second, database.CacheEntry)
+        assert first.id == second.id if use_cache else first.id != second.id
     else:
-        assert cached_now() < cached_now()
+        assert isinstance(first, datetime.datetime)
+        assert isinstance(second, datetime.datetime)
+        assert first == second if use_cache else first != second
 
 
 def test_expiration_and_return_cache_entry() -> None:
