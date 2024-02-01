@@ -72,18 +72,6 @@ class Settings(pydantic_settings.BaseSettings):
             create_engine_kwargs["poolclass"] = getattr(sa.pool, poolclass)
         return create_engine_kwargs
 
-    @pydantic.field_validator("return_cache_entry")
-    def validate_return_cache_entry(
-        cls: pydantic_settings.BaseSettings,
-        return_cache_entry: bool,
-        info: pydantic.ValidationInfo,
-    ) -> bool:
-        if return_cache_entry is True and info.data["use_cache"] is False:
-            raise ValueError(
-                "`use_cache` must be True when `return_cache_entry` is True"
-            )
-        return return_cache_entry
-
     @pydantic.field_validator("expiration")
     def validate_expiration(
         cls: pydantic_settings.BaseSettings, expiration: Optional[datetime.datetime]
