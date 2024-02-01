@@ -154,9 +154,9 @@ class set:
     """
 
     def __init__(self, **kwargs: Any):
+        self._old_settings = get()
         self._old_engine = database.ENGINE
         self._old_session = database.SESSIONMAKER
-        self._old_settings = get()
 
         global _SETTINGS
         _SETTINGS = Settings(**{**self._old_settings.model_dump(), **kwargs})
