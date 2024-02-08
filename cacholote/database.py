@@ -16,6 +16,7 @@
 
 import datetime
 import json
+import warnings
 from typing import Any, Dict, Optional
 
 import sqlalchemy as sa
@@ -68,7 +69,7 @@ def set_expiration_to_max(
 ) -> None:
     target.expiration = target.expiration or _DATETIME_MAX
     if target.expiration < utils.utcnow():
-        raise ValueError(f"Expiration date has passed. {target.expiration=}")
+        warnings.warn(f"Expiration date has passed. {target.expiration=}", UserWarning)
 
 
 def _commit_or_rollback(session: sa.orm.Session) -> None:
