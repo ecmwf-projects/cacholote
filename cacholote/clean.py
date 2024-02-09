@@ -31,7 +31,7 @@ from . import config, database, decode, encode, extra_encoders, utils
 def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sa.orm.Session] = None,
-    cache_entry_id: Optional[database.CacheEntry] = None,
+    cache_entry_id: Optional[int] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
 ) -> Any:
