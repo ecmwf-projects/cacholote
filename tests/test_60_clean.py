@@ -20,6 +20,11 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
         return f
 
 
+@cache.cacheable
+def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
+    return [fsspec.open(url).open() for url in urls]
+
+
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_clean_cache_files(
@@ -286,3 +291,16 @@ def test_cleaner_logging(
     line = next(captured)
     assert "check cache files total size" in line
     assert "size=0" in line
+
+
+def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+
+    fsspec.filesystem("file").pipe_file(tmp_path / "test1.txt", b"1")
+    fsspec.filesystem("file").pipe_file(tmp_path / "test2.txt", b"2")
+
+    open_urls(tmp_path / "test1.txt", tmp_path / "test2.txt")
+    assert len(fs.ls(dirname)) == 2
+
+    clean.clean_cache_files(0)
+    assert len(fs.ls(dirname)) == 0

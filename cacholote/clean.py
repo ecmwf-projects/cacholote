@@ -31,7 +31,7 @@ from . import config, database, decode, encode, extra_encoders, utils
 def _delete_cache_file(
     obj: Dict[str, Any],
     session: Optional[sa.orm.Session] = None,
-    cache_entry: Optional[database.CacheEntry] = None,
+    cache_entry_id: Optional[database.CacheEntry] = None,
     sizes: Optional[Dict[str, int]] = None,
     dry_run: bool = False,
 ) -> Any:
@@ -52,9 +52,14 @@ def _delete_cache_file(
         if posixpath.dirname(urlpath) == cache_dirname:
             size = sizes.pop(urlpath, 0)
             if not dry_run:
-                if session and cache_entry:
-                    logger.info("delete cache entry", cache_entry=cache_entry)
-                    session.delete(cache_entry)
+                if session:
+                    for cache_entry in session.scalars(
+                        sa.select(database.CacheEntry).filter(
+                            database.CacheEntry.id == cache_entry_id
+                        )
+                    ):
+                        logger.info("delete cache entry", cache_entry=cache_entry)
+                        session.delete(cache_entry)
                     database._commit_or_rollback(session)
 
                 if fs.exists(urlpath):
@@ -247,7 +252,7 @@ class _Cleaner:
                         object_hook=functools.partial(
                             _delete_cache_file,
                             session=session,
-                            cache_entry=cache_entry,
+                            cache_entry_id=cache_entry.id,
                             sizes=self.sizes,
                         ),
                     )
