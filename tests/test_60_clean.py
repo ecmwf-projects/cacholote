@@ -21,7 +21,7 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 
 
 @cache.cacheable
-def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
+def open_urls(*urls: pathlib.Path) -> List[fsspec.spec.AbstractBufferedFile]:
     return [fsspec.open(url).open() for url in urls]
 
 
