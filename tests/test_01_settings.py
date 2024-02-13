@@ -137,3 +137,9 @@ def test_set_expiration(
 ) -> None:
     with raises:
         config.set(expiration=expiration)
+
+
+def test_create_engine_dict_kwargs() -> None:
+    old_session_maker = config.get().instantiated_sessionmaker
+    config.set(create_engine_kwargs={"connect_args": {"timeout": 30}})
+    assert config.get().instantiated_sessionmaker is not old_session_maker

@@ -88,23 +88,20 @@ class Settings(pydantic_settings.BaseSettings):
         fs.mkdirs(urlpath, exist_ok=True)
         return self
 
-    @pydantic.model_validator(mode="after")
-    def check_mutually_exclusive(self) -> "Settings":
-        mutually_exclusive = (self.sessionmaker, self.cache_db_urlpath)
-        if all(mutually_exclusive) or not any(mutually_exclusive):
-            raise ValueError(
-                "Provide either `sessionmaker` or `cache_db_urlpath` (mutually exclusive)."
-            )
-        return self
-
     @property
     def instantiated_sessionmaker(self) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
         if self.sessionmaker is None:
+            if self.cache_db_urlpath is None:
+                raise ValueError("Provide either `sessionmaker` or `cache_db_urlpath`.")
             self.sessionmaker = database.cached_sessionmaker(
                 self.cache_db_urlpath, **self.create_engine_kwargs
             )
             self.cache_db_urlpath = None
             self.create_engine_kwargs = {}
+        elif self.cache_db_urlpath is not None:
+            raise ValueError(
+                "`sessionmaker` and `cache_db_urlpath` are mutually exclusive."
+            )
         return self.sessionmaker
 
     @property

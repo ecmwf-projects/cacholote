@@ -18,7 +18,7 @@ import datetime
 import functools
 import json
 import warnings
-from typing import Any
+from typing import Any, Dict
 
 import sqlalchemy as sa
 import sqlalchemy.orm
@@ -77,8 +77,32 @@ def _commit_or_rollback(session: sa.orm.Session) -> None:
         session.rollback()
 
 
+def _encode_kwargs(**kwargs: Any) -> Dict[str, Any]:
+    encoded_kwargs = {}
+    for key, value in kwargs.items():
+        if isinstance(value, dict):
+            encoded_kwargs["_encoded_" + key] = json.dumps(value)
+        else:
+            encoded_kwargs[key] = value
+    return encoded_kwargs
+
+
+def _decode_kwargs(**kwargs: Any) -> Dict[str, Any]:
+    decoded_kwargs = {}
+    for key, value in kwargs.items():
+        if key.startswith("_encoded_"):
+            decoded_kwargs[key.replace("_encoded_", "", 1)] = json.loads(value)
+        else:
+            decoded_kwargs[key] = value
+    return decoded_kwargs
+
+
 @functools.lru_cache()
-def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
-    engine = sa.create_engine(url, **kwargs)
+def _cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+    engine = sa.create_engine(url, **_decode_kwargs(**kwargs))
     Base.metadata.create_all(engine)
     return sa.orm.sessionmaker(engine)
+
+
+def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+    return _cached_sessionmaker(url, **_encode_kwargs(**kwargs))
