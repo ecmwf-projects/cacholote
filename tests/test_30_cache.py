@@ -74,7 +74,9 @@ def test_encode_errors(tmp_path: pathlib.Path, raise_all_encoding_errors: bool) 
         with pytest.raises(AttributeError):
             cfunc(inst)
     else:
-        with pytest.warns(UserWarning, match="can NOT encode python call"):
+        with pytest.warns(UserWarning, match="AttributeError"), pytest.warns(
+            UserWarning, match="can NOT encode python call"
+        ):
             res = cfunc(inst)
         assert res == {"a": inst, "args": (), "b": None, "kwargs": {}}
 
@@ -82,7 +84,9 @@ def test_encode_errors(tmp_path: pathlib.Path, raise_all_encoding_errors: bool) 
         with pytest.raises(AttributeError):
             cfunc("test", b=1)
     else:
-        with pytest.warns(UserWarning, match="can NOT encode output"):
+        with pytest.warns(UserWarning, match="AttributeError"), pytest.warns(
+            UserWarning, match="can NOT encode output"
+        ):
             res = cfunc("test", b=1)
         assert res.__class__.__name__ == "LocalClass"
 
