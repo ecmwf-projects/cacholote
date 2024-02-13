@@ -92,7 +92,7 @@ class Settings(pydantic_settings.BaseSettings):
     def check_mutually_exclusive(self) -> "Settings":
         if self.sessionmaker and (self.cache_db_urlpath or self.create_engine_kwargs):
             raise ValueError(
-                "`sessionmaker` is mutually exclusive with `cache_db_urlpath` and `create_engine_kwargs`."
+                f"`sessionmaker` is mutually exclusive with `{self.cache_db_urlpath=}` and `{self.create_engine_kwargs=}`."
             )
         if not (self.sessionmaker or self.cache_db_urlpath):
             raise ValueError(
