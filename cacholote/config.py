@@ -34,6 +34,8 @@ from . import database
 _SETTINGS: Optional[Settings] = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
+_DEFAULT_CACHE_DB_URLPATH = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
+_DEFAULT_CACHE_FILES_URLPATH = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
 _DEFAULT_LOGGER = structlog.get_logger(
     wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
 )
@@ -41,10 +43,10 @@ _DEFAULT_LOGGER = structlog.get_logger(
 
 class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
-    cache_db_urlpath: Optional[str] = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
+    cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
     create_engine_kwargs: Dict[str, Any] = {}
     sessionmaker: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
-    cache_files_urlpath: str = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
+    cache_files_urlpath: str = _DEFAULT_CACHE_FILES_URLPATH
     cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: Dict[str, Any] = {}
     xarray_cache_type: Literal[
@@ -128,10 +130,12 @@ class set:
     ----------
     use_cache: bool, default: True
         Enable/disable cache.
-    cache_db_urlpath: str, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
+    cache_db_urlpath: str, None, default:"sqlite:////system_tmp_dir/cacholote/cacholote.db"
         URL for cache database (driver://user:pass@host/database).
     create_engine_kwargs: dict, default: {}
         Keyword arguments for ``sqlalchemy.create_engine``
+    sessionmaker: sessionmaker, optional
+        sqlalchemy.sessionamaker, mutually exclusive with cache_db_urlpath and create_engine_kwargs
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
         URL for cache files (protocol://location).
     cache_files_storage_options: dict, default: {}
