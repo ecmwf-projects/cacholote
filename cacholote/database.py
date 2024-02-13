@@ -79,6 +79,6 @@ def _commit_or_rollback(session: sa.orm.Session) -> None:
 
 @functools.lru_cache()
 def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
-    engine = sa.create_engine(url, future=True, **kwargs)
+    engine = sa.create_engine(url, **kwargs)
     Base.metadata.create_all(engine)
     return sa.orm.sessionmaker(engine)
