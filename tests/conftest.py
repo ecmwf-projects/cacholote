@@ -8,7 +8,7 @@ import pytest
 import requests
 from moto.moto_server.threaded_moto_server import ThreadedMotoServer
 
-from cacholote import config
+from cacholote import config, database
 
 
 @pytest.fixture(scope="session")
@@ -44,6 +44,7 @@ def set_cache(
 ) -> Iterator[str]:
     param = getattr(request, "param", "file")
     if param.lower() == "cads":
+        database.cached_sessionmaker.cache_clear()
         test_bucket_name = "test-bucket"
         client_kwargs = create_test_bucket(s3_server, test_bucket_name)
         with config.set(

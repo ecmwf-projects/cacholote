@@ -7,6 +7,8 @@ import structlog
 
 from cacholote import cache, config, decode, encode, extra_encoders, utils
 
+dask = pytest.importorskip("dask")
+
 try:
     import xarray as xr
 except ImportError:
@@ -35,11 +37,14 @@ def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
 
     # Create sample dataset
     ds = xr.Dataset({"foo": [0]}, attrs={})
+    with dask.config.set({"tokenize.ensure-deterministic": True}):
+        token = dask.base.tokenize(ds)
 
     # Check dict
     actual = extra_encoders.dictify_xr_object(ds)
-    href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
-    local_path = f"{tmp_path}/cache_files/247fd17e087ae491996519c097e70e48.nc"
+    print(fsspec.filesystem("file").ls(f"{tmp_path}/cache_files"))
+    href = f"{readonly_dir}/{token}.nc"
+    local_path = f"{tmp_path}/cache_files/{token}.nc"
     expected = {
         "type": "python_call",
         "callable": "cacholote.extra_encoders:decode_xr_dataset",
