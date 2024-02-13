@@ -90,13 +90,10 @@ class Settings(pydantic_settings.BaseSettings):
 
     @pydantic.model_validator(mode="after")
     def check_mutually_exclusive(self) -> "Settings":
-        if self.sessionmaker and self.cache_db_urlpath:
+        mutually_exclusive = (self.sessionmaker, self.cache_db_urlpath)
+        if all(mutually_exclusive) or not any(mutually_exclusive):
             raise ValueError(
-                f"`sessionmaker` is mutually exclusive with `{self.cache_db_urlpath=}`."
-            )
-        if not (self.sessionmaker or self.cache_db_urlpath):
-            raise ValueError(
-                "Please provide either `sessionmaker` or `cache_db_urlpath`."
+                "Provide either `sessionmaker` or `cache_db_urlpath` (mutually exclusive)."
             )
         return self
 
@@ -165,14 +162,14 @@ class set:
         self._old_settings = get()
 
         model_dump = self._old_settings.model_dump()
-        if kwargs.get("cache_db_urlpath") or kwargs.get("create_engine_kwargs"):
+        if kwargs.get("cache_db_urlpath"):
             model_dump["sessionmaker"] = None
-        if kwargs.get("sessionmaker") is not None:
+        if kwargs.get("sessionmaker"):
             model_dump["cache_db_urlpath"] = None
-            model_dump["create_engine_kwargs"] = {}
+        model_dump.update(kwargs)
 
         global _SETTINGS
-        _SETTINGS = Settings(**{**model_dump, **kwargs})
+        _SETTINGS = Settings(**model_dump)
 
     def __enter__(self) -> Settings:
         return get()
