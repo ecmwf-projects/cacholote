@@ -71,7 +71,7 @@ def cacheable(func: F) -> F:
                 # When expiration is provided, only get entries with matching expiration
                 filters.append(database.CacheEntry.expiration == settings.expiration)
 
-            with settings.sessionmaker() as session:
+            with settings.instantiated_sessionmaker() as session:
                 for cache_entry in session.scalars(
                     sa.select(database.CacheEntry)
                     .filter(*filters)
@@ -97,7 +97,7 @@ def cacheable(func: F) -> F:
             warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
             return result
 
-        with settings.sessionmaker() as session:
+        with settings.instantiated_sessionmaker() as session:
             session.add(cache_entry)
             return _decode_and_update(session, cache_entry, settings)
 

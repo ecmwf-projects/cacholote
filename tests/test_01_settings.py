@@ -7,9 +7,29 @@ from typing import Any, Dict, Union
 import pytest
 import sqlalchemy as sa
 
-from cacholote import config, database
+from cacholote import config
 
 does_not_raise = contextlib.nullcontext
+
+
+def test_change_sessionmaker(tmp_path: pathlib.Path) -> None:
+    old_sessionmaker = config.get().instantiated_sessionmaker
+    new_db = "sqlite:///" + str(tmp_path / "dummy.db")
+
+    with config.set(cache_db_urlpath=new_db):
+        new_sessionmaker = config.get().instantiated_sessionmaker
+        assert new_sessionmaker is not old_sessionmaker
+    assert config.get().instantiated_sessionmaker is old_sessionmaker
+
+    with config.set(sessionmaker=new_sessionmaker):
+        assert config.get().instantiated_sessionmaker is new_sessionmaker
+    assert config.get().instantiated_sessionmaker is old_sessionmaker
+
+    config.set(cache_db_urlpath=new_db)
+    assert config.get().instantiated_sessionmaker is new_sessionmaker
+
+    config.set(sessionmaker=old_sessionmaker)
+    assert config.get().instantiated_sessionmaker is old_sessionmaker
 
 
 def test_change_cache_db_urlpath(tmp_path: pathlib.Path) -> None:
@@ -36,7 +56,7 @@ def test_set_engine_and_sessionmaker(
     tmp_path: pathlib.Path, key: str, reset: bool
 ) -> None:
     old_engine = config.get().engine
-    old_sessionmaker = config.get().sessionmaker
+    old_sessionmaker = config.get().instantiated_sessionmaker
 
     kwargs: Dict[str, Any] = {}
     if key == "cache_db_urlpath":
@@ -51,20 +71,20 @@ def test_set_engine_and_sessionmaker(
     with config.set(**kwargs):
         if reset:
             assert config.get().engine is not old_engine
-            assert config.get().sessionmaker is not old_sessionmaker
+            assert config.get().instantiated_sessionmaker is not old_sessionmaker
         else:
             assert config.get().engine is old_engine
-            assert config.get().sessionmaker is old_sessionmaker
+            assert config.get().instantiated_sessionmaker is old_sessionmaker
     assert config.get().engine is old_engine
-    assert config.get().sessionmaker is old_sessionmaker
+    assert config.get().instantiated_sessionmaker is old_sessionmaker
 
     config.set(**kwargs)
     if reset:
         assert config.get().engine is not old_engine
-        assert config.get().sessionmaker is not old_sessionmaker
+        assert config.get().instantiated_sessionmaker is not old_sessionmaker
     else:
         assert config.get().engine is old_engine
-        assert config.get().sessionmaker is old_sessionmaker
+        assert config.get().instantiated_sessionmaker is old_sessionmaker
 
 
 def test_env_variables(tmp_path: pathlib.Path) -> None:
@@ -117,11 +137,3 @@ def test_set_expiration(
 ) -> None:
     with raises:
         config.set(expiration=expiration)
-
-
-@pytest.mark.parametrize("set_cache", ["off"], indirect=True)
-def test_engine_and_session_are_initialized() -> None:
-    with config.set():
-        pass
-    assert database.SESSIONMAKER is not None
-    assert database.ENGINE is not None

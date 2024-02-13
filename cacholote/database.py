@@ -15,9 +15,10 @@
 # limitations under the License.
 
 import datetime
+import functools
 import json
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any
 
 import sqlalchemy as sa
 import sqlalchemy.orm
@@ -27,9 +28,6 @@ from . import utils
 _DATETIME_MAX = datetime.datetime(
     datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
 )
-
-ENGINE: Optional[sa.engine.Engine] = None
-SESSIONMAKER: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
 
 Base = sa.orm.declarative_base()
 
@@ -79,10 +77,8 @@ def _commit_or_rollback(session: sa.orm.Session) -> None:
         session.rollback()
 
 
-def _set_engine_and_session(
-    cache_db_urlpath: str, create_engine_kwargs: Dict[str, Any]
-) -> None:
-    global ENGINE, SESSIONMAKER
-    ENGINE = sa.create_engine(cache_db_urlpath, future=True, **create_engine_kwargs)
-    Base.metadata.create_all(ENGINE)
-    SESSIONMAKER = sa.orm.sessionmaker(ENGINE)
+@functools.lru_cache()
+def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+    engine = sa.create_engine(url, future=True, **kwargs)
+    Base.metadata.create_all(engine)
+    return sa.orm.sessionmaker(engine)

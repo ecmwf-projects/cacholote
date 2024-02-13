@@ -38,8 +38,9 @@ def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
 
     # Check dict
     actual = extra_encoders.dictify_xr_object(ds)
-    href = f"{readonly_dir}/247fd17e087ae491996519c097e70e48.nc"
-    local_path = f"{tmp_path}/cache_files/247fd17e087ae491996519c097e70e48.nc"
+    print(fsspec.filesystem("file").ls(f"{tmp_path}/cache_files"))
+    href = f"{readonly_dir}/44e71a6a1ccdee85de263e68989351e3.nc"
+    local_path = f"{tmp_path}/cache_files/44e71a6a1ccdee85de263e68989351e3.nc"
     expected = {
         "type": "python_call",
         "callable": "cacholote.extra_encoders:decode_xr_dataset",

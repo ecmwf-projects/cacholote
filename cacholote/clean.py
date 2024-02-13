@@ -97,7 +97,7 @@ def delete(
         Keyword arguments of functions to delete from cache
     """
     hexdigest = encode._hexdigestify_python_call(func_to_del, *args, **kwargs)
-    with config.get().sessionmaker() as session:
+    with config.get().instantiated_sessionmaker() as session:
         for cache_entry in session.scalars(
             sa.select(database.CacheEntry).filter(database.CacheEntry.key == hexdigest)
         ):
@@ -148,7 +148,7 @@ class _Cleaner:
 
         unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
         if unknown_sizes:
-            with config.get().sessionmaker() as session:
+            with config.get().instantiated_sessionmaker() as session:
                 for cache_entry in session.scalars(sa.select(database.CacheEntry)):
                     json.loads(
                         cache_entry._result_as_string,
@@ -231,14 +231,14 @@ class _Cleaner:
         start_timestamp = utils.utcnow()
 
         # Get entries to clean
-        with config.get().sessionmaker() as session:
+        with config.get().instantiated_sessionmaker() as session:
             cache_entry_ids = session.scalars(
                 sa.select(database.CacheEntry.id).filter(*filters).order_by(*sorters)
             )
 
         # Loop over entries
         for cache_entry_id in cache_entry_ids:
-            with config.get().sessionmaker() as session:
+            with config.get().instantiated_sessionmaker() as session:
                 filters = [
                     database.CacheEntry.id == cache_entry_id,
                     # skip entries updated while cleaning
@@ -322,14 +322,14 @@ def clean_invalid_cache_entries(
     if check_expiration:
         filters.append(database.CacheEntry.expiration <= utils.utcnow())
     if filters:
-        with config.get().sessionmaker() as session:
+        with config.get().instantiated_sessionmaker() as session:
             for cache_entry in session.scalars(
                 sa.select(database.CacheEntry).filter(*filters)
             ):
                 _delete_cache_entry(session, cache_entry)
 
     if try_decode:
-        with config.get().sessionmaker() as session:
+        with config.get().instantiated_sessionmaker() as session:
             for cache_entry in session.scalars(sa.select(database.CacheEntry)):
                 try:
                     decode.loads(cache_entry._result_as_string)

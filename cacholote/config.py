@@ -38,15 +38,12 @@ _DEFAULT_LOGGER = structlog.get_logger(
     wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
 )
 
-_CONFIG_NOT_SET_MSG = (
-    "Configuration settings have not been set. Run `cacholote.config.reset()`."
-)
-
 
 class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
-    cache_db_urlpath: str = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
+    cache_db_urlpath: Optional[str] = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
     create_engine_kwargs: Dict[str, Any] = {}
+    sessionmaker: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
     cache_files_urlpath: str = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
     cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: Dict[str, Any] = {}
@@ -80,35 +77,42 @@ class Settings(pydantic_settings.BaseSettings):
             raise ValueError(f"Expiration is missing the timezone info. {expiration=}")
         return expiration
 
-    def make_cache_dir(self) -> None:
+    @pydantic.model_validator(mode="after")
+    def make_cache_dir(self) -> "Settings":
         fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
             self.cache_files_urlpath,
             storage_options=self.cache_files_storage_options,
         )
         fs.mkdirs(urlpath, exist_ok=True)
+        return self
 
-    def set_engine_and_session(self, force_reset: bool = False) -> None:
-        if (
-            force_reset
-            or database.ENGINE is None
-            or database.SESSIONMAKER is None
-            or str(database.ENGINE.url) != self.cache_db_urlpath
-        ):
-            database._set_engine_and_session(
-                self.cache_db_urlpath, self.create_engine_kwargs
+    @pydantic.model_validator(mode="after")
+    def check_mutually_exclusive(self) -> "Settings":
+        if self.sessionmaker and (self.cache_db_urlpath or self.create_engine_kwargs):
+            raise ValueError(
+                "`sessionmaker` is mutually exclusive with `cache_db_urlpath` and `create_engine_kwargs`."
             )
+        if not (self.sessionmaker or self.cache_db_urlpath):
+            raise ValueError(
+                "Please provide either `sessionmaker` or `cache_db_urlpath`."
+            )
+        return self
+
+    @property
+    def instantiated_sessionmaker(self) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+        if self.sessionmaker is None:
+            self.sessionmaker = database.cached_sessionmaker(
+                self.cache_db_urlpath, **self.create_engine_kwargs
+            )
+            self.cache_db_urlpath = None
+            self.create_engine_kwargs = {}
+        return self.sessionmaker
 
     @property
     def engine(self) -> sa.engine.Engine:
-        if database.ENGINE is None:
-            raise ValueError(_CONFIG_NOT_SET_MSG)
-        return database.ENGINE
-
-    @property
-    def sessionmaker(self) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
-        if database.SESSIONMAKER is None:
-            raise ValueError(_CONFIG_NOT_SET_MSG)
-        return database.SESSIONMAKER
+        engine = self.instantiated_sessionmaker.kw["bind"]
+        assert isinstance(engine, sa.engine.Engine)
+        return engine
 
     model_config = pydantic_settings.SettingsConfigDict(
         case_sensitive=False, env_prefix="cacholote_"
@@ -155,15 +159,16 @@ class set:
 
     def __init__(self, **kwargs: Any):
         self._old_settings = get()
-        self._old_engine = database.ENGINE
-        self._old_session = database.SESSIONMAKER
+
+        model_dump = self._old_settings.model_dump()
+        if kwargs.get("cache_db_urlpath") or kwargs.get("create_engine_kwargs"):
+            model_dump["sessionmaker"] = None
+        if kwargs.get("sessionmaker") is not None:
+            model_dump["cache_db_urlpath"] = None
+            model_dump["create_engine_kwargs"] = {}
 
         global _SETTINGS
-        _SETTINGS = Settings(**{**self._old_settings.model_dump(), **kwargs})
-        _SETTINGS.make_cache_dir()
-        _SETTINGS.set_engine_and_session(
-            self._old_settings.create_engine_kwargs != _SETTINGS.create_engine_kwargs
-        )
+        _SETTINGS = Settings(**{**model_dump, **kwargs})
 
     def __enter__(self) -> Settings:
         return get()
@@ -174,9 +179,6 @@ class set:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        database.ENGINE = self._old_engine
-        database.SESSIONMAKER = self._old_session
-
         global _SETTINGS
         _SETTINGS = self._old_settings
 
