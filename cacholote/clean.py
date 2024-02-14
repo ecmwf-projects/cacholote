@@ -112,7 +112,7 @@ class _Cleaner:
         urldir = self.fs.unstrip_protocol(self.dirname)
 
         self.logger.info("get disk usage of cache files")
-        self.sizes: dict[str, int] = collections.defaultdict(lambda: 0)
+        self.sizes: dict[str, int] = collections.defaultdict(int)
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)

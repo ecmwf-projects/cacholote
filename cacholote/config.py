@@ -31,7 +31,7 @@ import structlog
 
 from . import database
 
-_SETTINGS: Optional[Settings] = None
+_SETTINGS: Settings | None = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 _DEFAULT_CACHE_DB_URLPATH = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
@@ -73,8 +73,8 @@ class Settings(pydantic_settings.BaseSettings):
 
     @pydantic.field_validator("expiration")
     def validate_expiration(
-        cls: pydantic_settings.BaseSettings, expiration: Optional[datetime.datetime]
-    ) -> Optional[datetime.datetime]:
+        cls: pydantic_settings.BaseSettings, expiration: datetime.datetime | None
+    ) -> datetime.datetime | None:
         if expiration is not None and expiration.tzinfo is None:
             raise ValueError(f"Expiration is missing the timezone info. {expiration=}")
         return expiration
@@ -173,15 +173,15 @@ class set:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         global _SETTINGS
         _SETTINGS = self._old_settings
 
 
-def reset(env_file: Optional[Union[str, tuple[str]]] = None) -> None:
+def reset(env_file: str | tuple[str] | None = None) -> None:
     """Reset cacholote settings.
 
     Priority:
