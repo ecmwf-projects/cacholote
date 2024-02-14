@@ -50,6 +50,7 @@ module = [
 # Same as Black.
 indent-width = 4
 line-length = 88
+target-version = "py39"
 
 [tool.ruff.lint]
 ignore = [
@@ -65,7 +66,9 @@ select = [
   # isort
   "I",
   # pydocstyle
-  "D"
+  "D",
+  # Pyupgrade
+  "UP"
 ]
 
 [tool.ruff.lint.pycodestyle]

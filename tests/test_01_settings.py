@@ -2,7 +2,7 @@ import contextlib
 import datetime
 import os
 import pathlib
-from typing import Any, Dict, Union
+from typing import Any, Union
 
 import pytest
 import sqlalchemy as sa
@@ -58,7 +58,7 @@ def test_set_engine_and_sessionmaker(
     old_engine = config.get().engine
     old_sessionmaker = config.get().instantiated_sessionmaker
 
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if key == "cache_db_urlpath":
         kwargs[key] = "sqlite:///" + str(tmp_path / "dummy.db")
     elif key == "create_engine_kwargs":

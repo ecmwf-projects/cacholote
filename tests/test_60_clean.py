@@ -2,7 +2,7 @@ import contextlib
 import datetime
 import pathlib
 import time
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 import fsspec
 import pydantic
@@ -21,7 +21,7 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 
 
 @cache.cacheable
-def open_urls(*urls: pathlib.Path) -> List[fsspec.spec.AbstractBufferedFile]:
+def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
     return [fsspec.open(url).open() for url in urls]
 
 
@@ -146,9 +146,9 @@ def test_clean_locked_files(
 )
 def test_clean_tagged_files(
     tmp_path: pathlib.Path,
-    tags_to_clean: Optional[List[Optional[str]]],
-    tags_to_keep: Optional[List[Optional[str]]],
-    cleaned: List[Optional[str]],
+    tags_to_clean: Optional[list[Optional[str]]],
+    tags_to_keep: Optional[list[Optional[str]]],
+    cleaned: list[Optional[str]],
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 

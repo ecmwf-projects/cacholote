@@ -4,7 +4,7 @@ import importlib
 import io
 import pathlib
 import subprocess
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Optional, Union
 
 import fsspec
 import pytest
@@ -73,7 +73,7 @@ def test_dictify_bytes_io_object(
         if importlib.util.find_spec("magic")
         else "application/octet-stream"
     )
-    expected: Tuple[Dict[str, Any], ...] = (
+    expected: tuple[dict[str, Any], ...] = (
         {
             "type": type,
             "href": local_path,

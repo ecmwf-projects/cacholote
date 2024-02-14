@@ -23,7 +23,7 @@ import io
 import time
 import warnings
 from types import TracebackType
-from typing import Any, Optional, Tuple, Type
+from typing import Any, Optional
 
 import fsspec
 
@@ -36,7 +36,7 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()[:32]
 
 
-def get_cache_files_fs_dirname() -> Tuple[fsspec.AbstractFileSystem, str]:
+def get_cache_files_fs_dirname() -> tuple[fsspec.AbstractFileSystem, str]:
     """Return the ``fsspec`` filesystem and directory name where cache files are stored."""
     fs, _, (path,) = fsspec.get_fs_token_paths(
         config.get().cache_files_urlpath,
@@ -110,7 +110,7 @@ class FileLock:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:

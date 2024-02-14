@@ -19,7 +19,7 @@ import datetime
 import functools
 import json
 import posixpath
-from typing import Any, Callable, Dict, List, Literal, Optional, Set, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 import pydantic
 import sqlalchemy as sa
@@ -29,10 +29,10 @@ from . import config, database, decode, encode, extra_encoders, utils
 
 
 def _delete_cache_file(
-    obj: Dict[str, Any],
+    obj: dict[str, Any],
     session: Optional[sa.orm.Session] = None,
     cache_entry_id: Optional[int] = None,
-    sizes: Optional[Dict[str, int]] = None,
+    sizes: Optional[dict[str, int]] = None,
     dry_run: bool = False,
 ) -> Any:
     logger = config.get().logger
@@ -112,7 +112,7 @@ class _Cleaner:
         urldir = self.fs.unstrip_protocol(self.dirname)
 
         self.logger.info("get disk usage of cache files")
-        self.sizes: Dict[str, int] = collections.defaultdict(lambda: 0)
+        self.sizes: dict[str, int] = collections.defaultdict(lambda: 0)
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)
@@ -129,7 +129,7 @@ class _Cleaner:
     def stop_cleaning(self, maxsize: int) -> bool:
         return self.size <= maxsize
 
-    def get_unknown_files(self, lock_validity_period: Optional[float]) -> Set[str]:
+    def get_unknown_files(self, lock_validity_period: Optional[float]) -> set[str]:
         self.logger.info("get unknown files")
 
         utcnow = utils.utcnow()
@@ -174,9 +174,9 @@ class _Cleaner:
     @staticmethod
     @pydantic.validate_call
     def _get_tag_filters(
-        tags_to_clean: Optional[List[Optional[str]]],
-        tags_to_keep: Optional[List[Optional[str]]],
-    ) -> List[sa.ColumnElement[bool]]:
+        tags_to_clean: Optional[list[Optional[str]]],
+        tags_to_keep: Optional[list[Optional[str]]],
+    ) -> list[sa.ColumnElement[bool]]:
         if (tags_to_clean is not None) and (tags_to_keep is not None):
             raise ValueError("tags_to_clean/keep are mutually exclusive.")
 
@@ -205,8 +205,8 @@ class _Cleaner:
     @pydantic.validate_call
     def _get_method_sorters(
         method: Literal["LRU", "LFU"],
-    ) -> List[sa.orm.InstrumentedAttribute[Any]]:
-        sorters: List[sa.orm.InstrumentedAttribute[Any]] = []
+    ) -> list[sa.orm.InstrumentedAttribute[Any]]:
+        sorters: list[sa.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":
             sorters.extend([database.CacheEntry.timestamp, database.CacheEntry.counter])
         elif method == "LFU":
@@ -220,8 +220,8 @@ class _Cleaner:
         self,
         maxsize: int,
         method: Literal["LRU", "LFU"],
-        tags_to_clean: Optional[List[Optional[str]]],
-        tags_to_keep: Optional[List[Optional[str]]],
+        tags_to_clean: Optional[list[Optional[str]]],
+        tags_to_keep: Optional[list[Optional[str]]],
     ) -> None:
         filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
         sorters = self._get_method_sorters(method)
@@ -270,8 +270,8 @@ def clean_cache_files(
     delete_unknown_files: bool = False,
     recursive: bool = False,
     lock_validity_period: Optional[float] = None,
-    tags_to_clean: Optional[List[Optional[str]]] = None,
-    tags_to_keep: Optional[List[Optional[str]]] = None,
+    tags_to_clean: Optional[list[Optional[str]]] = None,
+    tags_to_keep: Optional[list[Optional[str]]] = None,
 ) -> None:
     """Clean cache files.
 
