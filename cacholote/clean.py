@@ -13,13 +13,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import collections
 import datetime
 import functools
 import json
 import posixpath
-from typing import Any, Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional
 
 import pydantic
 import sqlalchemy as sa
@@ -30,9 +31,9 @@ from . import config, database, decode, encode, extra_encoders, utils
 
 def _delete_cache_file(
     obj: dict[str, Any],
-    session: Optional[sa.orm.Session] = None,
-    cache_entry_id: Optional[int] = None,
-    sizes: Optional[dict[str, int]] = None,
+    session: sa.orm.Session | None = None,
+    cache_entry_id: int | None = None,
+    sizes: dict[str, int] | None = None,
     dry_run: bool = False,
 ) -> Any:
     logger = config.get().logger
@@ -82,9 +83,7 @@ def _delete_cache_entry(
     json.loads(cache_entry._result_as_string, object_hook=_delete_cache_file)
 
 
-def delete(
-    func_to_del: Union[str, Callable[..., Any]], *args: Any, **kwargs: Any
-) -> None:
+def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> None:
     """Delete function previously cached.
 
     Parameters
@@ -129,7 +128,7 @@ class _Cleaner:
     def stop_cleaning(self, maxsize: int) -> bool:
         return self.size <= maxsize
 
-    def get_unknown_files(self, lock_validity_period: Optional[float]) -> set[str]:
+    def get_unknown_files(self, lock_validity_period: float | None) -> set[str]:
         self.logger.info("get unknown files")
 
         utcnow = utils.utcnow()
@@ -161,7 +160,7 @@ class _Cleaner:
         return set(unknown_sizes)
 
     def delete_unknown_files(
-        self, lock_validity_period: Optional[float], recursive: bool
+        self, lock_validity_period: float | None, recursive: bool
     ) -> None:
         for urlpath in self.get_unknown_files(lock_validity_period):
             size = self.sizes.pop(urlpath)
@@ -220,8 +219,8 @@ class _Cleaner:
         self,
         maxsize: int,
         method: Literal["LRU", "LFU"],
-        tags_to_clean: Optional[list[Optional[str]]],
-        tags_to_keep: Optional[list[Optional[str]]],
+        tags_to_clean: list[str | None] | None,
+        tags_to_keep: list[str | None] | None,
     ) -> None:
         filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
         sorters = self._get_method_sorters(method)
@@ -269,9 +268,9 @@ def clean_cache_files(
     method: Literal["LRU", "LFU"] = "LRU",
     delete_unknown_files: bool = False,
     recursive: bool = False,
-    lock_validity_period: Optional[float] = None,
-    tags_to_clean: Optional[list[Optional[str]]] = None,
-    tags_to_keep: Optional[list[Optional[str]]] = None,
+    lock_validity_period: float | None = None,
+    tags_to_clean: list[str | None] | None = None,
+    tags_to_keep: list[str | None] | None = None,
 ) -> None:
     """Clean cache files.
 

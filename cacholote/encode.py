@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import annotations
 
 import binascii
 import collections.abc
@@ -23,7 +23,7 @@ import inspect
 import json
 import pickle
 import warnings
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable
 
 from . import config, decode, utils
 
@@ -31,7 +31,7 @@ _JSON_DUMPS_KWARGS: dict[str, Any] = {"separators": (",", ":"), "skipkeys": Fals
 
 
 def _hexdigestify_python_call(
-    func_to_hex: Union[str, Callable[..., Any]],
+    func_to_hex: str | Callable[..., Any],
     *args: Any,
     **kwargs: Any,
 ) -> str:
@@ -46,7 +46,7 @@ def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
     return f"{module.__name__}:{obj.__qualname__}"
 
 
-def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> dict[str, str]:
+def dictify_python_object(obj: str | Callable[..., Any]) -> dict[str, str]:
     if isinstance(obj, str):
         # NOTE: a stricter test would be decode.import_object(obj)
         if ":" not in obj:
@@ -61,7 +61,7 @@ def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> dict[str, str]
 
 
 def dictify_python_call(
-    func_to_dict: Union[str, Callable[..., Any]],
+    func_to_dict: str | Callable[..., Any],
     *args: Any,
     **kwargs: Any,
 ) -> dict[str, Any]:
@@ -133,7 +133,7 @@ class EncodeError(Exception):
 
 def filecache_default(
     obj: Any,
-    encoders: Optional[list[tuple[Any, Callable[[Any], dict[str, Any]]]]] = None,
+    encoders: list[tuple[Any, Callable[[Any], dict[str, Any]]]] | None = None,
 ) -> dict[str, Any]:
     """Dictify objects that are not JSON-serializable.
 
@@ -187,7 +187,7 @@ def dumps(
 
 
 def dumps_python_call(
-    func_to_dump: Union[str, Callable[..., Any]],
+    func_to_dump: str | Callable[..., Any],
     *args: Any,
     **kwargs: Any,
 ) -> str:

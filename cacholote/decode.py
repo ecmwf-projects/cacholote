@@ -14,11 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import annotations
 
 import importlib
 import json
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 
 def import_object(fully_qualified_name: str) -> Any:
@@ -74,7 +74,7 @@ def object_hook(obj: dict[str, Any]) -> Any:
     return obj
 
 
-def loads(obj: Union[str, bytes, bytearray], **kwargs: Any) -> Any:
+def loads(obj: str | bytes | bytearray, **kwargs: Any) -> Any:
     """Decode serialized JSON data to a python object.
 
     Parameters

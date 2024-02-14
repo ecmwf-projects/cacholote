@@ -14,6 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import contextlib
 import functools
 import hashlib
@@ -29,7 +31,6 @@ from typing import (
     Any,
     Callable,
     Literal,
-    Optional,
     TypeVar,
     Union,
     cast,
@@ -148,7 +149,7 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> dict[str, A
 
 def _get_fs_and_urlpath(
     file_json: dict[str, Any],
-    storage_options: Optional[dict[str, Any]] = None,
+    storage_options: dict[str, Any] | None = None,
     validate: bool = False,
 ) -> tuple[fsspec.AbstractFileSystem, str]:
     urlpath = file_json["file:local_path"]
@@ -197,7 +198,7 @@ def decode_xr_object(
     storage_options: dict[str, Any],
     xr_type: Literal["DataArray"],
     **kwargs: Any,
-) -> "xr.DataArray":
+) -> xr.DataArray:
     ...
 
 
@@ -207,7 +208,7 @@ def decode_xr_object(
     storage_options: dict[str, Any],
     xr_type: Literal["Dataset"],
     **kwargs: Any,
-) -> "xr.Dataset":
+) -> xr.Dataset:
     ...
 
 
@@ -217,7 +218,7 @@ def decode_xr_object(
     storage_options: dict[str, Any],
     xr_type: Literal["Dataset", "DataArray"],
     **kwargs: Any,
-) -> Union["xr.Dataset", "xr.DataArray"]:
+) -> xr.Dataset | xr.DataArray:
     fs, urlpath = _get_fs_and_urlpath(
         file_json, storage_options=storage_options, validate=True
     )
@@ -243,13 +244,13 @@ def decode_xr_object(
 
 def decode_xr_dataset(
     file_json: dict[str, Any], storage_options: dict[str, Any], **kwargs: Any
-) -> "xr.Dataset":
+) -> xr.Dataset:
     return decode_xr_object(file_json, storage_options, "Dataset", **kwargs)
 
 
 def decode_xr_dataarray(
     file_json: dict[str, Any], storage_options: dict[str, Any], **kwargs: Any
-) -> "xr.DataArray":
+) -> xr.DataArray:
     return decode_xr_object(file_json, storage_options, "DataArray", **kwargs)
 
 
@@ -264,7 +265,7 @@ def decode_io_object(
 
 @_requires_xarray_and_dask
 def _maybe_store_xr_object(
-    obj: Union["xr.Dataset", "xr.DataArray"],
+    obj: xr.Dataset | xr.DataArray,
     fs: fsspec.AbstractFileSystem,
     urlpath: str,
     filetype: str,
@@ -304,7 +305,7 @@ def _maybe_store_xr_object(
 
 
 @_requires_xarray_and_dask
-def dictify_xr_object(obj: Union["xr.Dataset", "xr.DataArray"]) -> dict[str, Any]:
+def dictify_xr_object(obj: xr.Dataset | xr.DataArray) -> dict[str, Any]:
     """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
@@ -337,7 +338,7 @@ def _maybe_store_file_object(
     urlpath_in: str,
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
-    io_delete_original: Optional[bool] = None,
+    io_delete_original: bool | None = None,
 ) -> None:
     if io_delete_original is None:
         io_delete_original = config.get().io_delete_original

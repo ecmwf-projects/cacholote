@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.import hashlib
+from __future__ import annotations
 
 import dataclasses
 import datetime
@@ -23,7 +24,7 @@ import io
 import time
 import warnings
 from types import TracebackType
-from typing import Any, Optional
+from typing import Any
 
 import fsspec
 
@@ -49,7 +50,7 @@ def get_cache_files_fs_dirname() -> tuple[fsspec.AbstractFileSystem, str]:
 def copy_buffered_file(
     f_in: Any,
     f_out: fsspec.spec.AbstractBufferedFile,
-    buffer_size: Optional[int] = None,
+    buffer_size: int | None = None,
 ) -> None:
     """Copy file in chunks.
 
@@ -74,7 +75,7 @@ def copy_buffered_file(
 class FileLock:
     fs: fsspec.AbstractFileSystem  # fsspec file system
     urlpath: str  # file to lock
-    timeout: Optional[float]  # lock timeout in seconds
+    timeout: float | None  # lock timeout in seconds
 
     @functools.cached_property
     def lockfile(self) -> str:
@@ -110,9 +111,9 @@ class FileLock:
 
     def __exit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         self.release()
 
