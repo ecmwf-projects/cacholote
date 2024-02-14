@@ -14,6 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import contextlib
 import functools
 import hashlib
@@ -24,14 +26,11 @@ import pathlib
 import posixpath
 import tempfile
 import time
+from collections.abc import Generator
 from typing import (
     Any,
     Callable,
-    Dict,
-    Generator,
     Literal,
-    Optional,
-    Tuple,
     TypeVar,
     Union,
     cast,
@@ -132,7 +131,7 @@ class FileInfoModel(pydantic.BaseModel):
     file_local_path: str = pydantic.Field(..., alias="file:local_path")
 
 
-def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, Any]:
+def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> dict[str, Any]:
     href = posixpath.join(
         config.get().cache_files_urlpath_readonly or config.get().cache_files_urlpath,
         posixpath.basename(local_path),
@@ -149,10 +148,10 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> Dict[str, A
 
 
 def _get_fs_and_urlpath(
-    file_json: Dict[str, Any],
-    storage_options: Optional[Dict[str, Any]] = None,
+    file_json: dict[str, Any],
+    storage_options: dict[str, Any] | None = None,
     validate: bool = False,
-) -> Tuple[fsspec.AbstractFileSystem, str]:
+) -> tuple[fsspec.AbstractFileSystem, str]:
     urlpath = file_json["file:local_path"]
     if storage_options is None:
         storage_options = config.get().cache_files_storage_options
@@ -195,31 +194,31 @@ def _get_fs_and_urlpath(
 
 @overload
 def decode_xr_object(
-    file_json: Dict[str, Any],
-    storage_options: Dict[str, Any],
+    file_json: dict[str, Any],
+    storage_options: dict[str, Any],
     xr_type: Literal["DataArray"],
     **kwargs: Any,
-) -> "xr.DataArray":
+) -> xr.DataArray:
     ...
 
 
 @overload
 def decode_xr_object(
-    file_json: Dict[str, Any],
-    storage_options: Dict[str, Any],
+    file_json: dict[str, Any],
+    storage_options: dict[str, Any],
     xr_type: Literal["Dataset"],
     **kwargs: Any,
-) -> "xr.Dataset":
+) -> xr.Dataset:
     ...
 
 
 @_requires_xarray_and_dask
 def decode_xr_object(
-    file_json: Dict[str, Any],
-    storage_options: Dict[str, Any],
+    file_json: dict[str, Any],
+    storage_options: dict[str, Any],
     xr_type: Literal["Dataset", "DataArray"],
     **kwargs: Any,
-) -> Union["xr.Dataset", "xr.DataArray"]:
+) -> xr.Dataset | xr.DataArray:
     fs, urlpath = _get_fs_and_urlpath(
         file_json, storage_options=storage_options, validate=True
     )
@@ -244,19 +243,19 @@ def decode_xr_object(
 
 
 def decode_xr_dataset(
-    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
-) -> "xr.Dataset":
+    file_json: dict[str, Any], storage_options: dict[str, Any], **kwargs: Any
+) -> xr.Dataset:
     return decode_xr_object(file_json, storage_options, "Dataset", **kwargs)
 
 
 def decode_xr_dataarray(
-    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
-) -> "xr.DataArray":
+    file_json: dict[str, Any], storage_options: dict[str, Any], **kwargs: Any
+) -> xr.DataArray:
     return decode_xr_object(file_json, storage_options, "DataArray", **kwargs)
 
 
 def decode_io_object(
-    file_json: Dict[str, Any], storage_options: Dict[str, Any], **kwargs: Any
+    file_json: dict[str, Any], storage_options: dict[str, Any], **kwargs: Any
 ) -> _UNION_IO_TYPES:
     fs, urlpath = _get_fs_and_urlpath(
         file_json, storage_options=storage_options, validate=True
@@ -266,7 +265,7 @@ def decode_io_object(
 
 @_requires_xarray_and_dask
 def _maybe_store_xr_object(
-    obj: Union["xr.Dataset", "xr.DataArray"],
+    obj: xr.Dataset | xr.DataArray,
     fs: fsspec.AbstractFileSystem,
     urlpath: str,
     filetype: str,
@@ -306,7 +305,7 @@ def _maybe_store_xr_object(
 
 
 @_requires_xarray_and_dask
-def dictify_xr_object(obj: Union["xr.Dataset", "xr.DataArray"]) -> Dict[str, Any]:
+def dictify_xr_object(obj: xr.Dataset | xr.DataArray) -> dict[str, Any]:
     """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
@@ -322,7 +321,7 @@ def dictify_xr_object(obj: Union["xr.Dataset", "xr.DataArray"]) -> Dict[str, Any
     _maybe_store_xr_object(obj, fs_out, urlpath_out, filetype)
 
     file_json = _dictify_file(fs_out, urlpath_out)
-    kwargs: Dict[str, Any] = {"chunks": {}}
+    kwargs: dict[str, Any] = {"chunks": {}}
     if filetype == "application/vnd+zarr":
         kwargs.update({"engine": "zarr", "consolidated": True})
 
@@ -339,7 +338,7 @@ def _maybe_store_file_object(
     urlpath_in: str,
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
-    io_delete_original: Optional[bool] = None,
+    io_delete_original: bool | None = None,
 ) -> None:
     if io_delete_original is None:
         io_delete_original = config.get().io_delete_original
@@ -390,7 +389,7 @@ def _maybe_store_io_object(
                 utils.copy_buffered_file(f_in, f_out)
 
 
-def dictify_io_object(obj: _UNION_IO_TYPES) -> Dict[str, Any]:
+def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
     cache_files_urlpath = config.get().cache_files_urlpath
     fs_out, *_ = fsspec.get_fs_token_paths(

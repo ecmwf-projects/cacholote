@@ -14,11 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import annotations
 
 import importlib
 import json
-from typing import Any, Callable, Dict, List, Union
+from typing import Any, Callable
 
 
 def import_object(fully_qualified_name: str) -> Any:
@@ -37,13 +37,13 @@ class DecodeError(Exception):
     pass
 
 
-def decode_python_object(obj: Dict[str, Any]) -> Any:
+def decode_python_object(obj: dict[str, Any]) -> Any:
     if obj.get("type") == "python_object" and "fully_qualified_name" in obj:
         return import_object(obj["fully_qualified_name"])
     return None
 
 
-def decode_python_call(obj: Dict[str, Any]) -> Any:
+def decode_python_call(obj: dict[str, Any]) -> Any:
     if obj.get("type") == "python_call" and "callable" in obj:
         if callable(obj["callable"]):
             func = obj["callable"]
@@ -55,13 +55,13 @@ def decode_python_call(obj: Dict[str, Any]) -> Any:
     return None
 
 
-FILECACHE_DECODERS: List[Callable[[Dict[str, Any]], Any]] = [
+FILECACHE_DECODERS: list[Callable[[dict[str, Any]], Any]] = [
     decode_python_object,
     decode_python_call,
 ]
 
 
-def object_hook(obj: Dict[str, Any]) -> Any:
+def object_hook(obj: dict[str, Any]) -> Any:
     """Decode deserialized JSON data (``dict``)."""
     for decoder in reversed(FILECACHE_DECODERS):
         try:
@@ -74,7 +74,7 @@ def object_hook(obj: Dict[str, Any]) -> Any:
     return obj
 
 
-def loads(obj: Union[str, bytes, bytearray], **kwargs: Any) -> Any:
+def loads(obj: str | bytes | bytearray, **kwargs: Any) -> Any:
     """Decode serialized JSON data to a python object.
 
     Parameters

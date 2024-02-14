@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import contextlib
 import datetime
 import pathlib
 import time
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal
 
 import fsspec
 import pydantic
@@ -21,7 +23,7 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 
 
 @cache.cacheable
-def open_urls(*urls: pathlib.Path) -> List[fsspec.spec.AbstractBufferedFile]:
+def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
     return [fsspec.open(url).open() for url in urls]
 
 
@@ -105,7 +107,7 @@ def test_delete_unknown_dirs(
 @pytest.mark.parametrize("lock_validity_period", [None, 0])
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_clean_locked_files(
-    tmp_path: pathlib.Path, set_cache: str, lock_validity_period: Optional[float]
+    tmp_path: pathlib.Path, set_cache: str, lock_validity_period: float | None
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -146,9 +148,9 @@ def test_clean_locked_files(
 )
 def test_clean_tagged_files(
     tmp_path: pathlib.Path,
-    tags_to_clean: Optional[List[Optional[str]]],
-    tags_to_keep: Optional[List[Optional[str]]],
-    cleaned: List[Optional[str]],
+    tags_to_clean: list[str | None] | None,
+    tags_to_keep: list[str | None] | None,
+    cleaned: list[str | None],
 ) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 

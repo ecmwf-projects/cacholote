@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pytest
 
 from cacholote import decode
@@ -57,4 +59,4 @@ def test_loads() -> None:
     )
 
     res = decode.loads(len_call_json)
-    assert res == int()
+    assert res == 0

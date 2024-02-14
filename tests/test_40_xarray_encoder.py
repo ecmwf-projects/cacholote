@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import pathlib
-from typing import Union
+from typing import TYPE_CHECKING
 
 import fsspec
 import pytest
@@ -7,15 +9,14 @@ import structlog
 
 from cacholote import cache, config, decode, encode, extra_encoders, utils
 
+if TYPE_CHECKING:
+    import xarray as xr
+else:
+    xr = pytest.importorskip("xarray")
 dask = pytest.importorskip("dask")
 
-try:
-    import xarray as xr
-except ImportError:
-    pytest.importorskip("xarray")
 
-
-def get_grib_ds() -> "xr.Dataset":
+def get_grib_ds() -> xr.Dataset:
     pytest.importorskip("cfgrib")
     eccodes = pytest.importorskip("eccodes")
     filename = pathlib.Path(eccodes.codes_samples_path()) / "GRIB2.tmpl"
@@ -202,11 +203,11 @@ def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
         xr.DataArray([0], name="foo").to_dataset(),
     ),
 )
-def test_xr_roundtrip(original_obj: Union[xr.Dataset, xr.DataArray]) -> None:
+def test_xr_roundtrip(original_obj: xr.Dataset | xr.DataArray) -> None:
     @cache.cacheable
     def cache_xr_obj(
-        obj: Union[xr.Dataset, xr.DataArray],
-    ) -> Union[xr.Dataset, xr.DataArray]:
+        obj: xr.Dataset | xr.DataArray,
+    ) -> xr.Dataset | xr.DataArray:
         return obj
 
     cached_obj = cache_xr_obj(original_obj)

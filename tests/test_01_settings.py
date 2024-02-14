@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import contextlib
 import datetime
 import os
 import pathlib
-from typing import Any, Dict, Union
+from typing import Any
 
 import pytest
 import sqlalchemy as sa
@@ -58,7 +60,7 @@ def test_set_engine_and_sessionmaker(
     old_engine = config.get().engine
     old_sessionmaker = config.get().instantiated_sessionmaker
 
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     if key == "cache_db_urlpath":
         kwargs[key] = "sqlite:///" + str(tmp_path / "dummy.db")
     elif key == "create_engine_kwargs":
@@ -109,7 +111,7 @@ def test_env_variables(tmp_path: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize("poolclass", ("NullPool", sa.pool.NullPool))
-def test_set_poolclass(poolclass: Union[str, sa.pool.Pool]) -> None:
+def test_set_poolclass(poolclass: str | sa.pool.Pool) -> None:
     config.set(create_engine_kwargs={"poolclass": poolclass})
     settings = config.get()
     assert settings.create_engine_kwargs["poolclass"] == sa.pool.NullPool
@@ -132,7 +134,7 @@ def test_set_poolclass(poolclass: Union[str, sa.pool.Pool]) -> None:
     ],
 )
 def test_set_expiration(
-    expiration: Union[datetime.datetime, str],
+    expiration: datetime.datetime | str,
     raises: contextlib.nullcontext,  # type: ignore[type-arg]
 ) -> None:
     with raises:

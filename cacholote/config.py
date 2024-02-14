@@ -20,7 +20,7 @@ import logging
 import pathlib
 import tempfile
 from types import TracebackType
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Literal, Optional, Union
 
 import fsspec
 import pydantic
@@ -31,7 +31,7 @@ import structlog
 
 from . import database
 
-_SETTINGS: Optional[Settings] = None
+_SETTINGS: Settings | None = None
 _DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
 _DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
 _DEFAULT_CACHE_DB_URLPATH = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
@@ -44,11 +44,11 @@ _DEFAULT_LOGGER = structlog.get_logger(
 class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
     cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
-    create_engine_kwargs: Dict[str, Any] = {}
-    sessionmaker: Optional[sa.orm.sessionmaker] = None  # type: ignore[type-arg]
+    create_engine_kwargs: dict[str, Any] = {}
+    sessionmaker: Optional[sa.orm.sessionmaker[sa.orm.Session]] = None
     cache_files_urlpath: str = _DEFAULT_CACHE_FILES_URLPATH
     cache_files_urlpath_readonly: Optional[str] = None
-    cache_files_storage_options: Dict[str, Any] = {}
+    cache_files_storage_options: dict[str, Any] = {}
     xarray_cache_type: Literal[
         "application/netcdf", "application/x-grib", "application/vnd+zarr"
     ] = "application/netcdf"
@@ -64,8 +64,8 @@ class Settings(pydantic_settings.BaseSettings):
 
     @pydantic.field_validator("create_engine_kwargs")
     def validate_create_engine_kwargs(
-        cls: pydantic_settings.BaseSettings, create_engine_kwargs: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        cls: pydantic_settings.BaseSettings, create_engine_kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
         poolclass = create_engine_kwargs.get("poolclass")
         if isinstance(poolclass, str):
             create_engine_kwargs["poolclass"] = getattr(sa.pool, poolclass)
@@ -73,14 +73,14 @@ class Settings(pydantic_settings.BaseSettings):
 
     @pydantic.field_validator("expiration")
     def validate_expiration(
-        cls: pydantic_settings.BaseSettings, expiration: Optional[datetime.datetime]
-    ) -> Optional[datetime.datetime]:
+        cls: pydantic_settings.BaseSettings, expiration: datetime.datetime | None
+    ) -> datetime.datetime | None:
         if expiration is not None and expiration.tzinfo is None:
             raise ValueError(f"Expiration is missing the timezone info. {expiration=}")
         return expiration
 
     @pydantic.model_validator(mode="after")
-    def make_cache_dir(self) -> "Settings":
+    def make_cache_dir(self) -> Settings:
         fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
             self.cache_files_urlpath,
             storage_options=self.cache_files_storage_options,
@@ -89,7 +89,7 @@ class Settings(pydantic_settings.BaseSettings):
         return self
 
     @property
-    def instantiated_sessionmaker(self) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+    def instantiated_sessionmaker(self) -> sa.orm.sessionmaker[sa.orm.Session]:
         if self.sessionmaker is None:
             if self.cache_db_urlpath is None:
                 raise ValueError("Provide either `sessionmaker` or `cache_db_urlpath`.")
@@ -173,15 +173,15 @@ class set:
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         global _SETTINGS
         _SETTINGS = self._old_settings
 
 
-def reset(env_file: Optional[Union[str, Tuple[str]]] = None) -> None:
+def reset(env_file: str | tuple[str] | None = None) -> None:
     """Reset cacholote settings.
 
     Priority:

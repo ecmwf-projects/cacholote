@@ -13,12 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import datetime
 import functools
 import json
 import warnings
-from typing import Any, Dict
+from typing import Any
 
 import sqlalchemy as sa
 import sqlalchemy.orm
@@ -77,7 +78,7 @@ def _commit_or_rollback(session: sa.orm.Session) -> None:
         session.rollback()
 
 
-def _encode_kwargs(**kwargs: Any) -> Dict[str, Any]:
+def _encode_kwargs(**kwargs: Any) -> dict[str, Any]:
     encoded_kwargs = {}
     for key, value in kwargs.items():
         if isinstance(value, dict):
@@ -87,7 +88,7 @@ def _encode_kwargs(**kwargs: Any) -> Dict[str, Any]:
     return encoded_kwargs
 
 
-def _decode_kwargs(**kwargs: Any) -> Dict[str, Any]:
+def _decode_kwargs(**kwargs: Any) -> dict[str, Any]:
     decoded_kwargs = {}
     for key, value in kwargs.items():
         if key.startswith("_encoded_"):
@@ -97,12 +98,14 @@ def _decode_kwargs(**kwargs: Any) -> Dict[str, Any]:
     return decoded_kwargs
 
 
-@functools.lru_cache()
-def _cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+@functools.lru_cache
+def _cached_sessionmaker(
+    url: str, **kwargs: Any
+) -> sa.orm.sessionmaker[sa.orm.Session]:
     engine = sa.create_engine(url, **_decode_kwargs(**kwargs))
     Base.metadata.create_all(engine)
     return sa.orm.sessionmaker(engine)
 
 
-def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker:  # type: ignore[type-arg]
+def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker[sa.orm.Session]:
     return _cached_sessionmaker(url, **_encode_kwargs(**kwargs))

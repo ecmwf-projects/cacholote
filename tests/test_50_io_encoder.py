@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import contextlib
 import hashlib
 import importlib
 import io
 import pathlib
 import subprocess
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any
 
 import fsspec
 import pytest
@@ -63,7 +65,7 @@ def test_dictify_io_object(tmp_path: pathlib.Path, io_delete_original: bool) -> 
 
 @pytest.mark.parametrize("obj", [io.BytesIO(b"test"), io.StringIO("test")])
 def test_dictify_bytes_io_object(
-    tmp_path: pathlib.Path, obj: Union[io.BytesIO, io.StringIO]
+    tmp_path: pathlib.Path, obj: io.BytesIO | io.StringIO
 ) -> None:
     actual = extra_encoders.dictify_io_object(obj)["args"]
     obj_hash = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()
@@ -73,7 +75,7 @@ def test_dictify_bytes_io_object(
         if importlib.util.find_spec("magic")
         else "application/octet-stream"
     )
-    expected: Tuple[Dict[str, Any], ...] = (
+    expected: tuple[dict[str, Any], ...] = (
         {
             "type": type,
             "href": local_path,
@@ -156,7 +158,7 @@ def test_io_corrupted_files(
 )
 def test_io_locker(
     tmp_path: pathlib.Path,
-    lock_timeout: Optional[float],
+    lock_timeout: float | None,
     raises_or_warns: contextlib.nullcontext,  # type: ignore[type-arg]
 ) -> None:
     config.set(lock_timeout=lock_timeout, raise_all_encoding_errors=True)

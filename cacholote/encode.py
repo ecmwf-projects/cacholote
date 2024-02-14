@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from __future__ import annotations
 
 import binascii
 import collections.abc
@@ -23,15 +23,15 @@ import inspect
 import json
 import pickle
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable
 
 from . import config, decode, utils
 
-_JSON_DUMPS_KWARGS: Dict[str, Any] = {"separators": (",", ":"), "skipkeys": False}
+_JSON_DUMPS_KWARGS: dict[str, Any] = {"separators": (",", ":"), "skipkeys": False}
 
 
 def _hexdigestify_python_call(
-    func_to_hex: Union[str, Callable[..., Any]],
+    func_to_hex: str | Callable[..., Any],
     *args: Any,
     **kwargs: Any,
 ) -> str:
@@ -46,7 +46,7 @@ def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
     return f"{module.__name__}:{obj.__qualname__}"
 
 
-def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]:
+def dictify_python_object(obj: str | Callable[..., Any]) -> dict[str, str]:
     if isinstance(obj, str):
         # NOTE: a stricter test would be decode.import_object(obj)
         if ":" not in obj:
@@ -61,12 +61,12 @@ def dictify_python_object(obj: Union[str, Callable[..., Any]]) -> Dict[str, str]
 
 
 def dictify_python_call(
-    func_to_dict: Union[str, Callable[..., Any]],
+    func_to_dict: str | Callable[..., Any],
     *args: Any,
     **kwargs: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     callable_fqn = dictify_python_object(func_to_dict)["fully_qualified_name"]
-    python_call_simple: Dict[str, Any] = {
+    python_call_simple: dict[str, Any] = {
         "type": "python_call",
         "callable": callable_fqn,
     }
@@ -93,31 +93,31 @@ def dictify_python_call(
     return python_call_simple
 
 
-def dictify_datetime(obj: datetime.datetime) -> Dict[str, Any]:
+def dictify_datetime(obj: datetime.datetime) -> dict[str, Any]:
     # Work around "AttributeError: 'NoneType' object has no attribute '__name__'"
     return dictify_python_call("datetime:datetime.fromisoformat", obj.isoformat())
 
 
-def dictify_date(obj: datetime.date) -> Dict[str, Any]:
+def dictify_date(obj: datetime.date) -> dict[str, Any]:
     return dictify_python_call("datetime:date.fromisoformat", obj.isoformat())
 
 
-def dictify_timedelta(obj: datetime.timedelta) -> Dict[str, Any]:
+def dictify_timedelta(obj: datetime.timedelta) -> dict[str, Any]:
     return dictify_python_call(
         "datetime:timedelta", obj.days, obj.seconds, obj.microseconds
     )
 
 
-def dictify_bytes(obj: bytes) -> Dict[str, Any]:
+def dictify_bytes(obj: bytes) -> dict[str, Any]:
     ascii_decoded = binascii.b2a_base64(obj).decode("ascii")
     return dictify_python_call(binascii.a2b_base64, ascii_decoded)
 
 
-def dictify_pickable(obj: Any) -> Dict[str, Any]:
+def dictify_pickable(obj: Any) -> dict[str, Any]:
     return dictify_python_call(pickle.loads, pickle.dumps(obj))
 
 
-FILECACHE_ENCODERS: List[Tuple[Any, Callable[[Any], Dict[str, Any]]]] = [
+FILECACHE_ENCODERS: list[tuple[Any, Callable[[Any], dict[str, Any]]]] = [
     (object, dictify_pickable),
     (collections.abc.Callable, dictify_python_object),
     (bytes, dictify_bytes),
@@ -133,8 +133,8 @@ class EncodeError(Exception):
 
 def filecache_default(
     obj: Any,
-    encoders: Optional[List[Tuple[Any, Callable[[Any], Dict[str, Any]]]]] = None,
-) -> Dict[str, Any]:
+    encoders: list[tuple[Any, Callable[[Any], dict[str, Any]]]] | None = None,
+) -> dict[str, Any]:
     """Dictify objects that are not JSON-serializable.
 
     Parameters
@@ -187,7 +187,7 @@ def dumps(
 
 
 def dumps_python_call(
-    func_to_dump: Union[str, Callable[..., Any]],
+    func_to_dump: str | Callable[..., Any],
     *args: Any,
     **kwargs: Any,
 ) -> str:
