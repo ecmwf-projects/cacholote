@@ -20,7 +20,7 @@ import logging
 import pathlib
 import tempfile
 from types import TracebackType
-from typing import Any, Literal
+from typing import Any, Literal, Optional, Union
 
 import fsspec
 import pydantic
@@ -43,24 +43,24 @@ _DEFAULT_LOGGER = structlog.get_logger(
 
 class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
-    cache_db_urlpath: str | None = _DEFAULT_CACHE_DB_URLPATH
+    cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
     create_engine_kwargs: dict[str, Any] = {}
-    sessionmaker: sa.orm.sessionmaker[sa.orm.Session] | None = None
+    sessionmaker: Optional[sa.orm.sessionmaker[sa.orm.Session]] = None
     cache_files_urlpath: str = _DEFAULT_CACHE_FILES_URLPATH
-    cache_files_urlpath_readonly: str | None = None
+    cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: dict[str, Any] = {}
     xarray_cache_type: Literal[
         "application/netcdf", "application/x-grib", "application/vnd+zarr"
     ] = "application/netcdf"
     io_delete_original: bool = False
     raise_all_encoding_errors: bool = False
-    expiration: datetime.datetime | None = None
-    tag: str | None = None
+    expiration: Optional[datetime.datetime] = None
+    tag: Optional[str] = None
     return_cache_entry: bool = False
-    logger: structlog.BoundLogger | structlog._config.BoundLoggerLazyProxy = (
-        _DEFAULT_LOGGER
-    )
-    lock_timeout: float | None = None
+    logger: Union[
+        structlog.BoundLogger, structlog._config.BoundLoggerLazyProxy
+    ] = _DEFAULT_LOGGER
+    lock_timeout: Optional[float] = None
 
     @pydantic.field_validator("create_engine_kwargs")
     def validate_create_engine_kwargs(
@@ -73,8 +73,8 @@ class Settings(pydantic_settings.BaseSettings):
 
     @pydantic.field_validator("expiration")
     def validate_expiration(
-        cls: pydantic_settings.BaseSettings, expiration: datetime.datetime | None
-    ) -> datetime.datetime | None:
+        cls: pydantic_settings.BaseSettings, expiration: Optional[datetime.datetime]
+    ) -> Optional[datetime.datetime]:
         if expiration is not None and expiration.tzinfo is None:
             raise ValueError(f"Expiration is missing the timezone info. {expiration=}")
         return expiration
@@ -173,15 +173,15 @@ class set:
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         global _SETTINGS
         _SETTINGS = self._old_settings
 
 
-def reset(env_file: str | tuple[str] | None = None) -> None:
+def reset(env_file: Optional[Union[str, tuple[str]]] = None) -> None:
     """Reset cacholote settings.
 
     Priority:
