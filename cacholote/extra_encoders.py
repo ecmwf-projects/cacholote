@@ -308,7 +308,7 @@ def _maybe_store_xr_object(
 def dictify_xr_object(obj: xr.Dataset | xr.DataArray) -> dict[str, Any]:
     """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
     with dask.config.set({"tokenize.ensure-deterministic": True}):
-        root = dask.base.tokenize(obj)  # type: ignore[no-untyped-call]
+        root = dask.base.tokenize(obj)
 
     filetype = config.get().xarray_cache_type
     ext = mimetypes.guess_extension(filetype, strict=False)

@@ -69,7 +69,7 @@ True
 
 >>> ds = dataset_from_dict({"foo": 0})
 >>> ds
-<xarray.Dataset>
+<xarray.Dataset> Size: 8B
 Dimensions:  ()
 Data variables:
     foo      int64 ...

@@ -143,7 +143,7 @@ def test_xr_corrupted_files(
 
     # Get cached file path
     with dask.config.set({"tokenize.ensure-deterministic": True}):
-        root = dask.base.tokenize(expected)  # type: ignore[no-untyped-call]
+        root = dask.base.tokenize(expected)
     cached_path = f"{dirname}/{root}{ext}"
     assert fs.exists(cached_path)
 
