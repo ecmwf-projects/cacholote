@@ -198,8 +198,7 @@ def decode_xr_object(
     storage_options: dict[str, Any],
     xr_type: Literal["DataArray"],
     **kwargs: Any,
-) -> xr.DataArray:
-    ...
+) -> xr.DataArray: ...
 
 
 @overload
@@ -208,8 +207,7 @@ def decode_xr_object(
     storage_options: dict[str, Any],
     xr_type: Literal["Dataset"],
     **kwargs: Any,
-) -> xr.Dataset:
-    ...
+) -> xr.Dataset: ...
 
 
 @_requires_xarray_and_dask

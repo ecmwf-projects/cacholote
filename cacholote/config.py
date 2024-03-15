@@ -57,9 +57,9 @@ class Settings(pydantic_settings.BaseSettings):
     expiration: Optional[datetime.datetime] = None
     tag: Optional[str] = None
     return_cache_entry: bool = False
-    logger: Union[
-        structlog.BoundLogger, structlog._config.BoundLoggerLazyProxy
-    ] = _DEFAULT_LOGGER
+    logger: Union[structlog.BoundLogger, structlog._config.BoundLoggerLazyProxy] = (
+        _DEFAULT_LOGGER
+    )
     lock_timeout: Optional[float] = None
 
     @pydantic.field_validator("create_engine_kwargs")
