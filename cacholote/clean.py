@@ -153,7 +153,7 @@ class _Cleaner:
         return self.size <= maxsize
 
     def get_unknown_files(self, lock_validity_period: float | None) -> set[str]:
-        self.logger.info("get unknown files")
+        self.logger.info("getting unknown files")
 
         utcnow = utils.utcnow()
         files_to_skip = []
