@@ -28,6 +28,30 @@ import sqlalchemy.orm
 
 from . import config, database, decode, encode, extra_encoders, utils
 
+FILE_RESULT_KEYS = ("type", "callable", "args", "kwargs")
+FILE_RESULT_CALLABLES = (
+    "cacholote.extra_encoders:decode_xr_dataarray",
+    "cacholote.extra_encoders:decode_xr_dataset",
+    "cacholote.extra_encoders:decode_io_object",
+)
+
+
+def _get_files_from_cache_entry(cache_entry: database.CacheEntry) -> dict[str, str]:
+    result = cache_entry.result
+    if not isinstance(result, list | tuple | set):
+        result = [result]
+
+    files = {}
+    for obj in result:
+        if (
+            isinstance(obj, dict)
+            and set(FILE_RESULT_KEYS) == set(obj)
+            and obj["callable"] in FILE_RESULT_CALLABLES
+        ):
+            fs, urlpath = extra_encoders._get_fs_and_urlpath(*obj["args"][:2])
+            files[fs.unstrip_protocol(urlpath)] = obj["args"][0]["type"]
+    return files
+
 
 def _delete_cache_file(
     obj: dict[str, Any],
@@ -215,6 +239,29 @@ class _Cleaner:
         sorters.append(database.CacheEntry.expiration)
         return sorters
 
+    def _remove_files(
+        self,
+        files: list[str],
+        max_tries: int = 10,
+        **kwargs: Any,
+    ) -> None:
+        assert max_tries >= 1
+        if files:
+            self.logger.info("deleting files", urlpath=len(files))
+
+        n_tries = 0
+        while files and n_tries < max_tries:
+            n_tries += 1
+            try:
+                self.fs.rm(files, **kwargs)
+                return
+            except FileNotFoundError:
+                # Another process deleted some file
+                files = [file for file in files if self.fs.exists(file)]
+
+        if files:
+            raise ValueError(f"Could not delete {files=}")
+
     def delete_cache_files(
         self,
         maxsize: int,
@@ -227,40 +274,35 @@ class _Cleaner:
 
         if self.stop_cleaning(maxsize):
             return
-        start_timestamp = utils.utcnow()
 
-        # Get entries to clean
+        files_to_delete = []
+        dirs_to_delete = []
         with config.get().instantiated_sessionmaker() as session:
-            cache_entry_ids = session.scalars(
-                sa.select(database.CacheEntry.id).filter(*filters).order_by(*sorters)
+            for cache_entry in session.scalars(
+                sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
+            ):
+                files = _get_files_from_cache_entry(cache_entry)
+                if files:
+                    session.delete(cache_entry)
+
+                for file, file_type in files.items():
+                    self.sizes.pop(file, 0)
+                    if file_type == "application/vnd+zarr":
+                        dirs_to_delete.append(file)
+                    else:
+                        files_to_delete.append(file)
+
+                if self.stop_cleaning(maxsize):
+                    break
+            database._commit_or_rollback(session)
+
+        self._remove_files(files_to_delete, recursive=False)
+        self._remove_files(dirs_to_delete, recursive=True)
+
+        if not self.stop_cleaning(maxsize):
+            raise ValueError(
+                f"Unable to clean {self.dirname!r}. Final size: {self.size!r}. Expected size: {maxsize!r}"
             )
-
-        # Loop over entries
-        for cache_entry_id in cache_entry_ids:
-            with config.get().instantiated_sessionmaker() as session:
-                filters = [
-                    database.CacheEntry.id == cache_entry_id,
-                    # skip entries updated while cleaning
-                    database.CacheEntry.timestamp < start_timestamp,
-                ]
-                for cache_entry in session.scalars(
-                    sa.select(database.CacheEntry).filter(*filters)
-                ):
-                    json.loads(
-                        cache_entry._result_as_string,
-                        object_hook=functools.partial(
-                            _delete_cache_file,
-                            session=session,
-                            cache_entry_id=cache_entry.id,
-                            sizes=self.sizes,
-                        ),
-                    )
-                    if self.stop_cleaning(maxsize):
-                        return
-
-        raise ValueError(
-            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}. Expected size: {maxsize!r}"
-        )
 
 
 def clean_cache_files(
