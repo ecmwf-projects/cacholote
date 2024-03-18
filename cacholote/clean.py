@@ -220,17 +220,15 @@ class _Cleaner:
             )
 
         n_tries = 0
-        while files and n_tries < max_tries:
+        while files:
             n_tries += 1
             try:
                 self.fs.rm(files, **kwargs)
                 return
             except FileNotFoundError:
-                # Another process deleted some file
+                if n_tries >= max_tries:
+                    raise
                 files = [file for file in files if self.fs.exists(file)]
-
-        if files:
-            raise ValueError(f"Could not delete {files=}")
 
     def delete_cache_files(
         self,
