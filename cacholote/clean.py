@@ -36,7 +36,7 @@ FILE_RESULT_CALLABLES = (
 
 def _get_files_from_cache_entry(cache_entry: database.CacheEntry) -> dict[str, str]:
     result = cache_entry.result
-    if not isinstance(result, list | tuple | set):
+    if not isinstance(result, (list, tuple, set)):
         result = [result]
 
     files = {}
