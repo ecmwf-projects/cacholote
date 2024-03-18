@@ -17,8 +17,6 @@ from __future__ import annotations
 
 import collections
 import datetime
-import functools
-import json
 import posixpath
 from typing import Any, Callable, Literal, Optional
 
@@ -28,59 +26,48 @@ import sqlalchemy.orm
 
 from . import config, database, decode, encode, extra_encoders, utils
 
+FILE_RESULT_KEYS = ("type", "callable", "args", "kwargs")
+FILE_RESULT_CALLABLES = (
+    "cacholote.extra_encoders:decode_xr_dataarray",
+    "cacholote.extra_encoders:decode_xr_dataset",
+    "cacholote.extra_encoders:decode_io_object",
+)
 
-def _delete_cache_file(
-    obj: dict[str, Any],
-    session: sa.orm.Session | None = None,
-    cache_entry_id: int | None = None,
-    sizes: dict[str, int] | None = None,
-    dry_run: bool = False,
-) -> Any:
-    logger = config.get().logger
 
-    if {"type", "callable", "args", "kwargs"} == set(obj) and obj["callable"] in (
-        "cacholote.extra_encoders:decode_xr_dataarray",
-        "cacholote.extra_encoders:decode_xr_dataset",
-        "cacholote.extra_encoders:decode_io_object",
-    ):
-        sizes = sizes or {}
-        cache_fs, cache_dirname = utils.get_cache_files_fs_dirname()
-        cache_dirname = cache_fs.unstrip_protocol(cache_dirname)
+def _get_files_from_cache_entry(cache_entry: database.CacheEntry) -> dict[str, str]:
+    result = cache_entry.result
+    if not isinstance(result, (list, tuple, set)):
+        result = [result]
 
-        fs, urlpath = extra_encoders._get_fs_and_urlpath(*obj["args"][:2])
-        urlpath = fs.unstrip_protocol(urlpath)
-
-        if posixpath.dirname(urlpath) == cache_dirname:
-            size = sizes.pop(urlpath, 0)
-            if not dry_run:
-                if session:
-                    for cache_entry in session.scalars(
-                        sa.select(database.CacheEntry).filter(
-                            database.CacheEntry.id == cache_entry_id
-                        )
-                    ):
-                        logger.info("delete cache entry", cache_entry=cache_entry)
-                        session.delete(cache_entry)
-                    database._commit_or_rollback(session)
-
-                if fs.exists(urlpath):
-                    logger.info("delete cache file", urlpath=urlpath, size=size)
-                    fs.rm(
-                        urlpath,
-                        recursive=obj["args"][0]["type"] == "application/vnd+zarr",
-                    )
-
-    return obj
+    files = {}
+    for obj in result:
+        if (
+            isinstance(obj, dict)
+            and set(FILE_RESULT_KEYS) == set(obj)
+            and obj["callable"] in FILE_RESULT_CALLABLES
+        ):
+            fs, urlpath = extra_encoders._get_fs_and_urlpath(*obj["args"][:2])
+            files[fs.unstrip_protocol(urlpath)] = obj["args"][0]["type"]
+    return files
 
 
 def _delete_cache_entry(
     session: sa.orm.Session, cache_entry: database.CacheEntry
 ) -> None:
+    fs, _ = utils.get_cache_files_fs_dirname()
+    files_to_delete = _get_files_from_cache_entry(cache_entry)
+    logger = config.get().logger
+
     # First, delete database entry
+    logger.info("deleting cache entry", cache_entry=cache_entry)
     session.delete(cache_entry)
     database._commit_or_rollback(session)
+
     # Then, delete files
-    json.loads(cache_entry._result_as_string, object_hook=_delete_cache_file)
+    for urlpath, file_type in files_to_delete.items():
+        if fs.exists(urlpath):
+            logger.info("deleting cache file", urlpath=urlpath)
+            fs.rm(urlpath, recursive=file_type == "application/vnd+zarr")
 
 
 def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> None:
@@ -110,30 +97,33 @@ class _Cleaner:
 
         urldir = self.fs.unstrip_protocol(self.dirname)
 
-        self.logger.info("get disk usage of cache files")
-        self.sizes: dict[str, int] = collections.defaultdict(int)
+        self.logger.info("getting disk usage")
+        self.file_sizes: dict[str, int] = collections.defaultdict(int)
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)
             basename, *_ = urlpath.replace(urldir, "", 1).strip("/").split("/")
             if basename:
-                self.sizes[posixpath.join(urldir, basename)] += size
+                self.file_sizes[posixpath.join(urldir, basename)] += size
+
+        self.log_disk_usage()
 
     @property
-    def size(self) -> int:
-        sum_sizes = sum(self.sizes.values())
-        self.logger.info("check cache files total size", size=sum_sizes)
-        return sum_sizes
+    def disk_usage(self) -> int:
+        return sum(self.file_sizes.values())
+
+    def log_disk_usage(self) -> None:
+        self.logger.info("disk usage check", disk_usage=self.disk_usage)
 
     def stop_cleaning(self, maxsize: int) -> bool:
-        return self.size <= maxsize
+        return self.disk_usage <= maxsize
 
-    def get_unknown_files(self, lock_validity_period: float | None) -> set[str]:
-        self.logger.info("get unknown files")
+    def get_unknown_sizes(self, lock_validity_period: float | None) -> dict[str, int]:
+        self.logger.info("getting unknown files")
 
         utcnow = utils.utcnow()
         files_to_skip = []
-        for urlpath in self.sizes:
+        for urlpath in self.file_sizes:
             if urlpath.endswith(".lock"):
                 modified = self.fs.modified(urlpath)
                 if modified.tzinfo is None:
@@ -145,30 +135,28 @@ class _Cleaner:
                     files_to_skip.append(urlpath)
                     files_to_skip.append(urlpath.rsplit(".lock", 1)[0])
 
-        unknown_sizes = {k: v for k, v in self.sizes.items() if k not in files_to_skip}
+        unknown_sizes = {
+            k: v for k, v in self.file_sizes.items() if k not in files_to_skip
+        }
         if unknown_sizes:
             with config.get().instantiated_sessionmaker() as session:
                 for cache_entry in session.scalars(sa.select(database.CacheEntry)):
-                    json.loads(
-                        cache_entry._result_as_string,
-                        object_hook=functools.partial(
-                            _delete_cache_file,
-                            sizes=unknown_sizes,
-                            dry_run=True,
-                        ),
-                    )
-        return set(unknown_sizes)
+                    for file in _get_files_from_cache_entry(cache_entry):
+                        unknown_sizes.pop(file)
+        return unknown_sizes
 
     def delete_unknown_files(
         self, lock_validity_period: float | None, recursive: bool
     ) -> None:
-        for urlpath in self.get_unknown_files(lock_validity_period):
-            size = self.sizes.pop(urlpath)
-            if self.fs.exists(urlpath):
-                self.logger.info(
-                    "delete unknown", urlpath=urlpath, size=size, recursive=recursive
-                )
-                self.fs.rm(urlpath, recursive=recursive)
+        unknown_sizes = self.get_unknown_sizes(lock_validity_period)
+        for urlpath in unknown_sizes:
+            self.file_sizes.pop(urlpath)
+        self.remove_files(
+            list(unknown_sizes),
+            recursive=recursive,
+            msg="deleting unknown files",
+        )
+        self.log_disk_usage()
 
     @staticmethod
     @pydantic.validate_call
@@ -215,6 +203,33 @@ class _Cleaner:
         sorters.append(database.CacheEntry.expiration)
         return sorters
 
+    def remove_files(
+        self,
+        files: list[str],
+        max_tries: int = 10,
+        msg: str = "deleting cache files",
+        **kwargs: Any,
+    ) -> None:
+        assert max_tries >= 1
+
+        if files:
+            self.logger.info(
+                msg,
+                number_of_files=len(files),
+                recursive=kwargs.get("recursive", False),
+            )
+
+        n_tries = 0
+        while files:
+            n_tries += 1
+            try:
+                self.fs.rm(files, **kwargs)
+                return
+            except FileNotFoundError:
+                if n_tries >= max_tries:
+                    raise
+                files = [file for file in files if self.fs.exists(file)]
+
     def delete_cache_files(
         self,
         maxsize: int,
@@ -227,40 +242,49 @@ class _Cleaner:
 
         if self.stop_cleaning(maxsize):
             return
-        start_timestamp = utils.utcnow()
 
-        # Get entries to clean
+        files_to_delete = []
+        dirs_to_delete = []
+        self.logger.info("getting cache entries to delete")
+        number_of_cache_entries = 0
         with config.get().instantiated_sessionmaker() as session:
-            cache_entry_ids = session.scalars(
-                sa.select(database.CacheEntry.id).filter(*filters).order_by(*sorters)
+            for cache_entry in session.scalars(
+                sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
+            ):
+                files = _get_files_from_cache_entry(cache_entry)
+                if files:
+                    number_of_cache_entries += 1
+                    session.delete(cache_entry)
+
+                for file, file_type in files.items():
+                    self.file_sizes.pop(file, 0)
+                    if file_type == "application/vnd+zarr":
+                        dirs_to_delete.append(file)
+                    else:
+                        files_to_delete.append(file)
+
+                if self.stop_cleaning(maxsize):
+                    break
+
+            if number_of_cache_entries:
+                self.logger.info(
+                    "deleting cache entries",
+                    number_of_cache_entries=number_of_cache_entries,
+                )
+            database._commit_or_rollback(session)
+
+        self.remove_files(files_to_delete, recursive=False)
+        self.remove_files(dirs_to_delete, recursive=True)
+        self.log_disk_usage()
+
+        if not self.stop_cleaning(maxsize):
+            raise ValueError(
+                (
+                    f"Unable to clean {self.dirname!r}."
+                    f" Final disk usage: {self.disk_usage!r}."
+                    f" Expected disk usage: {maxsize!r}"
+                )
             )
-
-        # Loop over entries
-        for cache_entry_id in cache_entry_ids:
-            with config.get().instantiated_sessionmaker() as session:
-                filters = [
-                    database.CacheEntry.id == cache_entry_id,
-                    # skip entries updated while cleaning
-                    database.CacheEntry.timestamp < start_timestamp,
-                ]
-                for cache_entry in session.scalars(
-                    sa.select(database.CacheEntry).filter(*filters)
-                ):
-                    json.loads(
-                        cache_entry._result_as_string,
-                        object_hook=functools.partial(
-                            _delete_cache_file,
-                            session=session,
-                            cache_entry_id=cache_entry.id,
-                            sizes=self.sizes,
-                        ),
-                    )
-                    if self.stop_cleaning(maxsize):
-                        return
-
-        raise ValueError(
-            f"Unable to clean {self.dirname!r}. Final size: {self.size!r}. Expected size: {maxsize!r}"
-        )
 
 
 def clean_cache_files(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime
+import os
 import pathlib
 import time
 from typing import Any, Literal
@@ -13,6 +14,7 @@ import structlog
 
 from cacholote import cache, clean, config, utils
 
+ONE_BYTE = os.urandom(1)
 does_not_raise = contextlib.nullcontext
 
 
@@ -41,7 +43,7 @@ def test_clean_cache_files(
     # Create files
     for algorithm in ("LRU", "LFU"):
         filename = tmp_path / f"{algorithm}.txt"
-        fsspec.filesystem("file").pipe_file(filename, b"1")
+        fsspec.filesystem("file").pipe_file(filename, ONE_BYTE)
 
     # Copy to cache
     (lru_path,) = {open_url(tmp_path / "LRU.txt").path for _ in range(2)}
@@ -68,7 +70,7 @@ def test_delete_unknown_files(
 
     # Create file
     tmpfile = tmp_path / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+    fsspec.filesystem("file").pipe_file(tmpfile, ONE_BYTE)
 
     # Copy to cache
     cached_file = open_url(tmpfile).path
@@ -113,7 +115,7 @@ def test_clean_locked_files(
 
     # Create file
     tmpfile = tmp_path / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+    fsspec.filesystem("file").pipe_file(tmpfile, ONE_BYTE)
 
     # Copy to cache
     cached_file = open_url(tmpfile).path
@@ -157,7 +159,7 @@ def test_clean_tagged_files(
     expected_ls = []
     for tag in [None, "1", "2"]:
         tmpfile = tmp_path / f"test_{tag}.txt"
-        fsspec.filesystem("file").pipe_file(tmpfile, b"1")
+        fsspec.filesystem("file").pipe_file(tmpfile, ONE_BYTE)
         with config.set(tag=tag):
             cached_file = open_url(tmpfile).path
         if tag not in cleaned:
@@ -214,16 +216,16 @@ def test_clean_invalid_cache_entries(
     fs, dirname = utils.get_cache_files_fs_dirname()
 
     # Valid cache file
-    fsspec.filesystem("file").pipe_file(tmp_path / "valid.txt", b"1")
+    fsspec.filesystem("file").pipe_file(tmp_path / "valid.txt", ONE_BYTE)
     valid = open_url(tmp_path / "valid.txt").path
 
     # Corrupted cache file
-    fsspec.filesystem("file").pipe_file(tmp_path / "corrupted.txt", b"1")
+    fsspec.filesystem("file").pipe_file(tmp_path / "corrupted.txt", ONE_BYTE)
     corrupted = open_url(tmp_path / "corrupted.txt").path
     fs.touch(corrupted)
 
     # Expired cache file
-    fsspec.filesystem("file").pipe_file(tmp_path / "expired.txt", b"1")
+    fsspec.filesystem("file").pipe_file(tmp_path / "expired.txt", ONE_BYTE)
     with config.set(expiration=utils.utcnow() + datetime.timedelta(seconds=0.2)):
         expired = open_url(tmp_path / "expired.txt").path
     time.sleep(0.2)
@@ -255,51 +257,52 @@ def test_cleaner_logging(
 ) -> None:
     # Cache file and create unknown
     tmpfile = tmp_path / "test.txt"
-    fsspec.filesystem("file").pipe_file(tmpfile, b"1")
-    cached_file = open_url(tmpfile)
+    fsspec.filesystem("file").pipe_file(tmpfile, ONE_BYTE)
+    open_url(tmpfile)
     fs, dirname = utils.get_cache_files_fs_dirname()
-    fs.pipe_file(f"{dirname}/unknown.txt", b"1")
+    fs.pipe_file(f"{dirname}/unknown.txt", ONE_BYTE)
 
     # Clean
     config.set(logger=structlog.get_logger())
     clean.clean_cache_files(0, delete_unknown_files=True)
     captured = iter(capsys.readouterr().out.splitlines())
 
+    sep = " " * 15
     line = next(captured)
-    assert "get disk usage of cache files" in line
+    assert "getting disk usage" in line
 
     line = next(captured)
-    assert "get unknown files" in line
+    assert line.endswith(f"disk usage check{sep}disk_usage=2")
 
     line = next(captured)
-    assert "delete unknown" in line
-    assert "recursive=False" in line
-    assert f"urlpath=file://{dirname}/unknown.txt" in line
-    assert "size=1" in line
+    assert "getting unknown files" in line
 
     line = next(captured)
-    assert "check cache files total size" in line
-    assert "size=1" in line
+    line.endswith(f"deleting unknown files{sep}number_of_files=1{sep}recursive=False")
 
     line = next(captured)
-    assert "delete cache entry" in line
-    assert "cache_entry=" in line
+    line.endswith(f"disk usage check{sep}disk_usage=1")
 
     line = next(captured)
-    assert "delete cache file" in line
-    assert f"urlpath=file://{cached_file.path}" in line
-    assert "size=1" in line
+    assert "getting cache entries to delete" in line
 
     line = next(captured)
-    assert "check cache files total size" in line
-    assert "size=0" in line
+    line.endswith(f"deleting cache entries{sep}number_of_cache_entries=1")
+
+    line = next(captured)
+    line.endswith(f"deleting cache files{sep}number_of_files=1{sep}recursive=False")
+
+    line = next(captured)
+    line.endswith(f"disk usage check{sep}disk_usage=0")
+
+    assert next(captured, None) is None
 
 
 def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
-    fsspec.filesystem("file").pipe_file(tmp_path / "test1.txt", b"1")
-    fsspec.filesystem("file").pipe_file(tmp_path / "test2.txt", b"2")
+    fsspec.filesystem("file").pipe_file(tmp_path / "test1.txt", ONE_BYTE)
+    fsspec.filesystem("file").pipe_file(tmp_path / "test2.txt", ONE_BYTE)
 
     open_urls(tmp_path / "test1.txt", tmp_path / "test2.txt")
     assert len(fs.ls(dirname)) == 2
