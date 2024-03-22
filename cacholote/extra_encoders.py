@@ -151,9 +151,10 @@ def _get_fs_and_urlpath(
     storage_options: dict[str, Any] | None = None,
     validate: bool = False,
 ) -> tuple[fsspec.AbstractFileSystem, str]:
+    settings = config.get()
     urlpath = file_json["file:local_path"]
     if storage_options is None:
-        storage_options = config.get().cache_files_storage_options
+        storage_options = settings.cache_files_storage_options
 
     if not validate:
         fs, *_ = fsspec.get_fs_token_paths(urlpath, storage_options=storage_options)
@@ -174,7 +175,7 @@ def _get_fs_and_urlpath(
             )
             if expected != actual:
                 raise ValueError(f"checksum mismatch: {urlpath=} {expected=} {actual=}")
-            config.get().logger.info(
+            settings.logger.info(
                 "retrieve cache file", urlpath=fs.unstrip_protocol(urlpath)
             )
             return (fs, urlpath)
