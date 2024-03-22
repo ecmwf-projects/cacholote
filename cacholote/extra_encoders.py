@@ -392,8 +392,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
         storage_options=settings.cache_files_storage_options,
     )
 
-    if is_file := (hasattr(obj, "path") or hasattr(obj, "name")):
-        urlpath_in = obj.path if hasattr(obj, "path") else obj.name  # type: ignore[union-attr]
+    if urlpath_in := getattr(obj, "path", getattr(obj, "name", "")):
         fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
         root = f"{fs_in.checksum(urlpath_in):x}"
         ext = pathlib.Path(urlpath_in).suffix
@@ -406,7 +405,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
         fs_out, urlpath_out, timeout=settings.lock_timeout
     ) as file_exists:
         if not file_exists:
-            if is_file:
+            if urlpath_in:
                 _store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
             else:
                 _store_io_object(obj, fs_out, urlpath_out)
