@@ -85,9 +85,8 @@ def _guess_type(
     local_path: str,
     default: str = "application/octet-stream",
 ) -> str:
-    content_type: str = fs.info(local_path).get("ContentType", "")
-    if content_type:
-        return content_type
+    if content_type := fs.info(local_path).get("ContentType", ""):
+        return str(content_type)
 
     filetype, *_ = mimetypes.guess_type(local_path, strict=False)
     if filetype is None and _HAS_MAGIC:
@@ -344,8 +343,7 @@ def _store_file_object(
         io_delete_original = config.get().io_delete_original
 
     kwargs = {}
-    content_type = _guess_type(fs_in, urlpath_in)
-    if content_type:
+    if content_type := _guess_type(fs_in, urlpath_in):
         kwargs["ContentType"] = content_type
     with _logging_timer(
         "upload",
