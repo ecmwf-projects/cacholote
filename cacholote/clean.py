@@ -142,7 +142,7 @@ class _Cleaner:
             with config.get().instantiated_sessionmaker() as session:
                 for cache_entry in session.scalars(sa.select(database.CacheEntry)):
                     for file in _get_files_from_cache_entry(cache_entry):
-                        unknown_sizes.pop(file)
+                        unknown_sizes.pop(file, 0)
         return unknown_sizes
 
     def delete_unknown_files(
@@ -150,7 +150,7 @@ class _Cleaner:
     ) -> None:
         unknown_sizes = self.get_unknown_sizes(lock_validity_period)
         for urlpath in unknown_sizes:
-            self.file_sizes.pop(urlpath)
+            self.file_sizes.pop(urlpath, 0)
         self.remove_files(
             list(unknown_sizes),
             recursive=recursive,
