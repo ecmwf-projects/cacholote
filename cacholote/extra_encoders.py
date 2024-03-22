@@ -352,10 +352,8 @@ def _store_file_object(
         size=fs_in.size(urlpath_in),
     ):
         if fs_in == fs_out:
-            if io_delete_original:
-                fs_in.mv(urlpath_in, urlpath_out, **kwargs)
-            else:
-                fs_in.cp(urlpath_in, urlpath_out, **kwargs)
+            func = fs_in.mv if io_delete_original else fs_in.cp
+            func(urlpath_in, urlpath_out, **kwargs)
         elif _filesystem_is_local(fs_in):
             fs_out.put(urlpath_in, urlpath_out, **kwargs)
         else:
