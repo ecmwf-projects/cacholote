@@ -328,7 +328,7 @@ def dictify_xr_object(obj: xr.Dataset | xr.DataArray) -> dict[str, Any]:
         return encode.dictify_python_call(
             decode_xr_dataset if isinstance(obj, xr.Dataset) else decode_xr_dataarray,
             file_json,
-            storage_options=config.get().cache_files_storage_options,
+            storage_options=settings.cache_files_storage_options,
             **kwargs,
         )
 
@@ -393,7 +393,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
         storage_options=settings.cache_files_storage_options,
     )
 
-    if is_file := hasattr(obj, "path") or hasattr(obj, "name"):
+    if is_file := (hasattr(obj, "path") or hasattr(obj, "name")):
         urlpath_in = obj.path if hasattr(obj, "path") else obj.name  # type: ignore[union-attr]
         fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
         root = f"{fs_in.checksum(urlpath_in):x}"
