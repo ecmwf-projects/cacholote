@@ -132,8 +132,9 @@ class FileInfoModel(pydantic.BaseModel):
 
 
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> dict[str, Any]:
+    settings = config.get()
     href = posixpath.join(
-        config.get().cache_files_urlpath_readonly or config.get().cache_files_urlpath,
+        settings.cache_files_urlpath_readonly or settings.cache_files_urlpath,
         posixpath.basename(local_path),
     )
     file_dict = {
@@ -143,7 +144,6 @@ def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> dict[str, A
         "file:size": fs.size(local_path),
         "file:local_path": local_path,
     }
-
     return FileInfoModel(**file_dict).model_dump(by_alias=True)
 
 
@@ -262,76 +262,78 @@ def decode_io_object(
 
 
 @_requires_xarray_and_dask
-def _maybe_store_xr_object(
+def _store_xr_object(
     obj: xr.Dataset | xr.DataArray,
     fs: fsspec.AbstractFileSystem,
     urlpath: str,
     filetype: str,
 ) -> None:
     if filetype == "application/vnd+zarr":
-        with utils.FileLock(
-            fs, urlpath, timeout=config.get().lock_timeout
-        ) as file_exists:
-            if not file_exists:
-                # Write directly on any filesystem
-                mapper = fs.get_mapper(urlpath)
-                with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
-                    obj.to_zarr(mapper, consolidated=True)
-    elif not fs.exists(urlpath):
-        # Need a tmp local copy to write on a different filesystem
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
+        # Write directly on any filesystem
+        mapper = fs.get_mapper(urlpath)
+        with _logging_timer("upload", urlpath=fs.unstrip_protocol(urlpath)):
+            obj.to_zarr(mapper, consolidated=True)
+        return
 
-            with _logging_timer("write tmp file", urlpath=tmpfilename):
-                if filetype == "application/netcdf":
-                    obj.to_netcdf(tmpfilename)
-                elif filetype == "application/x-grib":
-                    import cfgrib.xarray_to_grib
+    # Need a tmp local copy to write on a different filesystem
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        tmpfilename = str(pathlib.Path(tmpdirname) / pathlib.Path(urlpath).name)
 
-                    cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
-                else:
-                    # Should never get here! xarray_cache_type is checked in config.py
-                    raise ValueError(f"type {filetype!r} is NOT supported.")
+        with _logging_timer("write tmp file", urlpath=tmpfilename):
+            if filetype == "application/netcdf":
+                obj.to_netcdf(tmpfilename)
+            elif filetype == "application/x-grib":
+                import cfgrib.xarray_to_grib
 
-            _maybe_store_file_object(
-                fs if _filesystem_is_local(fs) else fsspec.filesystem("file"),
-                tmpfilename,
-                fs,
-                urlpath,
-                io_delete_original=True,
-            )
+                cfgrib.xarray_to_grib.to_grib(obj, tmpfilename)
+            else:
+                # Should never get here! xarray_cache_type is checked in config.py
+                raise ValueError(f"type {filetype!r} is NOT supported.")
+
+        _store_file_object(
+            fs if _filesystem_is_local(fs) else fsspec.filesystem("file"),
+            tmpfilename,
+            fs,
+            urlpath,
+            io_delete_original=True,
+        )
 
 
 @_requires_xarray_and_dask
 def dictify_xr_object(obj: xr.Dataset | xr.DataArray) -> dict[str, Any]:
     """Encode a ``xr.Dataset`` to JSON deserialized data (``dict``)."""
+    settings = config.get()
     with dask.config.set({"tokenize.ensure-deterministic": True}):
         root = dask.base.tokenize(obj)
 
-    filetype = config.get().xarray_cache_type
-    ext = mimetypes.guess_extension(filetype, strict=False)
-    urlpath_out = posixpath.join(config.get().cache_files_urlpath, f"{root}{ext}")
+    ext = mimetypes.guess_extension(settings.xarray_cache_type, strict=False)
+    urlpath_out = posixpath.join(settings.cache_files_urlpath, f"{root}{ext}")
 
     fs_out, *_ = fsspec.get_fs_token_paths(
         urlpath_out,
-        storage_options=config.get().cache_files_storage_options,
+        storage_options=settings.cache_files_storage_options,
     )
-    _maybe_store_xr_object(obj, fs_out, urlpath_out, filetype)
+    with utils.FileLock(
+        fs_out, urlpath_out, timeout=settings.lock_timeout
+    ) as file_exists:
+        if not file_exists:
+            _store_xr_object(obj, fs_out, urlpath_out, settings.xarray_cache_type)
 
-    file_json = _dictify_file(fs_out, urlpath_out)
-    kwargs: dict[str, Any] = {"chunks": {}}
-    if filetype == "application/vnd+zarr":
-        kwargs.update({"engine": "zarr", "consolidated": True})
+        file_json = _dictify_file(fs_out, urlpath_out)
 
-    return encode.dictify_python_call(
-        decode_xr_dataset if isinstance(obj, xr.Dataset) else decode_xr_dataarray,
-        file_json,
-        storage_options=config.get().cache_files_storage_options,
-        **kwargs,
-    )
+        kwargs: dict[str, Any] = {"chunks": {}}
+        if settings.xarray_cache_type == "application/vnd+zarr":
+            kwargs.update({"engine": "zarr", "consolidated": True})
+
+        return encode.dictify_python_call(
+            decode_xr_dataset if isinstance(obj, xr.Dataset) else decode_xr_dataarray,
+            file_json,
+            storage_options=config.get().cache_files_storage_options,
+            **kwargs,
+        )
 
 
-def _maybe_store_file_object(
+def _store_file_object(
     fs_in: fsspec.AbstractFileSystem,
     urlpath_in: str,
     fs_out: fsspec.AbstractFileSystem,
@@ -340,30 +342,28 @@ def _maybe_store_file_object(
 ) -> None:
     if io_delete_original is None:
         io_delete_original = config.get().io_delete_original
-    with utils.FileLock(
-        fs_out, urlpath_out, timeout=config.get().lock_timeout
-    ) as file_exists:
-        if not file_exists:
-            kwargs = {}
-            content_type = _guess_type(fs_in, urlpath_in)
-            if content_type:
-                kwargs["ContentType"] = content_type
-            with _logging_timer(
-                "upload",
-                urlpath=fs_out.unstrip_protocol(urlpath_out),
-                size=fs_in.size(urlpath_in),
-            ):
-                if fs_in == fs_out:
-                    if io_delete_original:
-                        fs_in.mv(urlpath_in, urlpath_out, **kwargs)
-                    else:
-                        fs_in.cp(urlpath_in, urlpath_out, **kwargs)
-                elif _filesystem_is_local(fs_in):
-                    fs_out.put(urlpath_in, urlpath_out, **kwargs)
-                else:
-                    with fs_in.open(urlpath_in, "rb") as f_in:
-                        with fs_out.open(urlpath_out, "wb") as f_out:
-                            utils.copy_buffered_file(f_in, f_out)
+
+    kwargs = {}
+    content_type = _guess_type(fs_in, urlpath_in)
+    if content_type:
+        kwargs["ContentType"] = content_type
+    with _logging_timer(
+        "upload",
+        urlpath=fs_out.unstrip_protocol(urlpath_out),
+        size=fs_in.size(urlpath_in),
+    ):
+        if fs_in == fs_out:
+            if io_delete_original:
+                fs_in.mv(urlpath_in, urlpath_out, **kwargs)
+            else:
+                fs_in.cp(urlpath_in, urlpath_out, **kwargs)
+        elif _filesystem_is_local(fs_in):
+            fs_out.put(urlpath_in, urlpath_out, **kwargs)
+        else:
+            with fs_in.open(urlpath_in, "rb") as f_in:
+                with fs_out.open(urlpath_out, "wb") as f_out:
+                    utils.copy_buffered_file(f_in, f_out)
+
     if io_delete_original and fs_in.exists(urlpath_in):
         with _logging_timer(
             "remove",
@@ -373,50 +373,56 @@ def _maybe_store_file_object(
             fs_in.rm(urlpath_in)
 
 
-def _maybe_store_io_object(
+def _store_io_object(
     f_in: _UNION_IO_TYPES,
     fs_out: fsspec.AbstractFileSystem,
     urlpath_out: str,
 ) -> None:
-    with utils.FileLock(
-        fs_out, urlpath_out, timeout=config.get().lock_timeout
-    ) as file_exists:
-        if not file_exists:
-            f_out = fs_out.open(urlpath_out, "wb")
-            with _logging_timer("upload", urlpath=fs_out.unstrip_protocol(urlpath_out)):
-                utils.copy_buffered_file(f_in, f_out)
+    f_out = fs_out.open(urlpath_out, "wb")
+    with _logging_timer("upload", urlpath=fs_out.unstrip_protocol(urlpath_out)):
+        utils.copy_buffered_file(f_in, f_out)
 
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
-    cache_files_urlpath = config.get().cache_files_urlpath
+    settings = config.get()
+
+    cache_files_urlpath = settings.cache_files_urlpath
     fs_out, *_ = fsspec.get_fs_token_paths(
         cache_files_urlpath,
-        storage_options=config.get().cache_files_storage_options,
+        storage_options=settings.cache_files_storage_options,
     )
 
-    if hasattr(obj, "path") or hasattr(obj, "name"):
+    if is_file := hasattr(obj, "path") or hasattr(obj, "name"):
         urlpath_in = obj.path if hasattr(obj, "path") else obj.name  # type: ignore[union-attr]
         fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
         root = f"{fs_in.checksum(urlpath_in):x}"
         ext = pathlib.Path(urlpath_in).suffix
         urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
-        _maybe_store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
     else:
         root = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()  # fsspec uses md5
         urlpath_out = posixpath.join(cache_files_urlpath, root)
-        _maybe_store_io_object(obj, fs_out, urlpath_out)
 
-    file_json = _dictify_file(fs_out, urlpath_out)
-    params = inspect.signature(open).parameters
-    kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+    with utils.FileLock(
+        fs_out, urlpath_out, timeout=settings.lock_timeout
+    ) as file_exists:
+        if not file_exists:
+            if is_file:
+                _store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
+            else:
+                _store_io_object(obj, fs_out, urlpath_out)
 
-    return encode.dictify_python_call(
-        decode_io_object,
-        file_json,
-        storage_options=config.get().cache_files_storage_options,
-        **kwargs,
-    )
+        file_json = _dictify_file(fs_out, urlpath_out)
+
+        params = inspect.signature(open).parameters
+        kwargs = {k: getattr(obj, k) for k in params.keys() if hasattr(obj, k)}
+
+        return encode.dictify_python_call(
+            decode_io_object,
+            file_json,
+            storage_options=settings.cache_files_storage_options,
+            **kwargs,
+        )
 
 
 def register_all() -> None:
