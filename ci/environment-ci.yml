@@ -31,3 +31,5 @@ dependencies:
 - types-requests
 - xarray>=2022.6.0
 - zarr
+- pip:
+  - pytest-structlog

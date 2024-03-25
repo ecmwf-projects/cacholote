@@ -11,6 +11,7 @@ from typing import Any
 import fsspec
 import pytest
 import pytest_httpserver
+import pytest_structlog
 import structlog
 
 from cacholote import cache, config, decode, encode, extra_encoders, utils
@@ -187,37 +188,49 @@ def test_content_type(tmp_path: pathlib.Path, set_cache: str) -> None:
 
 
 @pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
-def test_io_logging(capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path) -> None:
+def test_io_logging(
+    log: pytest_structlog.StructuredLogCapture, tmp_path: pathlib.Path
+) -> None:
     config.set(logger=structlog.get_logger(), io_delete_original=True)
 
     # Cache file
     tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").touch(tmpfile)
     cached_file = cached_open(tmpfile)
-    captured = iter(capsys.readouterr().out.splitlines())
 
-    line = next(captured)
-    assert "start upload" in line
-    assert f"urlpath=s3://{cached_file.path}" in line
-    assert "size=0" in line
-
-    line = next(captured)
-    assert "end upload" in line
-    assert f"urlpath=s3://{cached_file.path}" in line
-    assert "upload_time=" in line
-    assert "size=0" in line
-
-    line = next(captured)
-    assert "start remove" in line
-    assert f"urlpath=file://{tmpfile}" in line
-    assert "size=0" in line
-
-    line = next(captured)
-    assert "end remove" in line
-    assert f"urlpath=file://{tmpfile}" in line
-    assert "remove_time=" in line
-    assert "size=0" in line
-
-    line = next(captured)
-    assert "retrieve cache file" in line
-    assert f"urlpath=s3://{cached_file.path}" in line
+    tmp_urlpath = f"file://{tmpfile!s}"
+    cached_urlpath = f"s3://{cached_file.path}"
+    expected = [
+        {
+            "urlpath": cached_urlpath,
+            "size": 0,
+            "event": "start upload",
+            "level": "info",
+        },
+        {
+            "urlpath": cached_urlpath,
+            "size": 0,
+            "upload_time": log.events[1]["upload_time"],
+            "event": "end upload",
+            "level": "info",
+        },
+        {
+            "urlpath": tmp_urlpath,
+            "size": 0,
+            "event": "start remove",
+            "level": "info",
+        },
+        {
+            "urlpath": tmp_urlpath,
+            "size": 0,
+            "remove_time": log.events[3]["remove_time"],
+            "event": "end remove",
+            "level": "info",
+        },
+        {
+            "urlpath": cached_urlpath,
+            "event": "retrieve cache file",
+            "level": "info",
+        },
+    ]
+    assert log.events == expected

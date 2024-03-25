@@ -10,6 +10,7 @@ from typing import Any, Literal
 import fsspec
 import pydantic
 import pytest
+import pytest_structlog
 import structlog
 
 from cacholote import cache, clean, config, utils
@@ -253,7 +254,7 @@ def test_clean_invalid_cache_entries(
 
 
 def test_cleaner_logging(
-    capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path
+    log: pytest_structlog.StructuredLogCapture, tmp_path: pathlib.Path
 ) -> None:
     # Cache file and create unknown
     tmpfile = tmp_path / "test.txt"
@@ -265,37 +266,28 @@ def test_cleaner_logging(
     # Clean
     config.set(logger=structlog.get_logger())
     clean.clean_cache_files(0, delete_unknown_files=True)
-    captured = iter(capsys.readouterr().out.splitlines())
 
-    sep = " " * 15
-    line = next(captured)
-    assert "getting disk usage" in line
-
-    line = next(captured)
-    assert line.endswith(f"disk usage check{sep}disk_usage=2")
-
-    line = next(captured)
-    assert "getting unknown files" in line
-
-    line = next(captured)
-    line.endswith(f"deleting unknown files{sep}number_of_files=1{sep}recursive=False")
-
-    line = next(captured)
-    line.endswith(f"disk usage check{sep}disk_usage=1")
-
-    line = next(captured)
-    assert "getting cache entries to delete" in line
-
-    line = next(captured)
-    line.endswith(f"deleting cache entries{sep}number_of_cache_entries=1")
-
-    line = next(captured)
-    line.endswith(f"deleting cache files{sep}number_of_files=1{sep}recursive=False")
-
-    line = next(captured)
-    line.endswith(f"disk usage check{sep}disk_usage=0")
-
-    assert next(captured, None) is None
+    assert log.events == [
+        {"event": "getting disk usage", "level": "info"},
+        {"disk_usage": 2, "event": "check disk usage", "level": "info"},
+        {"event": "getting unknown files", "level": "info"},
+        {
+            "n_files_to_delete": 1,
+            "recursive": False,
+            "event": "deleting files",
+            "level": "info",
+        },
+        {"disk_usage": 1, "event": "check disk usage", "level": "info"},
+        {"event": "getting cache entries to delete", "level": "info"},
+        {"n_entries_to_delete": 1, "event": "deleting cache entries", "level": "info"},
+        {
+            "n_files_to_delete": 1,
+            "recursive": False,
+            "event": "deleting files",
+            "level": "info",
+        },
+        {"disk_usage": 0, "event": "check disk usage", "level": "info"},
+    ]
 
 
 def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
