@@ -9,6 +9,7 @@ dependencies:
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW
 - aiohttp
 - moto
+- pip
 - postgresql
 - psycopg
 - psycopg2
@@ -16,3 +17,5 @@ dependencies:
 - pytest-postgresql
 - requests
 - s3fs
+- pip:
+  - pytest-structlog
