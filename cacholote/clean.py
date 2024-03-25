@@ -141,7 +141,7 @@ class _Cleaner:
             with config.get().instantiated_sessionmaker() as session:
                 for cache_entry in session.scalars(sa.select(database.CacheEntry)):
                     for known_file in _get_files_from_cache_entry(cache_entry):
-                        unknown_files.remove(known_file)
+                        unknown_files.discard(known_file)
                     if not unknown_files:
                         break
         return unknown_files
