@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 import fsspec
 import pytest
+import pytest_structlog
 import structlog
 
 from cacholote import cache, config, decode, encode, extra_encoders, utils
@@ -163,37 +164,48 @@ def test_xr_corrupted_files(
     assert fs.exists(cached_path)
 
 
-def test_xr_logging(capsys: pytest.CaptureFixture[str]) -> None:
+def test_xr_logging(log: pytest_structlog.StructuredLogCapture) -> None:
     config.set(logger=structlog.get_logger(), raise_all_encoding_errors=True)
 
     # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)
     cached_ds = cfunc()
-    captured = iter(capsys.readouterr().out.splitlines())
+    urlpath = f"file://{cached_ds.encoding['source']}"
+    tmpfile = log.events[0]["urlpath"]
+    assert urlpath.rsplit("/", 1)[1] == tmpfile.rsplit("/", 1)[1]
 
-    line = next(captured)
-    assert "start write tmp file" in line
-    assert "urlpath=" in line
-
-    line = next(captured)
-    assert "end write tmp file" in line
-    assert "urlpath=" in line
-    assert "write_tmp_file_time=" in line
-
-    line = next(captured)
-    assert "start upload" in line
-    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
-    assert "size=22597" in line
-
-    line = next(captured)
-    assert "end upload" in line
-    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
-    assert "upload_time=" in line
-    assert "size=22597" in line
-
-    line = next(captured)
-    assert "retrieve cache file" in line
-    assert f"urlpath=file://{cached_ds.encoding['source']}" in line
+    expected = [
+        {
+            "urlpath": tmpfile,
+            "event": "start write tmp file",
+            "level": "info",
+        },
+        {
+            "urlpath": tmpfile,
+            "write_tmp_file_time": log.events[1]["write_tmp_file_time"],
+            "event": "end write tmp file",
+            "level": "info",
+        },
+        {
+            "urlpath": urlpath,
+            "size": 22597,
+            "event": "start upload",
+            "level": "info",
+        },
+        {
+            "urlpath": urlpath,
+            "size": 22597,
+            "upload_time": log.events[3]["upload_time"],
+            "event": "end upload",
+            "level": "info",
+        },
+        {
+            "urlpath": urlpath,
+            "event": "retrieve cache file",
+            "level": "info",
+        },
+    ]
+    assert log.events == expected
 
 
 @pytest.mark.parametrize(
