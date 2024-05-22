@@ -84,13 +84,21 @@ class FileLock:
     def acquire(self) -> None:
         self.fs.touch(self.lockfile)
 
+    @property
+    def exists(self) -> bool:
+        return bool(self.fs.exists(self.urlpath))
+
+    @property
+    def lock_exists(self) -> bool:
+        return bool(self.fs.exists(self.lockfile))
+
     def release(self) -> None:
         if self.fs.exists(self.lockfile):
             self.fs.rm(self.lockfile)
 
     @property
     def is_locked(self) -> bool:
-        return bool(self.fs.exists(self.lockfile))
+        return self.lock_exists and self.exists
 
     def wait_until_released(self) -> None:
         warned = False
@@ -107,7 +115,7 @@ class FileLock:
     def __enter__(self) -> bool:
         self.wait_until_released()
         self.acquire()
-        return bool(self.fs.exists(self.urlpath))
+        return self.exists
 
     def __exit__(
         self,
