@@ -170,6 +170,7 @@ def test_io_locker(
     # Acquire lock
     fs, dirname = utils.get_cache_files_fs_dirname()
     file_path = f"{dirname}/{fsspec.filesystem('file').checksum(tmpfile):x}.txt"
+    fs.touch(file_path)
     fs.touch(f"{file_path}.lock")
 
     process = subprocess.Popen(f"sleep 0.1; rm {file_path}.lock", shell=True)
