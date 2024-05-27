@@ -40,6 +40,7 @@ from typing import (
 import fsspec
 import fsspec.implementations.local
 import pydantic
+import structlog
 
 from . import config, encode, utils
 
@@ -113,13 +114,22 @@ def _filesystem_is_local(fs: fsspec.AbstractFileSystem) -> bool:
 
 @contextlib.contextmanager
 def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
-    logger = config.get().logger
-    logger.info(f"start {event}", **kwargs)
+    loggers: list[
+        structlog.BoundLogger | structlog._config.BoundLoggerLazyProxy | config.Context
+    ] = [config.get().logger]
+    if (context := config.get().context) is not None:
+        loggers.append(context)
+
+    for logger in loggers:
+        logger.info(f"start {event}", **kwargs)
+
     tic = time.perf_counter()
     yield tic
     toc = time.perf_counter()
     kwargs["_".join(event.split() + ["time"])] = toc - tic  # elapsed time
-    logger.info(f"end {event}", **kwargs)
+
+    for logger in loggers:
+        logger.info(f"end {event}", **kwargs)
 
 
 class FileInfoModel(pydantic.BaseModel):
