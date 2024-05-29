@@ -40,7 +40,6 @@ from typing import (
 import fsspec
 import fsspec.implementations.local
 import pydantic
-import structlog
 
 from . import config, encode, utils
 
@@ -114,22 +113,22 @@ def _filesystem_is_local(fs: fsspec.AbstractFileSystem) -> bool:
 
 @contextlib.contextmanager
 def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
-    loggers: list[
-        structlog.BoundLogger | structlog._config.BoundLoggerLazyProxy | config.Context
-    ] = [config.get().logger]
-    if (context := config.get().context) is not None:
-        loggers.append(context)
-
-    for logger in loggers:
-        logger.info(f"start {event}", **kwargs)
+    logger = config.get().logger
+    context = config.get().context
+    logger.info(f"start {event}", **kwargs)
+    if event == "upload" and context is not None:
+        suffix = " ".join([f"{k}: {v}" for k, v in kwargs.items()])
+        context.upload_log(f"start {event}. {suffix}")
 
     tic = time.perf_counter()
     yield tic
     toc = time.perf_counter()
-    kwargs["_".join(event.split() + ["time"])] = toc - tic  # elapsed time
 
-    for logger in loggers:
-        logger.info(f"end {event}", **kwargs)
+    kwargs["_".join(event.split() + ["time"])] = toc - tic  # elapsed time
+    logger.info(f"end {event}", **kwargs)
+    if event == "upload" and context is not None:
+        suffix = " ".join([f"{k}: {v}" for k, v in kwargs.items()])
+        context.upload_log(f"end {event}. {suffix}")
 
 
 class FileInfoModel(pydantic.BaseModel):
