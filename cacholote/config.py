@@ -15,6 +15,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import abc
 import datetime
 import logging
 import pathlib
@@ -41,6 +42,14 @@ _DEFAULT_LOGGER = structlog.get_logger(
 )
 
 
+class Context(abc.ABC):
+    @abc.abstractmethod
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+
+    @abc.abstractmethod
+    def upload_log(self, *args: Any, **kwargs: Any) -> None: ...
+
+
 class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
     cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
@@ -61,6 +70,7 @@ class Settings(pydantic_settings.BaseSettings):
         _DEFAULT_LOGGER
     )
     lock_timeout: Optional[float] = None
+    context: Optional[Context] = None
 
     @pydantic.field_validator("create_engine_kwargs")
     def validate_create_engine_kwargs(
@@ -151,8 +161,10 @@ class set:
         Note that existing tags are overwritten.
     return_cache_entry: bool, default: False
         Whether to return the cache database entry rather than decoded results.
-    lock_timeout: fload, optional, default: None
+    lock_timeout: float, optional, default: None
         Time to wait before raising an error if a cache file is locked.
+    context: Context, optional, default: None
+        CADS context for internal use.
     """
 
     def __init__(self, **kwargs: Any):

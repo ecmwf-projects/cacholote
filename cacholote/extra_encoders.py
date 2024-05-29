@@ -111,15 +111,26 @@ def _filesystem_is_local(fs: fsspec.AbstractFileSystem) -> bool:
     return isinstance(fs, fsspec.get_filesystem_class("file"))
 
 
+def _kwargs_to_str(**kwargs: Any) -> str:
+    return " ".join([f"{k}={v}" for k, v in kwargs.items()])
+
+
 @contextlib.contextmanager
 def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
     logger = config.get().logger
+    context = config.get().context
     logger.info(f"start {event}", **kwargs)
+    if event == "upload" and context is not None:
+        context.upload_log(f"start {event}. {_kwargs_to_str(**kwargs)}")
+
     tic = time.perf_counter()
     yield tic
     toc = time.perf_counter()
+
     kwargs["_".join(event.split() + ["time"])] = toc - tic  # elapsed time
     logger.info(f"end {event}", **kwargs)
+    if event == "upload" and context is not None:
+        context.upload_log(f"end {event}. {_kwargs_to_str(**kwargs)}")
 
 
 class FileInfoModel(pydantic.BaseModel):
