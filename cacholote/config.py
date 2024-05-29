@@ -161,8 +161,10 @@ class set:
         Note that existing tags are overwritten.
     return_cache_entry: bool, default: False
         Whether to return the cache database entry rather than decoded results.
-    lock_timeout: fload, optional, default: None
+    lock_timeout: float, optional, default: None
         Time to wait before raising an error if a cache file is locked.
+    context: Context, optional, default: None
+        CADS context for internal use.
     """
 
     def __init__(self, **kwargs: Any):
