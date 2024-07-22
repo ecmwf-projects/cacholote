@@ -23,6 +23,7 @@ from typing import Any, Callable, Literal, Optional
 import pydantic
 import sqlalchemy as sa
 import sqlalchemy.orm
+from sqlalchemy import BinaryExpression, ColumnElement
 
 from . import config, database, decode, encode, extra_encoders, utils
 
@@ -354,3 +355,26 @@ def clean_invalid_cache_entries(
                     decode.loads(cache_entry._result_as_string)
                 except decode.DecodeError:
                     _delete_cache_entry(session, cache_entry)
+
+
+def expire_cache_entries(
+    tags: list[str] | None = None,
+    before: datetime.datetime | None = None,
+    after: datetime.date | None = None,
+) -> None:
+    now = utils.utcnow()
+
+    filters: list[BinaryExpression[bool] | ColumnElement[bool]] = []
+    if tags is not None:
+        filters.append(database.CacheEntry.tag.in_(tags))
+    if before is not None:
+        filters.append(database.CacheEntry.timestamp < before)
+    if after is not None:
+        filters.append(database.CacheEntry.timestamp > after)
+
+    with config.get().instantiated_sessionmaker() as session:
+        for cache_entry in session.scalars(
+            sa.select(database.CacheEntry).filter(*filters)
+        ):
+            cache_entry.expiration = now
+        database._commit_or_rollback(session)
