@@ -16,6 +16,9 @@ import structlog
 from cacholote import cache, clean, config, utils
 
 ONE_BYTE = os.urandom(1)
+TODAY = datetime.datetime.now(tz=datetime.timezone.utc)
+TOMORROW = TODAY + datetime.timedelta(days=1)
+YESTERDAY = TODAY - datetime.timedelta(days=1)
 does_not_raise = contextlib.nullcontext
 
 
@@ -28,6 +31,11 @@ def open_url(url: pathlib.Path) -> fsspec.spec.AbstractBufferedFile:
 @cache.cacheable
 def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
     return [fsspec.open(url).open() for url in urls]
+
+
+@cache.cacheable
+def cached_now() -> datetime.datetime:
+    return datetime.datetime.now()
 
 
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
@@ -301,3 +309,29 @@ def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
 
     clean.clean_cache_files(0)
     assert len(fs.ls(dirname)) == 0
+
+
+@pytest.mark.parametrize(
+    "tags,before,after",
+    [
+        (["foo"], None, None),
+        (None, TOMORROW, None),
+        (None, None, YESTERDAY),
+        (["foo"], TOMORROW, YESTERDAY),
+    ],
+)
+def test_expire_cache_entries(
+    tags: None | list[str],
+    before: None | datetime.datetime,
+    after: None | datetime.datetime,
+) -> None:
+    with config.set(tag="foo"):
+        now = cached_now()
+
+    # Do not expire
+    clean.expire_cache_entries(tags=["bar"], before=YESTERDAY, after=TOMORROW)
+    assert now == cached_now()
+
+    # Expire
+    clean.expire_cache_entries(tags=tags, before=before, after=after)
+    assert now != cached_now()
