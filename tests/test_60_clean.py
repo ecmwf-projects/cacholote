@@ -329,11 +329,11 @@ def test_expire_cache_entries(
         now = cached_now()
 
     # Do not expire
-    expired = clean.expire_cache_entries(tags=["bar"], before=YESTERDAY, after=TOMORROW)
-    assert expired == 0
+    count = clean.expire_cache_entries(tags=["bar"], before=YESTERDAY, after=TOMORROW)
+    assert count == 0
     assert now == cached_now()
 
     # Expire
-    expired = clean.expire_cache_entries(tags=tags, before=before, after=after)
-    assert expired == 1
+    count = clean.expire_cache_entries(tags=tags, before=before, after=after)
+    assert count == 1
     assert now != cached_now()
