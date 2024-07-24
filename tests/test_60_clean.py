@@ -337,3 +337,15 @@ def test_expire_cache_entries(
     count = clean.expire_cache_entries(tags=tags, before=before, after=after)
     assert count == 1
     assert now != cached_now()
+
+
+def test_expire_cache_entries_created_at() -> None:
+    tic = utils.utcnow()
+    _ = cached_now()
+    toc = utils.utcnow()
+    _ = cached_now()
+
+    assert clean.expire_cache_entries(before=tic) == 0
+    assert clean.expire_cache_entries(after=toc) == 0
+    assert clean.expire_cache_entries(before=toc) == 1
+    assert clean.expire_cache_entries(after=tic) == 1
