@@ -40,11 +40,8 @@ class CacheEntry(Base):
     key = sa.Column(sa.String(32))
     expiration = sa.Column(sa.DateTime, default=_DATETIME_MAX)
     result = sa.Column(sa.JSON)
-    timestamp = sa.Column(
-        sa.DateTime,
-        default=utils.utcnow,
-        onupdate=utils.utcnow,
-    )
+    created_at = sa.Column(sa.DateTime, default=utils.utcnow)
+    updated_at = sa.Column(sa.DateTime, default=utils.utcnow, onupdate=utils.utcnow)
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
 
@@ -53,7 +50,15 @@ class CacheEntry(Base):
         return json.dumps(self.result)
 
     def __repr__(self) -> str:
-        public_attrs = ("id", "key", "expiration", "timestamp", "counter", "tag")
+        public_attrs = (
+            "id",
+            "key",
+            "expiration",
+            "created_at",
+            "updated_at",
+            "counter",
+            "tag",
+        )
         public_attrs_repr = ", ".join(
             [f"{attr}={getattr(self, attr)!r}" for attr in public_attrs]
         )

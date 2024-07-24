@@ -56,9 +56,9 @@ def test_cacheable(tmp_path: pathlib.Path) -> None:
             )
         ]
 
-        cur.execute("SELECT timestamp FROM cache_entries", ())
-        (timestamp,) = cur.fetchone() or []
-        assert before < datetime.datetime.fromisoformat(timestamp + "+00:00") < after
+        cur.execute("SELECT updated_at FROM cache_entries", ())
+        (updated_at,) = cur.fetchone() or []
+        assert before < datetime.datetime.fromisoformat(updated_at + "+00:00") < after
 
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
@@ -199,13 +199,17 @@ def test_cached_error() -> None:
 def test_cache_entry_repr() -> None:
     with config.set(return_cache_entry=True):
         cache_entry = cached_now()
+    assert isinstance(cache_entry, database.CacheEntry)
 
+    created_at = cache_entry.created_at
+    updated_at = cache_entry.updated_at
     assert repr(cache_entry) == (
         "CacheEntry("
         "id=1, "
         "key='c3d9e414d0d32337c3672cb29b1b3cc9', "
         "expiration=datetime.datetime(9999, 12, 31, 0, 0), "
-        f"timestamp={cache_entry.timestamp!r}, "
+        f"created_at={created_at!r}, "
+        f"updated_at={updated_at!r}, "
         "counter=1, "
         "tag=None"
         ")"

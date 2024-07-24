@@ -17,6 +17,7 @@ classifiers = [
   "Topic :: Scientific/Engineering"
 ]
 dependencies = [
+  "alembic",
   "fsspec",
   "pydantic",
   "pydantic-settings",
