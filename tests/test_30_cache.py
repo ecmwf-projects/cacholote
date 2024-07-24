@@ -56,9 +56,17 @@ def test_cacheable(tmp_path: pathlib.Path) -> None:
             )
         ]
 
-        cur.execute("SELECT updated_at FROM cache_entries", ())
-        (updated_at,) = cur.fetchone() or []
-        assert before < datetime.datetime.fromisoformat(updated_at + "+00:00") < after
+        cur.execute("SELECT created_at, updated_at FROM cache_entries", ())
+        timestamps = cur.fetchone() or []
+        created_at, updated_at = [
+            datetime.datetime.fromisoformat(timestamp + "+00:00")
+            for timestamp in timestamps
+        ]
+        assert before < updated_at < after
+        if counter == 1:
+            assert before < created_at < after
+        else:
+            assert created_at < before
 
 
 @pytest.mark.parametrize("raise_all_encoding_errors", [True, False])
