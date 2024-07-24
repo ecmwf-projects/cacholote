@@ -361,7 +361,7 @@ def expire_cache_entries(
     tags: list[str] | None = None,
     before: datetime.datetime | None = None,
     after: datetime.date | None = None,
-) -> None:
+) -> int:
     now = utils.utcnow()
 
     filters: list[BinaryExpression[bool] | ColumnElement[bool]] = []
@@ -372,9 +372,12 @@ def expire_cache_entries(
     if after is not None:
         filters.append(database.CacheEntry.timestamp > after)
 
+    count = 0
     with config.get().instantiated_sessionmaker() as session:
         for cache_entry in session.scalars(
             sa.select(database.CacheEntry).filter(*filters)
         ):
+            count += 1
             cache_entry.expiration = now
         database._commit_or_rollback(session)
+    return count
