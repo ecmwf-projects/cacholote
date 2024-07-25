@@ -81,6 +81,13 @@ convention = "numpy"
 include-package-data = true
 packages = ["cacholote"]
 
+[tool.setuptools.package-data]
+cacholote = [
+  "alembic.ini",
+  "alembic/*",
+  "alembic/**/*"
+]
+
 [tool.setuptools_scm]
 write_to = "cacholote/version.py"
 write_to_template = '''
