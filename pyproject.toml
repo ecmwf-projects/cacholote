@@ -78,15 +78,7 @@ max-line-length = 110
 convention = "numpy"
 
 [tool.setuptools]
-include-package-data = true
 packages = ["cacholote"]
-
-[tool.setuptools.package-data]
-cacholote = [
-  "alembic.ini",
-  "alembic/*",
-  "alembic/**/*"
-]
 
 [tool.setuptools_scm]
 write_to = "cacholote/version.py"
