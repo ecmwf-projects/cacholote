@@ -25,6 +25,8 @@ def upgrade() -> None:
         "cache_entries",
         sa.Column("created_at", sa.DateTime, default=cacholote.utils.utcnow),
     )
+    op.execute(f"UPDATE cache_entries SET created_at='{cacholote.utils.utcnow()!s}'")
+
     op.alter_column("cache_entries", "timestamp", new_column_name="updated_at")
 
 
