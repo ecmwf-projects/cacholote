@@ -13,4 +13,5 @@ dependencies:
 - pydantic
 - pydantic-settings
 - sqlalchemy>=2.0.9
+- sqlalchemy-utils
 - structlog

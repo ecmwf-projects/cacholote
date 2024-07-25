@@ -33,3 +33,4 @@ dependencies:
 - zarr
 - pip:
   - pytest-structlog
+  - types-sqlalchemy-utils

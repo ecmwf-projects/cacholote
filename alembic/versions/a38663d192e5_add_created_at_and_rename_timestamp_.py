@@ -1,20 +1,20 @@
 """add created_at and rename timestamp column.
 
 Revision ID: a38663d192e5
-Revises: 
+Revises:
 Create Date: 2024-07-24 15:53:43.989464
 
 """
-import datetime
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
 
-from alembic import op
 import cacholote
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'a38663d192e5'
+revision: str = "a38663d192e5"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

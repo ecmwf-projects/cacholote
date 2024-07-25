@@ -123,7 +123,6 @@ In case of database structure upgrade, developers must follow these steps:
 
 For details about the alembic migration tool, see the [Alembic tutorial](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
 
-
 ## License
 
 ```

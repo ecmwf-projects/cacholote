@@ -52,14 +52,14 @@ def run_migrations_online() -> None:
         alembic.context.configure(
             connection=connection,
             target_metadata=cacholote.database.Base.metadata,
-            version_table='alembic_version_cacholote'
+            version_table="alembic_version_cacholote",
         )
 
         with alembic.context.begin_transaction():
             alembic.context.run_migrations()
 
 
-if context.is_offline_mode():
+if alembic.context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()

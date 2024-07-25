@@ -22,6 +22,7 @@ dependencies = [
   "pydantic",
   "pydantic-settings",
   "sqlalchemy>=2.0.9",
+  "sqlalchemy_utils",
   "structlog"
 ]
 description = "Efficiently cache calls to functions"
