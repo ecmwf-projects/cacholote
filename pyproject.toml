@@ -78,6 +78,7 @@ max-line-length = 110
 convention = "numpy"
 
 [tool.setuptools]
+include-package-data = true
 packages = ["cacholote"]
 
 [tool.setuptools_scm]
