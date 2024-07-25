@@ -8,8 +8,10 @@ channels:
 # - package2
 # DO NOT EDIT ABOVE THIS LINE, ADD DEPENDENCIES BELOW AS SHOWN IN THE EXAMPLE
 dependencies:
+- alembic
 - fsspec
 - pydantic
 - pydantic-settings
 - sqlalchemy>=2.0.9
+- sqlalchemy-utils
 - structlog

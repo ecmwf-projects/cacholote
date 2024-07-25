@@ -23,6 +23,7 @@ from .clean import (
     delete,
     expire_cache_entries,
 )
+from .database import init_database
 from .decode import loads
 from .encode import dumps
 
@@ -47,6 +48,7 @@ __all__ = [
     "dumps",
     "expire_cache_entries",
     "extra_encoders",
+    "init_database",
     "loads",
     "utils",
 ]

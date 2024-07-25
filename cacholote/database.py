@@ -18,11 +18,16 @@ from __future__ import annotations
 import datetime
 import functools
 import json
+import os
 import warnings
 from typing import Any
 
 import sqlalchemy as sa
 import sqlalchemy.orm
+import sqlalchemy_utils
+
+import alembic.command
+import alembic.config
 
 from . import utils
 
@@ -40,11 +45,8 @@ class CacheEntry(Base):
     key = sa.Column(sa.String(32))
     expiration = sa.Column(sa.DateTime, default=_DATETIME_MAX)
     result = sa.Column(sa.JSON)
-    timestamp = sa.Column(
-        sa.DateTime,
-        default=utils.utcnow,
-        onupdate=utils.utcnow,
-    )
+    created_at = sa.Column(sa.DateTime, default=utils.utcnow)
+    updated_at = sa.Column(sa.DateTime, default=utils.utcnow, onupdate=utils.utcnow)
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
 
@@ -53,7 +55,15 @@ class CacheEntry(Base):
         return json.dumps(self.result)
 
     def __repr__(self) -> str:
-        public_attrs = ("id", "key", "expiration", "timestamp", "counter", "tag")
+        public_attrs = (
+            "id",
+            "key",
+            "expiration",
+            "created_at",
+            "updated_at",
+            "counter",
+            "tag",
+        )
         public_attrs_repr = ", ".join(
             [f"{attr}={getattr(self, attr)!r}" for attr in public_attrs]
         )
@@ -109,3 +119,46 @@ def _cached_sessionmaker(
 
 def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker[sa.orm.Session]:
     return _cached_sessionmaker(url, **_encode_kwargs(**kwargs))
+
+
+def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
+    """
+    Make sure the db located at URI `connection_string` exists updated and return the engine object.
+
+    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
+    :param force: if True, drop the database structure and build again from scratch
+    """
+    engine = sa.create_engine(connection_string)
+    migration_directory = os.path.abspath(os.path.join(__file__, "..", ".."))
+    os.chdir(migration_directory)
+    alembic_config_path = os.path.join(migration_directory, "alembic.ini")
+    alembic_cfg = alembic.config.Config(alembic_config_path)
+    for option in ["drivername", "username", "password", "host", "port", "database"]:
+        value = getattr(engine.url, option)
+        if value is None:
+            value = ""
+        alembic_cfg.set_main_option(option, str(value))
+    if not sqlalchemy_utils.database_exists(engine.url):
+        sqlalchemy_utils.create_database(engine.url)
+        # cleanup and create the schema
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, "head")
+    else:
+        # check the structure is empty or incomplete
+        query = sa.text(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
+        )
+        conn = engine.connect()
+        if "cache_entries" not in conn.execute(query).scalars().all():
+            force = True
+        conn.close()
+    if force:
+        # cleanup and create the schema
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, "head")
+    else:
+        # update db structure
+        alembic.command.upgrade(alembic_cfg, "head")
+    return engine

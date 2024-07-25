@@ -196,9 +196,13 @@ class _Cleaner:
     ) -> list[sa.orm.InstrumentedAttribute[Any]]:
         sorters: list[sa.orm.InstrumentedAttribute[Any]] = []
         if method == "LRU":
-            sorters.extend([database.CacheEntry.timestamp, database.CacheEntry.counter])
+            sorters.extend(
+                [database.CacheEntry.updated_at, database.CacheEntry.counter]
+            )
         elif method == "LFU":
-            sorters.extend([database.CacheEntry.counter, database.CacheEntry.timestamp])
+            sorters.extend(
+                [database.CacheEntry.counter, database.CacheEntry.updated_at]
+            )
         else:
             raise ValueError(f"{method=}")
         sorters.append(database.CacheEntry.expiration)
@@ -368,9 +372,9 @@ def expire_cache_entries(
     if tags is not None:
         filters.append(database.CacheEntry.tag.in_(tags))
     if before is not None:
-        filters.append(database.CacheEntry.timestamp < before)
+        filters.append(database.CacheEntry.created_at < before)
     if after is not None:
-        filters.append(database.CacheEntry.timestamp > after)
+        filters.append(database.CacheEntry.created_at > after)
 
     count = 0
     with config.get().instantiated_sessionmaker() as session:

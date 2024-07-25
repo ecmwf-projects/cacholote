@@ -76,7 +76,7 @@ def cacheable(func: F) -> F:
                 for cache_entry in session.scalars(
                     sa.select(database.CacheEntry)
                     .filter(*filters)
-                    .order_by(database.CacheEntry.timestamp.desc())
+                    .order_by(database.CacheEntry.updated_at.desc())
                 ):
                     try:
                         return _decode_and_update(session, cache_entry, settings)
