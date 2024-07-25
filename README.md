@@ -104,6 +104,26 @@ Before pushing to GitHub, run the following commands:
 1. Run the static type checker: `make type-check`
 1. Build the documentation (see [Sphinx tutorial](https://www.sphinx-doc.org/en/master/tutorial/)): `make docs-build`
 
+### Instructions for database updating
+
+In case of database structure upgrade, developers must follow these steps:
+
+1. Update the new database structure modifying [/cacholote/database.py](/cacholote/database.py), using
+   [SQLAlchemy ORM technologies](https://docs.sqlalchemy.org/en/latest/orm/)
+1. Execute from the cacholote work folder:
+   ```
+   alembic revision -m "message about the db modification"
+   ```
+1. The last command will create a new python file inside [/alembic/versions](/alembic/versions). Fill the `upgrade`
+   function with the operations that must be executed to migrate the database from the old structure to the new one.
+   Keep in mind both DDL (structure modification) and DML (data modification) instructions. For reference,
+   use https://alembic.sqlalchemy.org/en/latest/ops.html#ops.
+   Similarly, do the same with the `downgrade` function.
+1. Commit and push the modifications and the new file.
+
+For details about the alembic migration tool, see the [Alembic tutorial](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
+
+
 ## License
 
 ```
