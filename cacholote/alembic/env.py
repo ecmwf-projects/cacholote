@@ -1,8 +1,8 @@
 """module for entry points."""
 
+import alembic.context
 import sqlalchemy as sa
 
-import alembic.context
 import cacholote
 
 config = alembic.context.config

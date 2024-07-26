@@ -22,12 +22,11 @@ import os
 import warnings
 from typing import Any
 
+import alembic.command
+import alembic.config
 import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy_utils
-
-import alembic.command
-import alembic.config
 
 from . import utils
 
@@ -129,7 +128,7 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
     :param force: if True, drop the database structure and build again from scratch
     """
     engine = sa.create_engine(connection_string)
-    migration_directory = os.path.abspath(os.path.join(__file__, "..", ".."))
+    migration_directory = os.path.abspath(os.path.join(__file__, ".."))
     os.chdir(migration_directory)
     alembic_config_path = os.path.join(migration_directory, "alembic.ini")
     alembic_cfg = alembic.config.Config(alembic_config_path)
