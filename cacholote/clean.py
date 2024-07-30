@@ -106,16 +106,15 @@ class _Cleaner:
         self.fs = fs
         self.dirname = dirname
 
-        urldir = self.fs.unstrip_protocol(self.dirname)
-
+        self.urldir = self.fs.unstrip_protocol(self.dirname)
         self._log_info("getting disk usage")
         self.file_sizes: dict[str, int] = collections.defaultdict(int)
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)
-            basename, *_ = urlpath.replace(urldir, "", 1).strip("/").split("/")
+            basename, *_ = urlpath.replace(self.urldir, "", 1).strip("/").split("/")
             if basename:
-                self.file_sizes[posixpath.join(urldir, basename)] += size
+                self.file_sizes[posixpath.join(self.urldir, basename)] += size
 
         self.disk_usage = sum(self.file_sizes.values())
         self.log_disk_usage()
@@ -267,12 +266,12 @@ class _Cleaner:
             for cache_entry in session.scalars(
                 sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
-                files = _get_files_from_cache_entry(cache_entry)
-                if set(files) & set(self.file_sizes):
+                urlpaths = _get_files_from_cache_entry(cache_entry)
+                if any(urlpath.startswith(self.urldir) for urlpath in urlpaths):
                     n_entries_to_delete += 1
                     session.delete(cache_entry)
 
-                    for file, file_type in files.items():
+                    for file, file_type in urlpaths.items():
                         self.pop_file_size(file)
                         if file_type == "application/vnd+zarr":
                             dirs_to_delete.append(file)
