@@ -52,7 +52,7 @@ def _default_cache_db_urlpath() -> str:
 def _default_cache_files_urlpaths() -> list[str]:
     if (config := os.getenv("CACHOLOTE_CACHE_FILES_URLPATHS_CONFIG")) is not None:
         return pathlib.Path(config).read_text().splitlines()
-    return [str(_get_tmp_path() / "cache_files.db")]
+    return [str(_get_tmp_path() / "cache_files")]
 
 
 class Context(abc.ABC):
