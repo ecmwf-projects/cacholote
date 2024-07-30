@@ -34,20 +34,25 @@ import structlog
 from . import database
 
 _SETTINGS: Settings | None = None
-_DEFAULT_CACHE_DIR = pathlib.Path(tempfile.gettempdir()) / "cacholote"
-_DEFAULT_CACHE_DIR.mkdir(exist_ok=True)
-_DEFAULT_CACHE_DB_URLPATH = f"sqlite:///{_DEFAULT_CACHE_DIR / 'cacholote.db'}"
-_DEFAULT_CACHE_FILES_URLPATH = f"{_DEFAULT_CACHE_DIR / 'cache_files'}"
 _DEFAULT_LOGGER = structlog.get_logger(
     wrapper_class=structlog.make_filtering_bound_logger(logging.WARNING)
 )
 
 
+def _get_tmp_path() -> pathlib.Path:
+    tmp_path = pathlib.Path(tempfile.gettempdir()) / "cacholote"
+    tmp_path.mkdir(exist_ok=True)
+    return tmp_path
+
+
+def _default_cache_db_urlpath() -> str:
+    return f"sqlite:///{_get_tmp_path() / 'cacholote.db'}"
+
+
 def _default_cache_files_urlpaths() -> list[str]:
-    config = os.environ.get("CACHOLOTE_CACHE_FILES_URLPATHS_CONFIG")
-    if config:
+    if (config := os.getenv("CACHOLOTE_CACHE_FILES_URLPATHS_CONFIG")) is not None:
         return pathlib.Path(config).read_text().splitlines()
-    return [_DEFAULT_CACHE_FILES_URLPATH]
+    return [str(_get_tmp_path() / "cache_files.db")]
 
 
 class Context(abc.ABC):
@@ -60,7 +65,9 @@ class Context(abc.ABC):
 
 class Settings(pydantic_settings.BaseSettings):
     use_cache: bool = True
-    cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
+    cache_db_urlpath: Optional[str] = pydantic.Field(
+        default_factory=_default_cache_db_urlpath
+    )
     create_engine_kwargs: dict[str, Any] = {}
     sessionmaker: Optional[sa.orm.sessionmaker[sa.orm.Session]] = None
     cache_files_urlpaths: list[str] = pydantic.Field(
