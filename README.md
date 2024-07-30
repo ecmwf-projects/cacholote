@@ -32,7 +32,7 @@ False
 >>> tmpdir = tempfile.TemporaryDirectory().name
 >>> cacholote.config.set(
 ...     cache_db_urlpath="sqlite://",
-...     cache_files_urlpath=tmpdir,
+...     cache_files_urlpaths=[tmpdir],
 ... )
 <cacholote.config.set ...
 
@@ -59,7 +59,7 @@ True
 >>> tmpdir = tempfile.TemporaryDirectory().name
 >>> cacholote.config.set(
 ...     cache_db_urlpath="sqlite://",
-...     cache_files_urlpath=tmpdir,
+...     cache_files_urlpaths=[tmpdir],
 ... )
 <cacholote.config.set ...
 
