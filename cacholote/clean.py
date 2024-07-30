@@ -36,6 +36,10 @@ FILE_RESULT_CALLABLES = (
 )
 
 
+class CleanerError(Exception):
+    pass
+
+
 def _get_files_from_cache_entry(cache_entry: database.CacheEntry) -> dict[str, str]:
     result = cache_entry.result
     if not isinstance(result, (list, tuple, set)):
@@ -93,7 +97,11 @@ def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> 
 
 
 class _Cleaner:
-    def __init__(self, fs: fsspec.AbstractFileSystem, dirname: str) -> None:
+    def __init__(
+        self,
+        fs: fsspec.AbstractFileSystem,
+        dirname: str,
+    ) -> None:
         self.logger = config.get().logger
         self.fs = fs
         self.dirname = dirname
@@ -281,7 +289,7 @@ class _Cleaner:
         self.log_disk_usage()
 
         if not self.stop_cleaning(maxsize):
-            raise ValueError(
+            raise CleanerError(
                 (
                     f"Unable to clean {self.dirname!r}."
                     f" Final disk usage: {self.disk_usage!r}."
@@ -320,18 +328,25 @@ def clean_cache_files(
         tags_to_clean and tags_to_keep are mutually exclusive.
     """
     fs, dirnames = utils.get_cache_files_fs_dirnames()
+    exceptions = []
     for dirname in dirnames:
         cleaner = _Cleaner(fs=fs, dirname=dirname)
 
         if delete_unknown_files:
             cleaner.delete_unknown_files(lock_validity_period, recursive)
 
-        cleaner.delete_cache_files(
-            maxsize=maxsize,
-            method=method,
-            tags_to_clean=tags_to_clean,
-            tags_to_keep=tags_to_keep,
-        )
+        try:
+            cleaner.delete_cache_files(
+                maxsize=maxsize,
+                method=method,
+                tags_to_clean=tags_to_clean,
+                tags_to_keep=tags_to_keep,
+            )
+        except CleanerError as exc:
+            exceptions.append(exc)
+
+    if exceptions:
+        raise CleanerError("\n".join(map(str, exceptions)))
 
 
 def clean_invalid_cache_entries(

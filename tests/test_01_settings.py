@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import datetime
-import os
 import pathlib
 from typing import Any
 
@@ -89,25 +88,28 @@ def test_set_engine_and_sessionmaker(
         assert config.get().instantiated_sessionmaker is old_sessionmaker
 
 
-def test_env_variables(tmp_path: pathlib.Path) -> None:
-    # env variables
-    old_environ = dict(os.environ)
-    os.environ["CACHOLOTE_CACHE_DB_URLPATH"] = "sqlite://"
-
+def test_env_variables(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # env file
     dotenv_path = tmp_path / ".env.cacholote"
     with dotenv_path.open("w") as f:
         f.write("CACHOLOTE_IO_DELETE_ORIGINAL=TRUE")
 
+    # config file
+    config_path = tmp_path / "config"
+    cache_files_urlpaths = [str(tmp_path / "foo"), str(tmp_path / "bar")]
+    config_path.write_text("\n".join(cache_files_urlpaths))
+
+    # env variables
+    monkeypatch.setenv("CACHOLOTE_CACHE_DB_URLPATH", "sqlite://")
+    monkeypatch.setenv("CACHOLOTE_CACHE_FILES_URLPATHS_CONFIG", str(config_path))
+
     config.reset(str(dotenv_path))
-    try:
-        assert config.get().cache_db_urlpath == "sqlite://"
-        assert str(config.get().engine.url) == "sqlite://"
-        assert config.get().io_delete_original is True
-        assert str(config.get().engine.url) == "sqlite://"
-    finally:
-        os.environ.clear()
-        os.environ.update(old_environ)
+    settings = config.get()
+    assert settings.cache_db_urlpath == "sqlite://"
+    assert str(settings.engine.url) == "sqlite://"
+    assert settings.io_delete_original is True
+    assert str(settings.engine.url) == "sqlite://"
+    assert settings.cache_files_urlpaths == cache_files_urlpaths
 
 
 @pytest.mark.parametrize("poolclass", ("NullPool", sa.pool.NullPool))

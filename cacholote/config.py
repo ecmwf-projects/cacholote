@@ -18,6 +18,7 @@ from __future__ import annotations
 import abc
 import datetime
 import logging
+import os
 import pathlib
 import tempfile
 from types import TracebackType
@@ -42,6 +43,13 @@ _DEFAULT_LOGGER = structlog.get_logger(
 )
 
 
+def _default_cache_files_urlpaths() -> list[str]:
+    config = os.environ.get("CACHOLOTE_CACHE_FILES_URLPATHS_CONFIG")
+    if config:
+        return pathlib.Path(config).read_text().splitlines()
+    return [_DEFAULT_CACHE_FILES_URLPATH]
+
+
 class Context(abc.ABC):
     @abc.abstractmethod
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
@@ -55,7 +63,9 @@ class Settings(pydantic_settings.BaseSettings):
     cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
     create_engine_kwargs: dict[str, Any] = {}
     sessionmaker: Optional[sa.orm.sessionmaker[sa.orm.Session]] = None
-    cache_files_urlpaths: list[str] = [_DEFAULT_CACHE_FILES_URLPATH]
+    cache_files_urlpaths: list[str] = pydantic.Field(
+        default_factory=_default_cache_files_urlpaths
+    )
     cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: dict[str, Any] = {}
     xarray_cache_type: Literal[
