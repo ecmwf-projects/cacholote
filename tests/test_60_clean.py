@@ -47,7 +47,7 @@ def test_clean_cache_files(
 ) -> None:
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     # Create files
     for algorithm in ("LRU", "LFU"):
@@ -75,7 +75,7 @@ def test_clean_cache_files(
 def test_delete_unknown_files(
     tmp_path: pathlib.Path, delete_unknown_files: bool
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     # Create file
     tmpfile = tmp_path / "test.txt"
@@ -107,7 +107,7 @@ def test_delete_unknown_dirs(
     raises: contextlib.nullcontext,  # type: ignore[type-arg]
     final_size: int,
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     fs.mkdir(f"{dirname}/unknown")
     fs.touch(f"{dirname}/unknown/unknown.txt")
     with raises:
@@ -120,7 +120,7 @@ def test_delete_unknown_dirs(
 def test_clean_locked_files(
     tmp_path: pathlib.Path, set_cache: str, lock_validity_period: float | None
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     # Create file
     tmpfile = tmp_path / "test.txt"
@@ -163,7 +163,7 @@ def test_clean_tagged_files(
     tags_to_keep: list[str | None] | None,
     cleaned: list[str | None],
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     expected_ls = []
     for tag in [None, "1", "2"]:
@@ -195,7 +195,7 @@ def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
 
 
 def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     # Create file
     tmpfile = tmp_path / "test.txt"
@@ -222,7 +222,7 @@ def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
 def test_clean_invalid_cache_entries(
     tmp_path: pathlib.Path, check_expiration: bool, try_decode: bool
 ) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     # Valid cache file
     fsspec.filesystem("file").pipe_file(tmp_path / "valid.txt", ONE_BYTE)
@@ -245,7 +245,7 @@ def test_clean_invalid_cache_entries(
     )
 
     # Check files
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     assert valid in fs.ls(dirname)
     assert (
         corrupted not in fs.ls(dirname) if try_decode else corrupted in fs.ls(dirname)
@@ -268,7 +268,7 @@ def test_cleaner_logging(
     tmpfile = tmp_path / "test.txt"
     fsspec.filesystem("file").pipe_file(tmpfile, ONE_BYTE)
     open_url(tmpfile)
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     fs.pipe_file(f"{dirname}/unknown.txt", ONE_BYTE)
 
     # Clean
@@ -299,7 +299,7 @@ def test_cleaner_logging(
 
 
 def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
 
     fsspec.filesystem("file").pipe_file(tmp_path / "test1.txt", ONE_BYTE)
     fsspec.filesystem("file").pipe_file(tmp_path / "test2.txt", ONE_BYTE)

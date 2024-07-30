@@ -55,14 +55,14 @@ def set_cache(
                 f"postgresql+psycopg2://{postgresql.info.user}:@{postgresql.info.host}:"
                 f"{postgresql.info.port}/{postgresql.info.dbname}"
             ),
-            cache_files_urlpath=f"s3://{test_bucket_name}",
+            cache_files_urlpaths=[f"s3://{test_bucket_name}"],
             cache_files_storage_options={"client_kwargs": client_kwargs},
         ):
             yield "cads"
     elif param.lower() in ("file", "local"):
         with config.set(
             cache_db_urlpath="sqlite:///" + str(tmp_path / "cacholote.db"),
-            cache_files_urlpath=str(tmp_path / "cache_files"),
+            cache_files_urlpaths=[str(tmp_path / "cache_files")],
         ):
             yield "file"
     elif param.lower() == "off":

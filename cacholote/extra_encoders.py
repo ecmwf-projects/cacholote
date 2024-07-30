@@ -24,6 +24,7 @@ import io
 import mimetypes
 import pathlib
 import posixpath
+import random
 import tempfile
 import time
 from collections.abc import Generator
@@ -144,7 +145,7 @@ class FileInfoModel(pydantic.BaseModel):
 def _dictify_file(fs: fsspec.AbstractFileSystem, local_path: str) -> dict[str, Any]:
     settings = config.get()
     href = posixpath.join(
-        settings.cache_files_urlpath_readonly or settings.cache_files_urlpath,
+        settings.cache_files_urlpath_readonly or posixpath.dirname(local_path),
         posixpath.basename(local_path),
     )
     file_dict = {
@@ -318,7 +319,8 @@ def dictify_xr_object(obj: xr.Dataset | xr.DataArray) -> dict[str, Any]:
         root = dask.base.tokenize(obj)
 
     ext = mimetypes.guess_extension(settings.xarray_cache_type, strict=False)
-    urlpath_out = posixpath.join(settings.cache_files_urlpath, f"{root}{ext}")
+    cache_files_urlpath = random.choice(settings.cache_files_urlpaths)
+    urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
 
     fs_out, *_ = fsspec.get_fs_token_paths(
         urlpath_out,
@@ -395,7 +397,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
     settings = config.get()
 
-    cache_files_urlpath = settings.cache_files_urlpath
+    cache_files_urlpath = random.choice(settings.cache_files_urlpaths)
     fs_out, *_ = fsspec.get_fs_token_paths(
         cache_files_urlpath,
         storage_options=settings.cache_files_storage_options,

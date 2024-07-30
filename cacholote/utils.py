@@ -37,14 +37,17 @@ def hexdigestify(text: str) -> str:
     return hash_req.hexdigest()[:32]
 
 
-def get_cache_files_fs_dirname() -> tuple[fsspec.AbstractFileSystem, str]:
+def get_cache_files_fs_dirnames() -> tuple[fsspec.AbstractFileSystem, list[str]]:
     """Return the ``fsspec`` filesystem and directory name where cache files are stored."""
-    fs, _, (path,) = fsspec.get_fs_token_paths(
-        config.get().cache_files_urlpath,
-        storage_options=config.get().cache_files_storage_options,
-    )
-    fs.invalidate_cache()
-    return (fs, path)
+    paths = []
+    for cache_files_urlpath in config.get().cache_files_urlpaths:
+        fs, _, (path,) = fsspec.get_fs_token_paths(
+            cache_files_urlpath,
+            storage_options=config.get().cache_files_storage_options,
+        )
+        paths.append(path)
+        fs.invalidate_cache()
+    return (fs, paths)
 
 
 def copy_buffered_file(

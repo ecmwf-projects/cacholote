@@ -14,10 +14,10 @@ def test_hexdigestify() -> None:
     assert res == expected
 
 
-def test_get_cache_files(tmp_path: pathlib.Path) -> None:
-    assert utils.get_cache_files_fs_dirname() == (
+def test_get_cache_files_fs_dirnames(tmp_path: pathlib.Path) -> None:
+    assert utils.get_cache_files_fs_dirnames() == (
         fsspec.filesystem("file"),
-        str(tmp_path / "cache_files"),
+        [str(tmp_path / "cache_files")],
     )
 
 

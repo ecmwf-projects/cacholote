@@ -137,7 +137,7 @@ def test_xr_corrupted_files(
     config.set(xarray_cache_type=xarray_cache_type)
 
     # Cache file
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     expected = get_grib_ds()
     cfunc = cache.cacheable(get_grib_ds)
     cfunc()

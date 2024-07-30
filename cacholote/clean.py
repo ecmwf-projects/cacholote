@@ -20,6 +20,7 @@ import datetime
 import posixpath
 from typing import Any, Callable, Literal, Optional
 
+import fsspec
 import pydantic
 import sqlalchemy as sa
 import sqlalchemy.orm
@@ -55,7 +56,7 @@ def _get_files_from_cache_entry(cache_entry: database.CacheEntry) -> dict[str, s
 def _delete_cache_entry(
     session: sa.orm.Session, cache_entry: database.CacheEntry
 ) -> None:
-    fs, _ = utils.get_cache_files_fs_dirname()
+    fs, _ = utils.get_cache_files_fs_dirnames()
     files_to_delete = _get_files_from_cache_entry(cache_entry)
     logger = config.get().logger
 
@@ -92,9 +93,10 @@ def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> 
 
 
 class _Cleaner:
-    def __init__(self) -> None:
+    def __init__(self, fs: fsspec.AbstractFileSystem, dirname: str) -> None:
         self.logger = config.get().logger
-        self.fs, self.dirname = utils.get_cache_files_fs_dirname()
+        self.fs = fs
+        self.dirname = dirname
 
         urldir = self.fs.unstrip_protocol(self.dirname)
 
@@ -317,17 +319,19 @@ def clean_cache_files(
         To delete/keep untagged entries, add None in the list (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
     """
-    cleaner = _Cleaner()
+    fs, dirnames = utils.get_cache_files_fs_dirnames()
+    for dirname in dirnames:
+        cleaner = _Cleaner(fs=fs, dirname=dirname)
 
-    if delete_unknown_files:
-        cleaner.delete_unknown_files(lock_validity_period, recursive)
+        if delete_unknown_files:
+            cleaner.delete_unknown_files(lock_validity_period, recursive)
 
-    cleaner.delete_cache_files(
-        maxsize=maxsize,
-        method=method,
-        tags_to_clean=tags_to_clean,
-        tags_to_keep=tags_to_keep,
-    )
+        cleaner.delete_cache_files(
+            maxsize=maxsize,
+            method=method,
+            tags_to_clean=tags_to_clean,
+            tags_to_keep=tags_to_keep,
+        )
 
 
 def clean_invalid_cache_entries(

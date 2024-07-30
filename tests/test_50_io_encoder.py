@@ -106,7 +106,7 @@ def test_copy_from_http_to_cache(
     cached_basename = f"{fsspec.filesystem('http').checksum(url):x}"
 
     # cache http file
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     for expected_counter in (1, 2):
         result = cached_open(url)
 
@@ -131,7 +131,7 @@ def test_io_corrupted_files(
     cached_basename = f"{fsspec.filesystem('http').checksum(url):x}"
 
     # cache file
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     cached_open(url)
 
     # Warn if file is corrupted
@@ -168,7 +168,7 @@ def test_io_locker(
     fsspec.filesystem("file").touch(tmpfile)
 
     # Acquire lock
-    fs, dirname = utils.get_cache_files_fs_dirname()
+    fs, (dirname,) = utils.get_cache_files_fs_dirnames()
     file_path = f"{dirname}/{fsspec.filesystem('file').checksum(tmpfile):x}.txt"
     fs.touch(file_path)
     fs.touch(f"{file_path}.lock")
@@ -183,7 +183,7 @@ def test_io_locker(
 def test_content_type(tmp_path: pathlib.Path, set_cache: str) -> None:
     tmpfile = str(tmp_path / "test.grib")
     fsspec.filesystem("file").touch(tmpfile)
-    fs, _ = utils.get_cache_files_fs_dirname()
+    fs, _ = utils.get_cache_files_fs_dirnames()
     cached_grib = cached_open(tmpfile)
     assert fs.info(cached_grib)["ContentType"] == "application/x-grib"
 

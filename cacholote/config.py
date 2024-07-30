@@ -55,7 +55,7 @@ class Settings(pydantic_settings.BaseSettings):
     cache_db_urlpath: Optional[str] = _DEFAULT_CACHE_DB_URLPATH
     create_engine_kwargs: dict[str, Any] = {}
     sessionmaker: Optional[sa.orm.sessionmaker[sa.orm.Session]] = None
-    cache_files_urlpath: str = _DEFAULT_CACHE_FILES_URLPATH
+    cache_files_urlpaths: list[str] = [_DEFAULT_CACHE_FILES_URLPATH]
     cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: dict[str, Any] = {}
     xarray_cache_type: Literal[
@@ -90,12 +90,13 @@ class Settings(pydantic_settings.BaseSettings):
         return expiration
 
     @pydantic.model_validator(mode="after")
-    def make_cache_dir(self) -> Settings:
-        fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
-            self.cache_files_urlpath,
-            storage_options=self.cache_files_storage_options,
-        )
-        fs.mkdirs(urlpath, exist_ok=True)
+    def make_cache_dirs(self) -> Settings:
+        for cache_files_urlpath in self.cache_files_urlpaths:
+            fs, _, (urlpath, *_) = fsspec.get_fs_token_paths(
+                cache_files_urlpath,
+                storage_options=self.cache_files_storage_options,
+            )
+            fs.mkdirs(urlpath, exist_ok=True)
         return self
 
     @property

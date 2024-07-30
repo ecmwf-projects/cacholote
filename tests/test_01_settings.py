@@ -51,7 +51,7 @@ def test_change_cache_db_urlpath(tmp_path: pathlib.Path) -> None:
     [
         ("cache_db_urlpath", True),
         ("create_engine_kwargs", True),
-        ("cache_files_urlpath", False),
+        ("cache_files_urlpaths", False),
     ],
 )
 def test_set_engine_and_sessionmaker(
@@ -65,8 +65,8 @@ def test_set_engine_and_sessionmaker(
         kwargs[key] = "sqlite:///" + str(tmp_path / "dummy.db")
     elif key == "create_engine_kwargs":
         kwargs[key] = {"pool_recycle": 60}
-    elif key == "cache_files_urlpath":
-        kwargs[key] = str(tmp_path / "dummy_files")
+    elif key == "cache_files_urlpaths":
+        kwargs[key] = [str(tmp_path / "dummy_files")]
     else:
         raise ValueError
 
