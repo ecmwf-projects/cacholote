@@ -144,15 +144,9 @@ def init_database(connection_string: str, force: bool = False) -> sa.engine.Engi
         Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)
         alembic.command.stamp(alembic_cfg, "head")
-    else:
-        # check the structure is empty or incomplete
-        query = sa.text(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
-        )
-        conn = engine.connect()
-        if "cache_entries" not in conn.execute(query).scalars().all():
-            force = True
-        conn.close()
+    elif "cache_entries" not in sa.inspect(engine).get_table_names():
+        # db structure is empty or incomplete
+        force = True
     if force:
         # cleanup and create the schema
         Base.metadata.drop_all(engine)
