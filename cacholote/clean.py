@@ -268,16 +268,16 @@ class _Cleaner:
                 sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
                 files = _get_files_from_cache_entry(cache_entry)
-                if files:
+                if set(files) & set(self.file_sizes):
                     n_entries_to_delete += 1
                     session.delete(cache_entry)
 
-                for file, file_type in files.items():
-                    self.pop_file_size(file)
-                    if file_type == "application/vnd+zarr":
-                        dirs_to_delete.append(file)
-                    else:
-                        files_to_delete.append(file)
+                    for file, file_type in files.items():
+                        self.pop_file_size(file)
+                        if file_type == "application/vnd+zarr":
+                            dirs_to_delete.append(file)
+                        else:
+                            files_to_delete.append(file)
 
                 if self.stop_cleaning(maxsize):
                     break
