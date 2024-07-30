@@ -108,7 +108,7 @@ class _Cleaner:
 
         urldir = self.fs.unstrip_protocol(self.dirname)
 
-        self.logger.info("getting disk usage")
+        self._log_info("getting disk usage")
         self.file_sizes: dict[str, int] = collections.defaultdict(int)
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
@@ -120,19 +120,23 @@ class _Cleaner:
         self.disk_usage = sum(self.file_sizes.values())
         self.log_disk_usage()
 
+    def _log_info(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("dirname", self.dirname)
+        self.logger.info(*args, **kwargs)
+
     def pop_file_size(self, file: str) -> int:
         size = self.file_sizes.pop(file, 0)
         self.disk_usage -= size
         return size
 
     def log_disk_usage(self) -> None:
-        self.logger.info("check disk usage", disk_usage=self.disk_usage)
+        self._log_info("check disk usage", disk_usage=self.disk_usage)
 
     def stop_cleaning(self, maxsize: int) -> bool:
         return self.disk_usage <= maxsize
 
     def get_unknown_files(self, lock_validity_period: float | None) -> set[str]:
-        self.logger.info("getting unknown files")
+        self._log_info("getting unknown files")
 
         utcnow = utils.utcnow()
         locked_files = set()
@@ -228,7 +232,7 @@ class _Cleaner:
         if not files:
             return
 
-        self.logger.info("deleting files", n_files_to_delete=len(files), **kwargs)
+        self._log_info("deleting files", n_files_to_delete=len(files), **kwargs)
 
         n_tries = 0
         while files:

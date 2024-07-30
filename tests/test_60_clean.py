@@ -276,16 +276,27 @@ def test_cleaner_logging(
     clean.clean_cache_files(0, delete_unknown_files=True)
 
     assert log.events == [
-        {"event": "getting disk usage", "level": "info"},
-        {"disk_usage": 2, "event": "check disk usage", "level": "info"},
-        {"event": "getting unknown files", "level": "info"},
+        {"event": "getting disk usage", "level": "info", "dirname": dirname},
+        {
+            "disk_usage": 2,
+            "event": "check disk usage",
+            "level": "info",
+            "dirname": dirname,
+        },
+        {"event": "getting unknown files", "level": "info", "dirname": dirname},
         {
             "n_files_to_delete": 1,
             "recursive": False,
             "event": "deleting files",
             "level": "info",
+            "dirname": dirname,
         },
-        {"disk_usage": 1, "event": "check disk usage", "level": "info"},
+        {
+            "disk_usage": 1,
+            "event": "check disk usage",
+            "level": "info",
+            "dirname": dirname,
+        },
         {"event": "getting cache entries to delete", "level": "info"},
         {"n_entries_to_delete": 1, "event": "deleting cache entries", "level": "info"},
         {
@@ -293,8 +304,14 @@ def test_cleaner_logging(
             "recursive": False,
             "event": "deleting files",
             "level": "info",
+            "dirname": dirname,
         },
-        {"disk_usage": 0, "event": "check disk usage", "level": "info"},
+        {
+            "disk_usage": 0,
+            "event": "check disk usage",
+            "level": "info",
+            "dirname": dirname,
+        },
     ]
 
 
