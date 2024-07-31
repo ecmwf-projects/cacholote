@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import pathlib
 
 import fsspec
@@ -29,3 +30,10 @@ def test_copy_buffered_file(tmp_path: pathlib.Path) -> None:
     with open(src, "rb") as f_src, open(dst, "wb") as f_dst:
         utils.copy_buffered_file(f_src, f_dst)
     assert open(src, "rb").read() == open(dst, "rb").read() == b"test"
+
+
+def test_change_working_dir(tmp_path: pathlib.Path) -> None:
+    old_cwd = os.getcwd()
+    with utils.change_working_dir(str(tmp_path)) as actual:
+        assert actual == os.getcwd() == str(tmp_path.resolve())
+    assert os.getcwd() == old_cwd

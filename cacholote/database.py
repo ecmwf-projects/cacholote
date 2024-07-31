@@ -111,7 +111,7 @@ def _decode_kwargs(**kwargs: Any) -> dict[str, Any]:
 def _cached_sessionmaker(
     url: str, **kwargs: Any
 ) -> sa.orm.sessionmaker[sa.orm.Session]:
-    engine = sa.create_engine(url, **_decode_kwargs(**kwargs))
+    engine = init_database(url, **_decode_kwargs(**kwargs))
     Base.metadata.create_all(engine)
     return sa.orm.sessionmaker(engine)
 
@@ -120,44 +120,57 @@ def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker[sa.orm.S
     return _cached_sessionmaker(url, **_encode_kwargs(**kwargs))
 
 
-def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
+def init_database(
+    connection_string: str, force: bool = False, **kwargs: Any
+) -> sa.engine.Engine:
     """
     Make sure the db located at URI `connection_string` exists updated and return the engine object.
 
-    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
-    :param force: if True, drop the database structure and build again from scratch
+    Parameters
+    ----------
+    connection_string: str
+        Something like 'postgresql://user:password@netloc:port/dbname'
+    force: bool
+        if True, drop the database structure and build again from scratch
+    kwargs: Any
+        Keyword arguments for create_engine
+
+    Returns
+    -------
+    engine: Engine
     """
-    engine = sa.create_engine(connection_string)
+    engine = sa.create_engine(connection_string, **kwargs)
     migration_directory = os.path.abspath(os.path.join(__file__, ".."))
-    os.chdir(migration_directory)
-    alembic_config_path = os.path.join(migration_directory, "alembic.ini")
-    alembic_cfg = alembic.config.Config(alembic_config_path)
-    for option in ["drivername", "username", "password", "host", "port", "database"]:
-        value = getattr(engine.url, option)
-        if value is None:
-            value = ""
-        alembic_cfg.set_main_option(option, str(value))
-    if not sqlalchemy_utils.database_exists(engine.url):
-        sqlalchemy_utils.create_database(engine.url)
-        # cleanup and create the schema
-        Base.metadata.drop_all(engine)
-        Base.metadata.create_all(engine)
-        alembic.command.stamp(alembic_cfg, "head")
-    else:
-        # check the structure is empty or incomplete
-        query = sa.text(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
-        )
-        conn = engine.connect()
-        if "cache_entries" not in conn.execute(query).scalars().all():
+    with utils.change_working_dir(migration_directory):
+        alembic_config_path = os.path.join(migration_directory, "alembic.ini")
+        alembic_cfg = alembic.config.Config(alembic_config_path)
+        for option in [
+            "drivername",
+            "username",
+            "password",
+            "host",
+            "port",
+            "database",
+        ]:
+            value = getattr(engine.url, option)
+            if value is None:
+                value = ""
+            alembic_cfg.set_main_option(option, str(value))
+        if not sqlalchemy_utils.database_exists(engine.url):
+            sqlalchemy_utils.create_database(engine.url)
+            # cleanup and create the schema
+            Base.metadata.drop_all(engine)
+            Base.metadata.create_all(engine)
+            alembic.command.stamp(alembic_cfg, "head")
+        elif "cache_entries" not in sa.inspect(engine).get_table_names():
+            # db structure is empty or incomplete
             force = True
-        conn.close()
-    if force:
-        # cleanup and create the schema
-        Base.metadata.drop_all(engine)
-        Base.metadata.create_all(engine)
-        alembic.command.stamp(alembic_cfg, "head")
-    else:
-        # update db structure
-        alembic.command.upgrade(alembic_cfg, "head")
+        if force:
+            # cleanup and create the schema
+            Base.metadata.drop_all(engine)
+            Base.metadata.create_all(engine)
+            alembic.command.stamp(alembic_cfg, "head")
+        else:
+            # update db structure
+            alembic.command.upgrade(alembic_cfg, "head")
     return engine
