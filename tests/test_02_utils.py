@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import pathlib
 
 import fsspec
 
 from cacholote import utils
-import os
+
 
 def test_hexdigestify() -> None:
     text = "some random Unicode text \U0001f4a9"
@@ -29,6 +30,7 @@ def test_copy_buffered_file(tmp_path: pathlib.Path) -> None:
     with open(src, "rb") as f_src, open(dst, "wb") as f_dst:
         utils.copy_buffered_file(f_src, f_dst)
     assert open(src, "rb").read() == open(dst, "rb").read() == b"test"
+
 
 def test_change_working_dir(tmp_path: pathlib.Path) -> None:
     old_cwd = os.getcwd()
