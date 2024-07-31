@@ -349,3 +349,22 @@ def test_expire_cache_entries_created_at() -> None:
     assert clean.expire_cache_entries(after=toc) == 0
     assert clean.expire_cache_entries(before=toc) == 1
     assert clean.expire_cache_entries(after=tic) == 1
+
+
+def test_multiple(tmp_path: pathlib.Path) -> None:
+    oldpath = tmp_path / "old.txt"
+    oldpath.write_bytes(ONE_BYTE)
+    with config.set(cache_files_urlpath=str(tmp_path / "old")):
+        cached_oldpath = pathlib.Path(open_url(oldpath).path)
+    assert cached_oldpath.exists()
+
+    newpath = tmp_path / "new.txt"
+    newpath.write_bytes(ONE_BYTE)
+    with config.set(cache_files_urlpath=str(tmp_path / "new")):
+        cached_newpath = pathlib.Path(open_url(newpath).path)
+    assert cached_newpath.exists()
+
+    with config.set(cache_files_urlpath=str(tmp_path / "new")):
+        clean.clean_cache_files(0)
+    assert not cached_newpath.exists()
+    assert cached_oldpath.exists()
