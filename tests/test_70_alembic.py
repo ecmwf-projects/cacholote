@@ -16,7 +16,6 @@ def old_cache_db_urlpath(tmp_path: pathlib.Path) -> str:
 
 
 def test_old_database(old_cache_db_urlpath: str) -> None:
-    old_db_path = pathlib.Path(__name__) / "data" / "old_cacholote.db"
     cached_time = cache.cacheable(time.time)
     with config.set(cache_db_urlpath=old_cache_db_urlpath):
         actual = cached_time()
