@@ -141,29 +141,36 @@ def init_database(
     """
     engine = sa.create_engine(connection_string, **kwargs)
     migration_directory = os.path.abspath(os.path.join(__file__, ".."))
-    os.chdir(migration_directory)
-    alembic_config_path = os.path.join(migration_directory, "alembic.ini")
-    alembic_cfg = alembic.config.Config(alembic_config_path)
-    for option in ["drivername", "username", "password", "host", "port", "database"]:
-        value = getattr(engine.url, option)
-        if value is None:
-            value = ""
-        alembic_cfg.set_main_option(option, str(value))
-    if not sqlalchemy_utils.database_exists(engine.url):
-        sqlalchemy_utils.create_database(engine.url)
-        # cleanup and create the schema
-        Base.metadata.drop_all(engine)
-        Base.metadata.create_all(engine)
-        alembic.command.stamp(alembic_cfg, "head")
-    elif "cache_entries" not in sa.inspect(engine).get_table_names():
-        # db structure is empty or incomplete
-        force = True
-    if force:
-        # cleanup and create the schema
-        Base.metadata.drop_all(engine)
-        Base.metadata.create_all(engine)
-        alembic.command.stamp(alembic_cfg, "head")
-    else:
-        # update db structure
-        alembic.command.upgrade(alembic_cfg, "head")
+    with utils.change_working_dir(migration_directory):
+        alembic_config_path = os.path.join(migration_directory, "alembic.ini")
+        alembic_cfg = alembic.config.Config(alembic_config_path)
+        for option in [
+            "drivername",
+            "username",
+            "password",
+            "host",
+            "port",
+            "database",
+        ]:
+            value = getattr(engine.url, option)
+            if value is None:
+                value = ""
+            alembic_cfg.set_main_option(option, str(value))
+        if not sqlalchemy_utils.database_exists(engine.url):
+            sqlalchemy_utils.create_database(engine.url)
+            # cleanup and create the schema
+            Base.metadata.drop_all(engine)
+            Base.metadata.create_all(engine)
+            alembic.command.stamp(alembic_cfg, "head")
+        elif "cache_entries" not in sa.inspect(engine).get_table_names():
+            # db structure is empty or incomplete
+            force = True
+        if force:
+            # cleanup and create the schema
+            Base.metadata.drop_all(engine)
+            Base.metadata.create_all(engine)
+            alembic.command.stamp(alembic_cfg, "head")
+        else:
+            # update db structure
+            alembic.command.upgrade(alembic_cfg, "head")
     return engine

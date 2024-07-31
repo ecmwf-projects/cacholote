@@ -16,15 +16,17 @@
 # limitations under the License.import hashlib
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import datetime
 import functools
 import hashlib
 import io
+import os
 import time
 import warnings
 from types import TracebackType
-from typing import Any
+from typing import Any, Iterator
 
 import fsspec
 
@@ -129,3 +131,13 @@ class FileLock:
 def utcnow() -> datetime.datetime:
     """See https://discuss.python.org/t/deprecating-utcnow-and-utcfromtimestamp/26221."""
     return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+@contextlib.contextmanager
+def change_working_dir(working_dir: str) -> Iterator[str]:
+    old_dir = os.getcwd()
+    os.chdir(working_dir)
+    try:
+        yield os.getcwd()
+    finally:
+        os.chdir(old_dir)
