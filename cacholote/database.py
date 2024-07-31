@@ -112,7 +112,7 @@ def _decode_kwargs(**kwargs: Any) -> dict[str, Any]:
 def _cached_sessionmaker(
     url: str, **kwargs: Any
 ) -> sa.orm.sessionmaker[sa.orm.Session]:
-    engine = sa.create_engine(url, **_decode_kwargs(**kwargs))
+    engine = init_database(url, **_decode_kwargs(**kwargs))
     Base.metadata.create_all(engine)
     return sa.orm.sessionmaker(engine)
 
@@ -121,14 +121,26 @@ def cached_sessionmaker(url: str, **kwargs: Any) -> sa.orm.sessionmaker[sa.orm.S
     return _cached_sessionmaker(url, **_encode_kwargs(**kwargs))
 
 
-def init_database(connection_string: str, force: bool = False) -> sa.engine.Engine:
+def init_database(
+    connection_string: str, force: bool = False, **kwargs: Any
+) -> sa.engine.Engine:
     """
     Make sure the db located at URI `connection_string` exists updated and return the engine object.
 
-    :param connection_string: something like 'postgresql://user:password@netloc:port/dbname'
-    :param force: if True, drop the database structure and build again from scratch
+    Parameters
+    ----------
+    connection_string: str
+        Something like 'postgresql://user:password@netloc:port/dbname'
+    force: bool
+        if True, drop the database structure and build again from scratch
+    kwargs: Any
+        Keyword arguments for create_engine
+
+    Returns
+    -------
+    engine: Engine
     """
-    engine = sa.create_engine(connection_string)
+    engine = sa.create_engine(connection_string, **kwargs)
     migration_directory = os.path.abspath(os.path.join(__file__, "..", ".."))
     os.chdir(migration_directory)
     alembic_config_path = os.path.join(migration_directory, "alembic.ini")
