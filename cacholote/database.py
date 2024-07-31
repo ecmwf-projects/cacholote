@@ -22,12 +22,11 @@ import os
 import warnings
 from typing import Any
 
+import alembic.command
+import alembic.config
 import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy_utils
-
-import alembic.command
-import alembic.config
 
 from . import utils
 
@@ -141,7 +140,7 @@ def init_database(
     engine: Engine
     """
     engine = sa.create_engine(connection_string, **kwargs)
-    migration_directory = os.path.abspath(os.path.join(__file__, "..", ".."))
+    migration_directory = os.path.abspath(os.path.join(__file__, ".."))
     os.chdir(migration_directory)
     alembic_config_path = os.path.join(migration_directory, "alembic.ini")
     alembic_cfg = alembic.config.Config(alembic_config_path)
