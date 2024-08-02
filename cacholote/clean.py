@@ -106,7 +106,6 @@ class _Cleaner:
             parts = urlpath.replace(self.urldir, "", 1).strip("/").split("/")
             if parts:
                 self.file_sizes[posixpath.join(self.urldir, *parts[:depth])] += size
-        print(dict(self.file_sizes))
         self.disk_usage = sum(self.file_sizes.values())
         self.log_disk_usage()
 
