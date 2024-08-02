@@ -326,21 +326,33 @@ def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
         (["foo"], TOMORROW, YESTERDAY),
     ],
 )
+@pytest.mark.parametrize("delete,n_entries", [(True, 0), (False, 1)])
 def test_expire_cache_entries(
     tags: None | list[str],
     before: None | datetime.datetime,
     after: None | datetime.datetime,
+    delete: bool,
+    n_entries: int,
 ) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
     with config.set(tag="foo"):
         now = cached_now()
 
     # Do not expire
-    count = clean.expire_cache_entries(tags=["bar"], before=YESTERDAY, after=TOMORROW)
+    count = clean.expire_cache_entries(
+        tags=["bar"], before=YESTERDAY, after=TOMORROW, delete=delete
+    )
     assert count == 0
     assert now == cached_now()
 
     # Expire
-    count = clean.expire_cache_entries(tags=tags, before=before, after=after)
+    count = clean.expire_cache_entries(
+        tags=tags, before=before, after=after, delete=delete
+    )
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (n_entries,)
     assert count == 1
     assert now != cached_now()
 

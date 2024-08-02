@@ -367,6 +367,7 @@ def expire_cache_entries(
     tags: list[str] | None = None,
     before: datetime.datetime | None = None,
     after: datetime.date | None = None,
+    delete: bool = False,
 ) -> int:
     now = utils.utcnow()
 
@@ -384,6 +385,9 @@ def expire_cache_entries(
             sa.select(database.CacheEntry).filter(*filters)
         ):
             count += 1
-            cache_entry.expiration = now
+            if delete:
+                session.delete(cache_entry)
+            else:
+                cache_entry.expiration = now
         database._commit_or_rollback(session)
     return count
