@@ -40,32 +40,38 @@ def cached_now() -> datetime.datetime:
 
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
+@pytest.mark.parametrize("folder,depth", [("", 1), ("", 2), ("foo", 2)])
 def test_clean_cache_files(
     tmp_path: pathlib.Path,
     set_cache: str,
     method: Literal["LRU", "LFU"],
+    folder: str,
+    depth: int,
 ) -> None:
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    fs, dirname = utils.get_cache_files_fs_dirname()
 
-    # Create files
-    for algorithm in ("LRU", "LFU"):
-        filename = tmp_path / f"{algorithm}.txt"
-        fsspec.filesystem("file").pipe_file(filename, ONE_BYTE)
+    cache_files_urlpath = os.path.join(config.get().cache_files_urlpath, folder)
+    with config.set(cache_files_urlpath=cache_files_urlpath):
+        fs, dirname = utils.get_cache_files_fs_dirname()
 
-    # Copy to cache
-    (lru_path,) = {open_url(tmp_path / "LRU.txt").path for _ in range(2)}
-    lfu_path = open_url(tmp_path / "LFU.txt").path
-    assert set(fs.ls(dirname)) == {lru_path, lfu_path}
+        # Create files
+        for algorithm in ("LRU", "LFU"):
+            filename = tmp_path / f"{algorithm}.txt"
+            fsspec.filesystem("file").pipe_file(filename, ONE_BYTE)
+
+        # Copy to cache
+        (lru_path,) = {open_url(tmp_path / "LRU.txt").path for _ in range(2)}
+        lfu_path = open_url(tmp_path / "LFU.txt").path
+        assert set(fs.ls(dirname)) == {lru_path, lfu_path}
 
     # Do not clean
-    clean.clean_cache_files(2, method=method)
+    clean.clean_cache_files(2, method=method, depth=depth)
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (fs.du(dirname),) == (2,)
 
     # Delete one file
-    clean.clean_cache_files(1, method=method)
+    clean.clean_cache_files(1, method=method, depth=depth)
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (fs.du(dirname),) == (1,)
     assert not fs.exists(lru_path if method == "LRU" else lfu_path)
