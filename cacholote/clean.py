@@ -92,7 +92,7 @@ def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> 
 
 
 class _Cleaner:
-    def __init__(self) -> None:
+    def __init__(self, depth: int) -> None:
         self.logger = config.get().logger
         self.fs, self.dirname = utils.get_cache_files_fs_dirname()
 
@@ -103,10 +103,9 @@ class _Cleaner:
         for path, size in self.fs.du(self.dirname, total=False).items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)
-            basename, *_ = urlpath.replace(self.urldir, "", 1).strip("/").split("/")
-            if basename:
-                self.file_sizes[posixpath.join(self.urldir, basename)] += size
-
+            parts = urlpath.replace(self.urldir, "", 1).strip("/").split("/")
+            if parts:
+                self.file_sizes[posixpath.join(self.urldir, *parts[:depth])] += size
         self.disk_usage = sum(self.file_sizes.values())
         self.log_disk_usage()
 
@@ -296,6 +295,7 @@ def clean_cache_files(
     lock_validity_period: float | None = None,
     tags_to_clean: list[str | None] | None = None,
     tags_to_keep: list[str | None] | None = None,
+    depth: int = 1,
 ) -> None:
     """Clean cache files.
 
@@ -316,8 +316,10 @@ def clean_cache_files(
         Tags to clean/keep. If None, delete all cache entries.
         To delete/keep untagged entries, add None in the list (e.g., [None, 'tag1', ...]).
         tags_to_clean and tags_to_keep are mutually exclusive.
+    depth: int, default: 1
+        depth for grouping cache files
     """
-    cleaner = _Cleaner()
+    cleaner = _Cleaner(depth=depth)
 
     if delete_unknown_files:
         cleaner.delete_unknown_files(lock_validity_period, recursive)
