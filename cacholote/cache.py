@@ -57,8 +57,8 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
 
     Returns
     -------
-    callable:
-        Cache functions
+    callable
+        Cached function
     """
 
     @functools.wraps(func)
