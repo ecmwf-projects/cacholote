@@ -45,7 +45,7 @@ def _decode_and_update(
     return result
 
 
-def cacheable(func: F) -> F:
+def cacheable(func: F, **cache_kwargs) -> F:
     """Make a function cacheable."""
 
     @functools.wraps(func)
@@ -56,7 +56,7 @@ def cacheable(func: F) -> F:
             return func(*args, **kwargs)
 
         try:
-            hexdigest = encode._hexdigestify_python_call(func, *args, **kwargs)
+            hexdigest = encode._hexdigestify_python_call(func, *args, **kwargs, **cache_kwargs)
         except encode.EncodeError as ex:
             if settings.return_cache_entry:
                 raise ex
