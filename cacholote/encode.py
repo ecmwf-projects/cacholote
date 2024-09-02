@@ -33,9 +33,12 @@ _JSON_DUMPS_KWARGS: dict[str, Any] = {"separators": (",", ":"), "skipkeys": Fals
 def _hexdigestify_python_call(
     func_to_hex: str | Callable[..., Any],
     *args: Any,
+    cache_kwargs: dict[str, Any] = {},
     **kwargs: Any,
 ) -> str:
-    return utils.hexdigestify(dumps_python_call(func_to_hex, *args, **kwargs))
+    return utils.hexdigestify(
+        dumps_python_call(func_to_hex, *args, cache_kwargs=cache_kwargs, **kwargs)
+    )
 
 
 def inspect_fully_qualified_name(obj: Callable[..., Any]) -> str:
@@ -63,6 +66,7 @@ def dictify_python_object(obj: str | Callable[..., Any]) -> dict[str, str]:
 def dictify_python_call(
     func_to_dict: str | Callable[..., Any],
     *args: Any,
+    cache_kwargs: dict[str, Any] = {},
     **kwargs: Any,
 ) -> dict[str, Any]:
     callable_fqn = dictify_python_object(func_to_dict)["fully_qualified_name"]
@@ -89,6 +93,8 @@ def dictify_python_call(
         python_call_simple["args"] = args
     if kwargs:
         python_call_simple["kwargs"] = {k: kwargs[k] for k in sorted(kwargs)}
+    if cache_kwargs:
+        python_call_simple["cache_kwargs"] = dict(sorted(cache_kwargs.items()))
 
     return python_call_simple
 
@@ -189,6 +195,7 @@ def dumps(
 def dumps_python_call(
     func_to_dump: str | Callable[..., Any],
     *args: Any,
+    cache_kwargs: dict[str, Any] = {},
     **kwargs: Any,
 ) -> str:
     """Serialize python call to JSON formatted string.
@@ -199,6 +206,8 @@ def dumps_python_call(
         Function to serialize
     *args: Any
         Arguments of ``func``
+    cache_kwargs: dict
+        Additional arguments for hashing only
     **kwargs: Any
         Keyword arguments of ``func``
 
@@ -206,5 +215,7 @@ def dumps_python_call(
     -------
     str
     """
-    python_call = dictify_python_call(func_to_dump, *args, **kwargs)
+    python_call = dictify_python_call(
+        func_to_dump, *args, cache_kwargs=cache_kwargs, **kwargs
+    )
     return dumps(python_call)
