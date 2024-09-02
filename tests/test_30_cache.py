@@ -30,11 +30,22 @@ def cached_error() -> None:
     raise ValueError("test error")
 
 
+def test_cache_kwargs() -> None:
+    def test_func() -> datetime.datetime:
+        return datetime.datetime.now()
+
+    func1 = cache.cacheable(test_func, count=1)
+    func2 = cache.cacheable(test_func, count=2)
+    assert func1() != func2()
+    assert func1() == func1()
+    assert func2() == func2()
+
+
 @pytest.mark.parametrize(
     "cache_kwargs,expected_hash",
     [
         ({}, "a8260ac3cdc1404aa64a6fb71e853049"),
-        ({"foo": "bar"}, "ad4c1867757974cfccabc18c3a5078b9"),
+        ({"foo": "bar"}, "f732a8c299b41e9d73b7bf1d32a2fa68"),
     ],
 )
 def test_cacheable(cache_kwargs: dict[str, Any], expected_hash: str) -> None:

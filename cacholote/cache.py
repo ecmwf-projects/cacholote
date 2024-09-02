@@ -70,7 +70,7 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
 
         try:
             hexdigest = encode._hexdigestify_python_call(
-                func, *args, **kwargs, **cache_kwargs
+                func, *args, cache_kwargs=cache_kwargs, **kwargs
             )
         except encode.EncodeError as ex:
             if settings.return_cache_entry:
