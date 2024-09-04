@@ -130,11 +130,7 @@ class _Cleaner:
 
         self.logger.info("getting disk usage")
         self.file_sizes: dict[str, int] = collections.defaultdict(int)
-        du = (
-            self.get_known_files()
-            if use_database
-            else self.fs.du(self.dirname, total=False)
-        )
+        du = self.known_files if use_database else self.fs.du(self.dirname, total=False)
         for path, size in du.items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)
@@ -155,7 +151,8 @@ class _Cleaner:
     def stop_cleaning(self, maxsize: int) -> bool:
         return self.disk_usage <= maxsize
 
-    def get_known_files(self) -> dict[str, int]:
+    @property
+    def known_files(self) -> dict[str, int]:
         known_files: dict[str, int] = {}
         with config.get().instantiated_sessionmaker() as session:
             for cache_entry in session.scalars(sa.select(database.CacheEntry)):
@@ -181,14 +178,7 @@ class _Cleaner:
                     locked_files.add(urlpath)
                     locked_files.add(urlpath.rsplit(".lock", 1)[0])
 
-        if unknown_files := (set(self.file_sizes) - locked_files):
-            with config.get().instantiated_sessionmaker() as session:
-                for cache_entry in session.scalars(sa.select(database.CacheEntry)):
-                    for known_file in _get_files_from_cache_entry(cache_entry):
-                        unknown_files.discard(known_file)
-                    if not unknown_files:
-                        break
-        return unknown_files
+        return set(self.file_sizes) - locked_files - set(self.known_files)
 
     def delete_unknown_files(
         self, lock_validity_period: float | None, recursive: bool
