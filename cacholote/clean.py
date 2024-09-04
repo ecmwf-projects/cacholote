@@ -37,7 +37,7 @@ FILE_RESULT_CALLABLES = (
 
 
 def _get_files_from_cache_entry(
-    cache_entry: database.CacheEntry, key: str = "file:size"
+    cache_entry: database.CacheEntry, key: str | None
 ) -> dict[str, Any]:
     result = cache_entry.result
     if not isinstance(result, (list, tuple, set)):
@@ -51,7 +51,10 @@ def _get_files_from_cache_entry(
             and obj["callable"] in FILE_RESULT_CALLABLES
         ):
             fs, urlpath = extra_encoders._get_fs_and_urlpath(*obj["args"][:2])
-            files[fs.unstrip_protocol(urlpath)] = obj["args"][0][key]
+            value = obj["args"][0]
+            if key is not None:
+                value = value[key]
+            files[fs.unstrip_protocol(urlpath)] = value
     return files
 
 
@@ -257,7 +260,7 @@ class _Cleaner:
             for cache_entry in session.scalars(
                 sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
-                files = _get_files_from_cache_entry(cache_entry)
+                files = _get_files_from_cache_entry(cache_entry, key="file:size")
                 if any(file.startswith(self.urldir) for file in files):
                     entries_to_delete.append(cache_entry)
                     for file in files:
