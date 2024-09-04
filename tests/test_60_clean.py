@@ -40,32 +40,40 @@ def cached_now() -> datetime.datetime:
 
 @pytest.mark.parametrize("method", ["LRU", "LFU"])
 @pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
+@pytest.mark.parametrize("folder,depth", [("", 1), ("", 2), ("foo", 2)])
+@pytest.mark.parametrize("use_database", [True, False])
 def test_clean_cache_files(
     tmp_path: pathlib.Path,
     set_cache: str,
     method: Literal["LRU", "LFU"],
+    folder: str,
+    depth: int,
+    use_database: bool,
 ) -> None:
     con = config.get().engine.raw_connection()
     cur = con.cursor()
-    fs, dirname = utils.get_cache_files_fs_dirname()
 
-    # Create files
-    for algorithm in ("LRU", "LFU"):
-        filename = tmp_path / f"{algorithm}.txt"
-        fsspec.filesystem("file").pipe_file(filename, ONE_BYTE)
+    cache_files_urlpath = os.path.join(config.get().cache_files_urlpath, folder)
+    with config.set(cache_files_urlpath=cache_files_urlpath):
+        fs, dirname = utils.get_cache_files_fs_dirname()
 
-    # Copy to cache
-    (lru_path,) = {open_url(tmp_path / "LRU.txt").path for _ in range(2)}
-    lfu_path = open_url(tmp_path / "LFU.txt").path
-    assert set(fs.ls(dirname)) == {lru_path, lfu_path}
+        # Create files
+        for algorithm in ("LRU", "LFU"):
+            filename = tmp_path / f"{algorithm}.txt"
+            fsspec.filesystem("file").pipe_file(filename, ONE_BYTE)
+
+        # Copy to cache
+        (lru_path,) = {open_url(tmp_path / "LRU.txt").path for _ in range(2)}
+        lfu_path = open_url(tmp_path / "LFU.txt").path
+        assert set(fs.ls(dirname)) == {lru_path, lfu_path}
 
     # Do not clean
-    clean.clean_cache_files(2, method=method)
+    clean.clean_cache_files(2, method=method, depth=depth, use_database=use_database)
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (fs.du(dirname),) == (2,)
 
     # Delete one file
-    clean.clean_cache_files(1, method=method)
+    clean.clean_cache_files(1, method=method, depth=depth, use_database=use_database)
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (fs.du(dirname),) == (1,)
     assert not fs.exists(lru_path if method == "LRU" else lfu_path)
@@ -320,21 +328,33 @@ def test_clean_multiple_files(tmp_path: pathlib.Path) -> None:
         (["foo"], TOMORROW, YESTERDAY),
     ],
 )
+@pytest.mark.parametrize("delete,n_entries", [(True, 0), (False, 1)])
 def test_expire_cache_entries(
     tags: None | list[str],
     before: None | datetime.datetime,
     after: None | datetime.datetime,
+    delete: bool,
+    n_entries: int,
 ) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
     with config.set(tag="foo"):
         now = cached_now()
 
     # Do not expire
-    count = clean.expire_cache_entries(tags=["bar"], before=YESTERDAY, after=TOMORROW)
+    count = clean.expire_cache_entries(
+        tags=["bar"], before=YESTERDAY, after=TOMORROW, delete=delete
+    )
     assert count == 0
     assert now == cached_now()
 
     # Expire
-    count = clean.expire_cache_entries(tags=tags, before=before, after=after)
+    count = clean.expire_cache_entries(
+        tags=tags, before=before, after=after, delete=delete
+    )
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (n_entries,)
     assert count == 1
     assert now != cached_now()
 
@@ -349,3 +369,22 @@ def test_expire_cache_entries_created_at() -> None:
     assert clean.expire_cache_entries(after=toc) == 0
     assert clean.expire_cache_entries(before=toc) == 1
     assert clean.expire_cache_entries(after=tic) == 1
+
+
+def test_multiple(tmp_path: pathlib.Path) -> None:
+    oldpath = tmp_path / "old.txt"
+    oldpath.write_bytes(ONE_BYTE)
+    with config.set(cache_files_urlpath=str(tmp_path / "old")):
+        cached_oldpath = pathlib.Path(open_url(oldpath).path)
+    assert cached_oldpath.exists()
+
+    newpath = tmp_path / "new.txt"
+    newpath.write_bytes(ONE_BYTE)
+    with config.set(cache_files_urlpath=str(tmp_path / "new")):
+        cached_newpath = pathlib.Path(open_url(newpath).path)
+    assert cached_newpath.exists()
+
+    with config.set(cache_files_urlpath=str(tmp_path / "new")):
+        clean.clean_cache_files(0)
+    assert not cached_newpath.exists()
+    assert cached_oldpath.exists()

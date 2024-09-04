@@ -82,7 +82,7 @@ def cacheable(func: F) -> F:
                         return _decode_and_update(session, cache_entry, settings)
                     except decode.DecodeError as ex:
                         warnings.warn(str(ex), UserWarning)
-                        clean._delete_cache_entry(session, cache_entry)
+                        clean._delete_cache_entries(session, cache_entry)
 
         result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(
