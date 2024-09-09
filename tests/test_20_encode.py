@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import pickle
 from typing import Any
 
 import pytest
@@ -100,11 +101,18 @@ def test_filecache_default_error(raise_all_encoding_errors: bool) -> None:
     class Dummy:
         pass
 
+    try:
+        pickle.dumps(Dummy)
+    except Exception as exc:
+        match = str(exc)
+    else:
+        raise ValueError("Did not raise!")
+
     if raise_all_encoding_errors:
-        with pytest.raises(AttributeError, match="Can't pickle local object"):
+        with pytest.raises(AttributeError, match=match):
             encode.filecache_default(Dummy())
     else:
-        with pytest.warns(UserWarning, match="Can't pickle local object"):
+        with pytest.warns(UserWarning, match=match):
             with pytest.raises(encode.EncodeError):
                 encode.filecache_default(Dummy())
 
