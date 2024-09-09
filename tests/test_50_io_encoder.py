@@ -173,7 +173,7 @@ def test_io_locker(
     fs.touch(file_path)
     fs.touch(f"{file_path}.lock")
 
-    process = subprocess.Popen(f"sleep 0.1; rm {file_path}.lock", shell=True)
+    process = subprocess.Popen(f"sleep 1; rm {file_path}.lock", shell=True)
     with raises_or_warns:
         cached_open(tmpfile)
     assert process.wait() == 0

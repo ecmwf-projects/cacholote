@@ -151,6 +151,8 @@ jobs:
         include:
         - python-version: '3.9'
           extra: -ci
+        - python-version: '3.12'
+          extra: -ci
         - python-version: '3.11'
           extra: -integration
 
