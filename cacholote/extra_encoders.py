@@ -107,10 +107,6 @@ def _requires_xarray_and_dask(func: F) -> F:
     return cast(F, wrapper)
 
 
-def _filesystem_is_local(fs: fsspec.AbstractFileSystem) -> bool:
-    return isinstance(fs, fsspec.get_filesystem_class("file"))
-
-
 def _kwargs_to_str(**kwargs: Any) -> str:
     return " ".join([f"{k}={v}" for k, v in kwargs.items()])
 
@@ -235,7 +231,7 @@ def decode_xr_object(
     if file_json["type"] == "application/vnd+zarr":
         filename_or_obj = fs.get_mapper(urlpath)
     else:
-        if _filesystem_is_local(fs):
+        if "file" in fs.protocol:
             filename_or_obj = urlpath
         else:
             # Download local copy
@@ -302,7 +298,7 @@ def _store_xr_object(
                 raise ValueError(f"type {filetype!r} is NOT supported.")
 
         _store_file_object(
-            fs if _filesystem_is_local(fs) else fsspec.filesystem("file"),
+            fs if "file" in fs.protocol else fsspec.filesystem("file"),
             tmpfilename,
             fs,
             urlpath,
@@ -362,10 +358,10 @@ def _store_file_object(
         urlpath=fs_out.unstrip_protocol(urlpath_out),
         size=fs_in.size(urlpath_in),
     ):
-        if fs_in == fs_out:
+        if fs_in == fs_out or ("file" in fs_in.protocol and "file" in fs_out.protocol):
             func = fs_in.mv if io_delete_original else fs_in.cp
             func(urlpath_in, urlpath_out, **kwargs)
-        elif _filesystem_is_local(fs_in):
+        elif "file" in fs_in.protocol:
             fs_out.put(urlpath_in, urlpath_out, **kwargs)
         else:
             with fs_in.open(urlpath_in, "rb") as f_in:
