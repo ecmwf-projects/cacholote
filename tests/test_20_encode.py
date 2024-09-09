@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any
 import pickle
+from typing import Any
+
 import pytest
 
 from cacholote import config, decode, encode
