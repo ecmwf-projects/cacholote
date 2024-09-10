@@ -159,8 +159,9 @@ class _Cleaner:
         known_files: dict[str, int] = {}
         with config.get().instantiated_sessionmaker() as session:
             for cache_entry in session.scalars(sa.select(database.CacheEntry)):
+                files = _get_files_from_cache_entry(cache_entry, key="file:size")
                 known_files.update(
-                    _get_files_from_cache_entry(cache_entry, key="file:size")
+                    {k: v for k, v in files.items() if k.startswith(self.urldir)}
                 )
         return known_files
 
