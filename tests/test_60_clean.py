@@ -400,15 +400,14 @@ def test_clean_multiple_urlpaths(tmp_path: pathlib.Path, use_database: bool) -> 
 
     # Copy to cache
     path1 = tmp_path / "cache_files" / "folder1"
-    with config.set(cache_files_urlpath=str(path1)):
+    with config.set(cache_files_urlpath=str(path1 / "today")):
         cached_file1 = pathlib.Path(open_url(tmpfile1).path)
-
     path2 = tmp_path / "cache_files" / "folder2"
-    with config.set(cache_files_urlpath=str(path2)):
+    with config.set(cache_files_urlpath=str(path2 / "today")):
         cached_file2 = pathlib.Path(open_url(tmpfile2).path)
 
+    # Clean
     with config.set(cache_files_urlpath=str(path1)):
-        clean.clean_cache_files(maxsize=0, use_database=use_database)
-
+        clean.clean_cache_files(maxsize=0, use_database=use_database, depth=2)
     assert not cached_file1.exists()
     assert cached_file2.exists()
