@@ -388,3 +388,27 @@ def test_multiple(tmp_path: pathlib.Path) -> None:
         clean.clean_cache_files(0)
     assert not cached_newpath.exists()
     assert cached_oldpath.exists()
+
+
+@pytest.mark.parametrize("use_database", [True, False])
+def test_clean_multiple_urlpaths(tmp_path: pathlib.Path, use_database: bool) -> None:
+    # Create files
+    tmpfile1 = tmp_path / "file1.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile1, ONE_BYTE)
+    tmpfile2 = tmp_path / "file2.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile2, ONE_BYTE)
+
+    # Copy to cache
+    path1 = tmp_path / "cache_files" / "folder1"
+    with config.set(cache_files_urlpath=str(path1)):
+        cached_file1 = pathlib.Path(open_url(tmpfile1).path)
+
+    path2 = tmp_path / "cache_files" / "folder2"
+    with config.set(cache_files_urlpath=str(path2)):
+        cached_file2 = pathlib.Path(open_url(tmpfile2).path)
+
+    with config.set(cache_files_urlpath=str(path1)):
+        clean.clean_cache_files(maxsize=0, use_database=use_database)
+
+    assert not cached_file1.exists()
+    assert cached_file2.exists()
