@@ -28,7 +28,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy_utils
 
-from . import utils
+from . import clean, utils
 
 _DATETIME_MAX = datetime.datetime(
     datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
@@ -55,8 +55,10 @@ class CacheEntry(Base):
     updated_at = sa.Column(sa.DateTime, default=utils.utcnow, onupdate=utils.utcnow)
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
-    cache_files: sa.orm.Mapped[list[CacheFile]] = sa.orm.relationship(
-        secondary=association_table, back_populates="cache_entries"
+    cache_files: sa.orm.Mapped[set[CacheFile]] = sa.orm.relationship(
+        secondary=association_table,
+        back_populates="cache_entries",
+        cascade="all, save-update",  # TODO
     )
 
     @property
@@ -82,10 +84,32 @@ class CacheEntry(Base):
 class CacheFile(Base):
     __tablename__ = "cache_files"
 
-    name = sa.Column(sa.String(), primary_key=True)
-    cache_entries: sa.orm.Mapped[list[CacheEntry]] = sa.orm.relationship(
-        secondary=association_table, back_populates="cache_files"
+    name: str = sa.Column(sa.String(), primary_key=True)
+    size: int = sa.Column(sa.Integer())
+    cache_entries: sa.orm.Mapped[set[CacheEntry]] = sa.orm.relationship(
+        secondary=association_table,
+        back_populates="cache_files",
     )
+
+    @property
+    def updated_at(self) -> datetime.datetime:
+        return max(
+            [
+                cache_entry.updated_at
+                for cache_entry in self.cache_entries
+                if cache_entry.updated_at
+            ]
+        )
+
+    @property
+    def count(self) -> int:
+        return sum(
+            [
+                cache_entry.counter
+                for cache_entry in self.cache_entries
+                if cache_entry.counter
+            ]
+        )
 
 
 @sa.event.listens_for(CacheEntry, "before_insert")
@@ -97,6 +121,18 @@ def set_expiration_to_max(
     target.expiration = target.expiration or _DATETIME_MAX
     if target.expiration < utils.utcnow():
         warnings.warn(f"Expiration date has passed. {target.expiration=}", UserWarning)
+
+
+@sa.event.listens_for(CacheEntry, "after_insert")
+def add_cache_files(
+    mapper: sa.orm.Mapper[CacheEntry],
+    connection: sa.Connection,
+    target: CacheEntry,
+) -> None:
+    for name, size in clean._get_files_from_cache_entry(
+        target, key="file:size"
+    ).items():
+        target.cache_files.add(CacheFile(name=name, size=size))
 
 
 def _commit_or_rollback(session: sa.orm.Session) -> None:

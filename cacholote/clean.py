@@ -157,12 +157,12 @@ class _Cleaner:
     @property
     def known_files(self) -> dict[str, int]:
         known_files: dict[str, int] = {}
+        filters = [database.CacheFile.name.startswith(self.urldir)]
         with config.get().instantiated_sessionmaker() as session:
-            for cache_entry in session.scalars(sa.select(database.CacheEntry)):
-                files = _get_files_from_cache_entry(cache_entry, key="file:size")
-                known_files.update(
-                    {k: v for k, v in files.items() if k.startswith(self.urldir)}
-                )
+            for cache_file in session.scalars(
+                sa.select(database.CacheFile).filter(*filters)
+            ):
+                known_files[cache_file.name] = cache_file.size
         return known_files
 
     def get_unknown_files(self, lock_validity_period: float | None) -> set[str]:
