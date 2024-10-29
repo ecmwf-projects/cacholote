@@ -39,8 +39,8 @@ Base = sa.orm.declarative_base()
 association_table = sa.Table(
     "association_table",
     Base.metadata,
-    sa.Column("left_id", sa.ForeignKey("cache_entries.id"), primary_key=True),
-    sa.Column("right_id", sa.ForeignKey("cache_files.id"), primary_key=True),
+    sa.Column("cache_entries_id", sa.ForeignKey("cache_entries.id"), primary_key=True),
+    sa.Column("cache_files_name", sa.ForeignKey("cache_files.name"), primary_key=True),
 )
 
 
@@ -82,7 +82,7 @@ class CacheEntry(Base):
 class CacheFile(Base):
     __tablename__ = "cache_files"
 
-    id = sa.Column(sa.Integer(), primary_key=True)
+    name = sa.Column(sa.String(), primary_key=True)
     cache_entries: sa.orm.Mapped[list[CacheEntry]] = sa.orm.relationship(
         secondary=association_table, back_populates="cache_files"
     )
