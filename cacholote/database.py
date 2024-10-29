@@ -36,6 +36,13 @@ _DATETIME_MAX = datetime.datetime(
 
 Base = sa.orm.declarative_base()
 
+association_table = sa.Table(
+    "association_table",
+    Base.metadata,
+    sa.Column("left_id", sa.ForeignKey("cache_entries.id"), primary_key=True),
+    sa.Column("right_id", sa.ForeignKey("cache_files.id"), primary_key=True),
+)
+
 
 class CacheEntry(Base):
     __tablename__ = "cache_entries"
@@ -48,6 +55,9 @@ class CacheEntry(Base):
     updated_at = sa.Column(sa.DateTime, default=utils.utcnow, onupdate=utils.utcnow)
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
+    cache_files: sa.orm.Mapped[list[CacheFile]] = sa.orm.relationship(
+        secondary=association_table, back_populates="cache_entries"
+    )
 
     @property
     def _result_as_string(self) -> str:
@@ -67,6 +77,15 @@ class CacheEntry(Base):
             [f"{attr}={getattr(self, attr)!r}" for attr in public_attrs]
         )
         return f"CacheEntry({public_attrs_repr})"
+
+
+class CacheFile(Base):
+    __tablename__ = "cache_files"
+
+    id = sa.Column(sa.Integer(), primary_key=True)
+    cache_entries: sa.orm.Mapped[list[CacheEntry]] = sa.orm.relationship(
+        secondary=association_table, back_populates="cache_files"
+    )
 
 
 @sa.event.listens_for(CacheEntry, "before_insert")
