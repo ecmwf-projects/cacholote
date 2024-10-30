@@ -41,7 +41,7 @@ import fsspec
 import fsspec.implementations.local
 import pydantic
 
-from . import config, encode, utils
+from . import config, database, encode, utils
 
 try:
     import dask
@@ -67,6 +67,13 @@ _UNION_IO_TYPES = Union[
     fsspec.spec.AbstractBufferedFile,
     fsspec.implementations.local.LocalFileOpener,
 ]
+
+FILE_RESULT_KEYS = ("type", "callable", "args", "kwargs")
+FILE_RESULT_CALLABLES = (
+    "cacholote.extra_encoders:decode_xr_dataarray",
+    "cacholote.extra_encoders:decode_xr_dataset",
+    "cacholote.extra_encoders:decode_io_object",
+)
 
 
 def _add_ext_to_mimetypes() -> None:
@@ -127,6 +134,28 @@ def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
     logger.info(f"end {event}", **kwargs)
     if event == "upload" and context is not None:
         context.upload_log(f"end {event}. {_kwargs_to_str(**kwargs)}")
+
+
+def _get_files_from_cache_entry(
+    cache_entry: database.CacheEntry, key: str | None
+) -> dict[str, Any]:
+    result = cache_entry.result
+    if not isinstance(result, (list, tuple, set)):
+        result = [result]
+
+    files = {}
+    for obj in result:
+        if (
+            isinstance(obj, dict)
+            and set(FILE_RESULT_KEYS) == set(obj)
+            and obj["callable"] in FILE_RESULT_CALLABLES
+        ):
+            fs, urlpath = _get_fs_and_urlpath(*obj["args"][:2])
+            value = obj["args"][0]
+            if key is not None:
+                value = value[key]
+            files[fs.unstrip_protocol(urlpath)] = value
+    return files
 
 
 class FileInfoModel(pydantic.BaseModel):

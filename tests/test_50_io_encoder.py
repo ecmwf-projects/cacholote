@@ -12,9 +12,10 @@ import fsspec
 import pytest
 import pytest_httpserver
 import pytest_structlog
+import sqlalchemy as sa
 import structlog
 
-from cacholote import cache, config, decode, encode, extra_encoders, utils
+from cacholote import cache, config, database, decode, encode, extra_encoders, utils
 
 
 @cache.cacheable
@@ -235,3 +236,26 @@ def test_io_logging(
         },
     ]
     assert log.events == expected
+
+
+def test_io_delete_cache_file(tmp_path: pathlib.Path) -> None:
+    # Create tmpfile and cache
+    tmpfile = tmp_path / "test.txt"
+    fsspec.filesystem("file").touch(tmpfile)
+
+    # Cache file
+    cached_open(tmpfile)
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (1,)
+
+    # Delete cache file
+    with config.get().instantiated_sessionmaker() as session:
+        for cache_file in session.scalars(sa.select(database.CacheFile)):
+            session.delete(cache_file)
+        database._commit_or_rollback(session)
+
+    # cache-db must be empty
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (0,)

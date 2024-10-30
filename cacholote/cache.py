@@ -115,6 +115,7 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
 
         with settings.instantiated_sessionmaker() as session:
             session.add(cache_entry)
+            cache_entry._add_cache_files()
             return _decode_and_update(session, cache_entry, settings)
 
     return cast(F, wrapper)

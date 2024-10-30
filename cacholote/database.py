@@ -28,13 +28,28 @@ import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy_utils
 
-from . import utils
+from . import extra_encoders, utils
 
 _DATETIME_MAX = datetime.datetime(
     datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
 )
 
 Base = sa.orm.declarative_base()
+
+association_table = sa.Table(
+    "association_table",
+    Base.metadata,
+    sa.Column(
+        "cache_entries_id",
+        sa.ForeignKey("cache_entries.id"),
+        primary_key=True,
+    ),
+    sa.Column(
+        "cache_files_name",
+        sa.ForeignKey("cache_files.name"),
+        primary_key=True,
+    ),
+)
 
 
 class CacheEntry(Base):
@@ -48,6 +63,23 @@ class CacheEntry(Base):
     updated_at = sa.Column(sa.DateTime, default=utils.utcnow, onupdate=utils.utcnow)
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
+    cache_files: sa.orm.Mapped[set[CacheFile]] = sa.orm.relationship(
+        secondary=association_table,
+        back_populates="cache_entries",
+        cascade="all, save-update",
+    )
+
+    def _add_cache_files(self) -> None:
+        for name, info in extra_encoders._get_files_from_cache_entry(
+            self, key=None
+        ).items():
+            self.cache_files.add(
+                CacheFile(
+                    name=name,
+                    size=info["file:size"],
+                    type=info["type"],
+                )
+            )
 
     @property
     def _result_as_string(self) -> str:
@@ -67,6 +99,39 @@ class CacheEntry(Base):
             [f"{attr}={getattr(self, attr)!r}" for attr in public_attrs]
         )
         return f"CacheEntry({public_attrs_repr})"
+
+
+class CacheFile(Base):
+    __tablename__ = "cache_files"
+
+    name: str = sa.Column(sa.String(), primary_key=True)
+    size: int = sa.Column(sa.Integer())
+    type: str = sa.Column(sa.String())
+    cache_entries: sa.orm.Mapped[set[CacheEntry]] = sa.orm.relationship(
+        secondary=association_table,
+        back_populates="cache_files",
+        cascade="all, delete",
+    )
+
+    @property
+    def updated_at(self) -> datetime.datetime:
+        return max(
+            [
+                cache_entry.updated_at
+                for cache_entry in self.cache_entries
+                if cache_entry.updated_at
+            ]
+        )
+
+    @property
+    def count(self) -> int:
+        return sum(
+            [
+                cache_entry.counter
+                for cache_entry in self.cache_entries
+                if cache_entry.counter
+            ]
+        )
 
 
 @sa.event.listens_for(CacheEntry, "before_insert")
