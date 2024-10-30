@@ -89,6 +89,7 @@ class CacheFile(Base):
     cache_entries: sa.orm.Mapped[set[CacheEntry]] = sa.orm.relationship(
         secondary=association_table,
         back_populates="cache_files",
+        passive_deletes=True,
     )
 
     @property
