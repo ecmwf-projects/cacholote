@@ -61,14 +61,12 @@ def _delete_cache_entries(
     files_to_delete = []
     dirs_to_delete = []
     for cache_entry in cache_entries:
-        session.delete(cache_entry)
-
-        files = extra_encoders._get_files_from_cache_entry(cache_entry, key="type")
-        for file, file_type in files.items():
-            if file_type == "application/vnd+zarr":
-                dirs_to_delete.append(file)
+        for cache_file in cache_entry.cache_files:
+            if cache_file.type == "application/vnd+zarr":
+                dirs_to_delete.append(cache_file.name)
             else:
-                files_to_delete.append(file)
+                files_to_delete.append(cache_file.name)
+        session.delete(cache_entry)
     database._commit_or_rollback(session)
 
     _remove_files(fs, files_to_delete, recursive=False)

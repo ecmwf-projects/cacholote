@@ -70,10 +70,16 @@ class CacheEntry(Base):
     )
 
     def _add_cache_files(self) -> None:
-        for name, size in extra_encoders._get_files_from_cache_entry(
-            self, key="file:size"
+        for name, info in extra_encoders._get_files_from_cache_entry(
+            self, key=None
         ).items():
-            self.cache_files.add(CacheFile(name=name, size=size))
+            self.cache_files.add(
+                CacheFile(
+                    name=name,
+                    size=info["file:size"],
+                    type=info["type"],
+                )
+            )
 
     @property
     def _result_as_string(self) -> str:
@@ -100,8 +106,11 @@ class CacheFile(Base):
 
     name: str = sa.Column(sa.String(), primary_key=True)
     size: int = sa.Column(sa.Integer())
+    type: str = sa.Column(sa.String())
     cache_entries: sa.orm.Mapped[set[CacheEntry]] = sa.orm.relationship(
-        secondary=association_table, back_populates="cache_files", cascade="all, delete"
+        secondary=association_table,
+        back_populates="cache_files",
+        cascade="all, delete",
     )
 
     @property
