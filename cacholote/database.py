@@ -39,8 +39,16 @@ Base = sa.orm.declarative_base()
 association_table = sa.Table(
     "association_table",
     Base.metadata,
-    sa.Column("cache_entries_id", sa.ForeignKey("cache_entries.id"), primary_key=True),
-    sa.Column("cache_files_name", sa.ForeignKey("cache_files.name"), primary_key=True),
+    sa.Column(
+        "cache_entries_id",
+        sa.ForeignKey("cache_entries.id"),
+        primary_key=True,
+    ),
+    sa.Column(
+        "cache_files_name",
+        sa.ForeignKey("cache_files.name"),
+        primary_key=True,
+    ),
 )
 
 
@@ -58,8 +66,14 @@ class CacheEntry(Base):
     cache_files: sa.orm.Mapped[set[CacheFile]] = sa.orm.relationship(
         secondary=association_table,
         back_populates="cache_entries",
-        cascade="all, save-update",  # TODO
+        cascade="all, save-update",
     )
+
+    def _add_cache_files(self) -> None:
+        for name, size in extra_encoders._get_files_from_cache_entry(
+            self, key="file:size"
+        ).items():
+            self.cache_files.add(CacheFile(name=name, size=size))
 
     @property
     def _result_as_string(self) -> str:
@@ -87,9 +101,7 @@ class CacheFile(Base):
     name: str = sa.Column(sa.String(), primary_key=True)
     size: int = sa.Column(sa.Integer())
     cache_entries: sa.orm.Mapped[set[CacheEntry]] = sa.orm.relationship(
-        secondary=association_table,
-        back_populates="cache_files",
-        passive_deletes=True,
+        secondary=association_table, back_populates="cache_files", cascade="all, delete"
     )
 
     @property
@@ -122,18 +134,6 @@ def set_expiration_to_max(
     target.expiration = target.expiration or _DATETIME_MAX
     if target.expiration < utils.utcnow():
         warnings.warn(f"Expiration date has passed. {target.expiration=}", UserWarning)
-
-
-@sa.event.listens_for(CacheEntry, "after_insert")
-def add_cache_files(
-    mapper: sa.orm.Mapper[CacheEntry],
-    connection: sa.Connection,
-    target: CacheEntry,
-) -> None:
-    for name, size in extra_encoders._get_files_from_cache_entry(
-        target, key="file:size"
-    ).items():
-        target.cache_files.add(CacheFile(name=name, size=size))
 
 
 def _commit_or_rollback(session: sa.orm.Session) -> None:
