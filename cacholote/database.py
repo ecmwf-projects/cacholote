@@ -28,7 +28,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy_utils
 
-from . import clean, utils
+from . import extra_encoders, utils
 
 _DATETIME_MAX = datetime.datetime(
     datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
@@ -129,7 +129,7 @@ def add_cache_files(
     connection: sa.Connection,
     target: CacheEntry,
 ) -> None:
-    for name, size in clean._get_files_from_cache_entry(
+    for name, size in extra_encoders._get_files_from_cache_entry(
         target, key="file:size"
     ).items():
         target.cache_files.add(CacheFile(name=name, size=size))

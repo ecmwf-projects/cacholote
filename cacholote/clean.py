@@ -28,35 +28,6 @@ from sqlalchemy import BinaryExpression, ColumnElement
 
 from . import config, database, decode, encode, extra_encoders, utils
 
-FILE_RESULT_KEYS = ("type", "callable", "args", "kwargs")
-FILE_RESULT_CALLABLES = (
-    "cacholote.extra_encoders:decode_xr_dataarray",
-    "cacholote.extra_encoders:decode_xr_dataset",
-    "cacholote.extra_encoders:decode_io_object",
-)
-
-
-def _get_files_from_cache_entry(
-    cache_entry: database.CacheEntry, key: str | None
-) -> dict[str, Any]:
-    result = cache_entry.result
-    if not isinstance(result, (list, tuple, set)):
-        result = [result]
-
-    files = {}
-    for obj in result:
-        if (
-            isinstance(obj, dict)
-            and set(FILE_RESULT_KEYS) == set(obj)
-            and obj["callable"] in FILE_RESULT_CALLABLES
-        ):
-            fs, urlpath = extra_encoders._get_fs_and_urlpath(*obj["args"][:2])
-            value = obj["args"][0]
-            if key is not None:
-                value = value[key]
-            files[fs.unstrip_protocol(urlpath)] = value
-    return files
-
 
 def _remove_files(
     fs: fsspec.AbstractFileSystem,
@@ -92,7 +63,7 @@ def _delete_cache_entries(
     for cache_entry in cache_entries:
         session.delete(cache_entry)
 
-        files = _get_files_from_cache_entry(cache_entry, key="type")
+        files = extra_encoders._get_files_from_cache_entry(cache_entry, key="type")
         for file, file_type in files.items():
             if file_type == "application/vnd+zarr":
                 dirs_to_delete.append(file)
@@ -261,7 +232,9 @@ class _Cleaner:
             for cache_entry in session.scalars(
                 sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
-                files = _get_files_from_cache_entry(cache_entry, key="file:size")
+                files = extra_encoders._get_files_from_cache_entry(
+                    cache_entry, key="file:size"
+                )
                 if any(file.startswith(self.urldir) for file in files):
                     entries_to_delete.append(cache_entry)
                     for file in files:
