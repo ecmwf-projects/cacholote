@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import functools
 import hashlib
 import inspect
@@ -127,6 +128,11 @@ def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
     logger.info(f"end {event}", **kwargs)
     if event == "upload" and context is not None:
         context.upload_log(f"end {event}. {_kwargs_to_str(**kwargs)}")
+
+
+@dataclasses.dataclass
+class FrozenFile:
+    obj: _UNION_IO_TYPES
 
 
 class FileInfoModel(pydantic.BaseModel):
@@ -387,8 +393,11 @@ def _store_io_object(
         utils.copy_buffered_file(f_in, f_out)
 
 
-def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
+def dictify_io_object(obj: _UNION_IO_TYPES | FrozenFile) -> dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
+    if is_frozen := isinstance(obj, FrozenFile):
+        obj = obj.obj
+
     settings = config.get()
 
     cache_files_urlpath = settings.cache_files_urlpath
@@ -399,9 +408,12 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
 
     if urlpath_in := getattr(obj, "path", getattr(obj, "name", "")):
         fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
-        root = f"{fs_in.checksum(urlpath_in):x}"
-        ext = pathlib.Path(urlpath_in).suffix
-        urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
+        if is_frozen:
+            urlpath_out = urlpath_in
+        else:
+            root = f"{fs_in.checksum(urlpath_in):x}"
+            ext = pathlib.Path(urlpath_in).suffix
+            urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
     else:
         root = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()  # fsspec uses md5
         urlpath_out = posixpath.join(cache_files_urlpath, root)
@@ -409,7 +421,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     with utils.FileLock(
         fs_out, urlpath_out, timeout=settings.lock_timeout
     ) as file_exists:
-        if not file_exists:
+        if not file_exists or is_frozen:
             if urlpath_in:
                 _store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
             else:
@@ -436,6 +448,7 @@ def register_all() -> None:
         io.TextIOBase,
         fsspec.spec.AbstractBufferedFile,
         fsspec.implementations.local.LocalFileOpener,
+        FrozenFile,
     ):
         encode.FILECACHE_ENCODERS.append((type_, dictify_io_object))
     if _HAS_XARRAY_AND_DASK:
