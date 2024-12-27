@@ -5,7 +5,7 @@ import datetime
 import os
 import pathlib
 import time
-from typing import Any, Literal
+from typing import Any, BinaryIO, Literal
 
 import fsspec
 import pydantic
@@ -411,3 +411,31 @@ def test_clean_multiple_urlpaths(tmp_path: pathlib.Path, use_database: bool) -> 
         clean.clean_cache_files(maxsize=0, use_database=use_database, depth=2)
     assert not cached_file1.exists()
     assert cached_file2.exists()
+
+
+def test_clean_duplicates(tmp_path: pathlib.Path) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
+    # Create file
+    tmpfile = tmp_path / "file.txt"
+    fsspec.filesystem("file").pipe_file(tmpfile, ONE_BYTE)
+
+    @cache.cacheable
+    def test1(path: pathlib.Path) -> BinaryIO:
+        return path.open("rb")
+
+    @cache.cacheable
+    def test2(path: pathlib.Path) -> BinaryIO:
+        return path.open("rb")
+
+    fp1 = test1(tmpfile)
+    fp2 = test2(tmpfile)
+    assert fp1.name == fp2.name
+
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (2,)
+
+    clean.clean_cache_files(maxsize=0)
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (0,)
