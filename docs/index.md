@@ -6,6 +6,7 @@ Efficiently cache calls to functions.
 :caption: 'Contents:'
 :maxdepth: 2
 
+README.md
 API Reference <_api/cacholote/index>
 ```
 
