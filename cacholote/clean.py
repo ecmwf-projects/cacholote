@@ -256,19 +256,21 @@ class _Cleaner:
             return
 
         entries_to_delete = []
+        files_to_delete: set[str] = set()
         self.logger.info("getting cache entries to delete")
         with config.get().instantiated_sessionmaker() as session:
             for cache_entry in session.scalars(
                 sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
             ):
                 files = _get_files_from_cache_entry(cache_entry, key="file:size")
-                if any(file.startswith(self.urldir) for file in files):
+                if (
+                    not self.stop_cleaning(maxsize)
+                    and any(file.startswith(self.urldir) for file in files)
+                ) or (set(files) & files_to_delete):
                     entries_to_delete.append(cache_entry)
                     for file in files:
                         self.pop_file_size(file)
-
-                if self.stop_cleaning(maxsize):
-                    break
+                        files_to_delete.add(file)
 
             if entries_to_delete:
                 self.logger.info(
