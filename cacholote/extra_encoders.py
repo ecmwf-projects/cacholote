@@ -129,7 +129,7 @@ def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
         context.upload_log(f"end {event}. {_kwargs_to_str(**kwargs)}")
 
 
-class FrozenFile(io.FileIO):
+class InPlaceFile(io.FileIO):
     pass
 
 
@@ -393,14 +393,14 @@ def _store_io_object(
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
-    is_frozen = isinstance(obj, FrozenFile)
+    is_in_place = isinstance(obj, InPlaceFile)
     settings = config.get()
 
     cache_files_urlpath = settings.cache_files_urlpath
 
     if urlpath_in := getattr(obj, "path", getattr(obj, "name", "")):
         fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
-        if is_frozen:
+        if is_in_place:
             urlpath_out = urlpath_in
         else:
             root = f"{fs_in.checksum(urlpath_in):x}"
@@ -410,7 +410,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
         root = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()  # fsspec uses md5
         urlpath_out = posixpath.join(cache_files_urlpath, root)
 
-    if is_frozen:
+    if is_in_place:
         fs_out = fs_in
     else:
         fs_out, *_ = fsspec.get_fs_token_paths(
@@ -421,7 +421,7 @@ def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     with utils.FileLock(
         fs_out, urlpath_out, timeout=settings.lock_timeout
     ) as file_exists:
-        if not (file_exists or is_frozen):
+        if not (file_exists or is_in_place):
             if urlpath_in:
                 _store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
             else:
