@@ -129,6 +129,10 @@ def _logging_timer(event: str, **kwargs: Any) -> Generator[float, None, None]:
         context.upload_log(f"end {event}. {_kwargs_to_str(**kwargs)}")
 
 
+class InPlaceFile(io.FileIO):
+    pass
+
+
 class FileInfoModel(pydantic.BaseModel):
     type: str
     href: str
@@ -389,27 +393,35 @@ def _store_io_object(
 
 def dictify_io_object(obj: _UNION_IO_TYPES) -> dict[str, Any]:
     """Encode a file object to JSON deserialized data (``dict``)."""
+    is_in_place = isinstance(obj, InPlaceFile)
     settings = config.get()
 
     cache_files_urlpath = settings.cache_files_urlpath
-    fs_out, *_ = fsspec.get_fs_token_paths(
-        cache_files_urlpath,
-        storage_options=settings.cache_files_storage_options,
-    )
 
     if urlpath_in := getattr(obj, "path", getattr(obj, "name", "")):
         fs_in = getattr(obj, "fs", fsspec.filesystem("file"))
-        root = f"{fs_in.checksum(urlpath_in):x}"
-        ext = pathlib.Path(urlpath_in).suffix
-        urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
+        if is_in_place:
+            urlpath_out = urlpath_in
+        else:
+            root = f"{fs_in.checksum(urlpath_in):x}"
+            ext = pathlib.Path(urlpath_in).suffix
+            urlpath_out = posixpath.join(cache_files_urlpath, f"{root}{ext}")
     else:
         root = hashlib.md5(f"{hash(obj)}".encode()).hexdigest()  # fsspec uses md5
         urlpath_out = posixpath.join(cache_files_urlpath, root)
 
+    if is_in_place:
+        fs_out = fs_in
+    else:
+        fs_out, *_ = fsspec.get_fs_token_paths(
+            cache_files_urlpath,
+            storage_options=settings.cache_files_storage_options,
+        )
+
     with utils.FileLock(
         fs_out, urlpath_out, timeout=settings.lock_timeout
     ) as file_exists:
-        if not file_exists:
+        if not (file_exists or is_in_place):
             if urlpath_in:
                 _store_file_object(fs_in, urlpath_in, fs_out, urlpath_out)
             else:

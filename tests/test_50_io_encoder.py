@@ -9,6 +9,7 @@ import subprocess
 from typing import Any
 
 import fsspec
+import fsspec.implementations.local
 import pytest
 import pytest_httpserver
 import pytest_structlog
@@ -235,3 +236,16 @@ def test_io_logging(
         },
     ]
     assert log.events == expected
+
+
+def test_io_in_place_file(tmp_path: pathlib.Path) -> None:
+    @cache.cacheable
+    def cached_in_place_open(path: str) -> io.FileIO:
+        return extra_encoders.InPlaceFile(path, "rb")
+
+    tmpfile = tmp_path / "test.txt"
+    fsspec.filesystem("file").touch(tmpfile)
+
+    output = cached_in_place_open(str(tmpfile))
+    assert isinstance(output, fsspec.implementations.local.LocalFileOpener)
+    assert output.name == str(tmpfile)
