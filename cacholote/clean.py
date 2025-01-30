@@ -88,29 +88,34 @@ def _delete_cache_entries(
     session: sa.orm.Session,
     *cache_entries: database.CacheEntry,
     batch_size: int | None,
-    batch_sleep: int,
+    batch_sleep: float,
 ) -> None:
-    if batch_size is None:
-        fs, _ = utils.get_cache_files_fs_dirname()
-        files_to_delete = []
-        dirs_to_delete = []
-        for cache_entry in cache_entries:
-            session.delete(cache_entry)
-
-            files = _get_files_from_cache_entry(cache_entry, key="type")
-            for file, file_type in files.items():
-                if file_type == "application/vnd+zarr":
-                    dirs_to_delete.append(file)
-                else:
-                    files_to_delete.append(file)
-        database._commit_or_rollback(session)
-
-        _remove_files(fs, files_to_delete, recursive=False)
-        _remove_files(fs, dirs_to_delete, recursive=True)
-    else:
+    if batch_size is not None:
         for batch in utils.batched(cache_entries, n=batch_size):
-            _delete_cache_entries(session, *batch, batch_size=None, batch_sleep=0)
-            time.sleep(batch_sleep)
+            _delete_cache_entries(
+                session, *batch, batch_size=None, batch_sleep=batch_sleep
+            )
+        return
+
+    fs, _ = utils.get_cache_files_fs_dirname()
+    files_to_delete = []
+    dirs_to_delete = []
+    for cache_entry in cache_entries:
+        session.delete(cache_entry)
+
+        files = _get_files_from_cache_entry(cache_entry, key="type")
+        for file, file_type in files.items():
+            if file_type == "application/vnd+zarr":
+                dirs_to_delete.append(file)
+            else:
+                files_to_delete.append(file)
+    database._commit_or_rollback(session)
+
+    tic = time.perf_counter()
+    _remove_files(fs, files_to_delete, recursive=False)
+    _remove_files(fs, dirs_to_delete, recursive=True)
+    batch_sleep -= time.perf_counter() - tic
+    time.sleep(batch_sleep if batch_sleep >= 0 else 0)
 
 
 def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> None:
@@ -258,7 +263,7 @@ class _Cleaner:
         tags_to_clean: list[str | None] | None,
         tags_to_keep: list[str | None] | None,
         batch_size: int | None,
-        batch_sleep: int,
+        batch_sleep: float,
     ) -> None:
         filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
         sorters = self._get_method_sorters(method)
@@ -317,7 +322,7 @@ def clean_cache_files(
     depth: int = 1,
     use_database: bool = False,
     batch_size: int | None = None,
-    batch_sleep: int = 0,
+    batch_sleep: float = 0,
 ) -> None:
     """Clean cache files.
 
@@ -344,8 +349,8 @@ def clean_cache_files(
         Whether to infer disk usage from the cacholote database
     batch_size: int | None, default: None
         Group cache entries to clean into batches of this size (None: single batch)
-    batch_sleep: int, default: 0
-        Sleep duration after processing each batch
+    batch_sleep: float, default: 0
+        Sleep duration after processing each batch (seconds)
     """
     if use_database and delete_unknown_files:
         raise ValueError(
@@ -371,7 +376,7 @@ def clean_invalid_cache_entries(
     check_expiration: bool = True,
     try_decode: bool = False,
     batch_size: int | None = None,
-    batch_sleep: int = 0,
+    batch_sleep: float = 0,
 ) -> None:
     """Clean invalid cache entries.
 
@@ -383,8 +388,8 @@ def clean_invalid_cache_entries(
         Whether or not to delete entries that raise DecodeError (this can be slow!)
     batch_size: int | None
         Group cache entries to clean into batches of this size (None: single batch)
-    batch_sleep: int
-        Sleep duration after processing each batch
+    batch_sleep: float
+        Sleep duration after processing each batch (seconds)
     """
     cache_entries = []
 
@@ -419,7 +424,7 @@ def expire_cache_entries(
     after: datetime.date | None = None,
     delete: bool = False,
     batch_size: int | None = None,
-    batch_sleep: int = 0,
+    batch_sleep: float = 0,
 ) -> int:
     now = utils.utcnow()
 
