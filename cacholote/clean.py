@@ -18,6 +18,7 @@ from __future__ import annotations
 import collections
 import datetime
 import posixpath
+import time
 from typing import Any, Callable, Literal, Optional
 
 import fsspec
@@ -84,24 +85,32 @@ def _remove_files(
 
 
 def _delete_cache_entries(
-    session: sa.orm.Session, *cache_entries: database.CacheEntry
+    session: sa.orm.Session,
+    *cache_entries: database.CacheEntry,
+    batch_size: int | None,
+    batch_sleep: int,
 ) -> None:
-    fs, _ = utils.get_cache_files_fs_dirname()
-    files_to_delete = []
-    dirs_to_delete = []
-    for cache_entry in cache_entries:
-        session.delete(cache_entry)
+    if batch_size is None:
+        fs, _ = utils.get_cache_files_fs_dirname()
+        files_to_delete = []
+        dirs_to_delete = []
+        for cache_entry in cache_entries:
+            session.delete(cache_entry)
 
-        files = _get_files_from_cache_entry(cache_entry, key="type")
-        for file, file_type in files.items():
-            if file_type == "application/vnd+zarr":
-                dirs_to_delete.append(file)
-            else:
-                files_to_delete.append(file)
-    database._commit_or_rollback(session)
+            files = _get_files_from_cache_entry(cache_entry, key="type")
+            for file, file_type in files.items():
+                if file_type == "application/vnd+zarr":
+                    dirs_to_delete.append(file)
+                else:
+                    files_to_delete.append(file)
+        database._commit_or_rollback(session)
 
-    _remove_files(fs, files_to_delete, recursive=False)
-    _remove_files(fs, dirs_to_delete, recursive=True)
+        _remove_files(fs, files_to_delete, recursive=False)
+        _remove_files(fs, dirs_to_delete, recursive=True)
+    else:
+        for batch in utils.batched(cache_entries, n=batch_size):
+            _delete_cache_entries(session, *batch, batch_size=None, batch_sleep=0)
+            time.sleep(batch_sleep)
 
 
 def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> None:
@@ -121,7 +130,7 @@ def delete(func_to_del: str | Callable[..., Any], *args: Any, **kwargs: Any) -> 
         for cache_entry in session.scalars(
             sa.select(database.CacheEntry).filter(database.CacheEntry.key == hexdigest)
         ):
-            _delete_cache_entries(session, cache_entry)
+            _delete_cache_entries(session, cache_entry, batch_size=None, batch_sleep=0)
 
 
 class _Cleaner:
@@ -248,6 +257,8 @@ class _Cleaner:
         method: Literal["LRU", "LFU"],
         tags_to_clean: list[str | None] | None,
         tags_to_keep: list[str | None] | None,
+        batch_size: int | None,
+        batch_sleep: int,
     ) -> None:
         filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
         sorters = self._get_method_sorters(method)
@@ -276,7 +287,12 @@ class _Cleaner:
                 self.logger.info(
                     "deleting cache entries", n_entries_to_delete=len(entries_to_delete)
                 )
-            _delete_cache_entries(session, *entries_to_delete)
+            _delete_cache_entries(
+                session,
+                *entries_to_delete,
+                batch_size=batch_size,
+                batch_sleep=batch_sleep,
+            )
 
         self.log_disk_usage()
 
@@ -300,6 +316,8 @@ def clean_cache_files(
     tags_to_keep: list[str | None] | None = None,
     depth: int = 1,
     use_database: bool = False,
+    batch_size: int | None = None,
+    batch_sleep: int = 0,
 ) -> None:
     """Clean cache files.
 
@@ -324,6 +342,10 @@ def clean_cache_files(
         depth for grouping cache files
     use_database: bool, default: False
         Whether to infer disk usage from the cacholote database
+    batch_size: int | None, default: None
+        Group cache entries to clean into batches of this size (None: single batch)
+    batch_sleep: int, default: 0
+        Sleep duration after processing each batch
     """
     if use_database and delete_unknown_files:
         raise ValueError(
@@ -340,11 +362,16 @@ def clean_cache_files(
         method=method,
         tags_to_clean=tags_to_clean,
         tags_to_keep=tags_to_keep,
+        batch_size=batch_size,
+        batch_sleep=batch_sleep,
     )
 
 
 def clean_invalid_cache_entries(
-    check_expiration: bool = True, try_decode: bool = False
+    check_expiration: bool = True,
+    try_decode: bool = False,
+    batch_size: int | None = None,
+    batch_sleep: int = 0,
 ) -> None:
     """Clean invalid cache entries.
 
@@ -354,24 +381,36 @@ def clean_invalid_cache_entries(
         Whether or not to delete expired entries
     try_decode: bool
         Whether or not to delete entries that raise DecodeError (this can be slow!)
+    batch_size: int | None
+        Group cache entries to clean into batches of this size (None: single batch)
+    batch_sleep: int
+        Sleep duration after processing each batch
     """
+    cache_entries = []
+
     filters = []
     if check_expiration:
         filters.append(database.CacheEntry.expiration <= utils.utcnow())
     if filters:
         with config.get().instantiated_sessionmaker() as session:
-            for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters)
-            ):
-                _delete_cache_entries(session, cache_entry)
+            cache_entries = list(
+                session.scalars(sa.select(database.CacheEntry).filter(*filters))
+            )
 
     if try_decode:
         with config.get().instantiated_sessionmaker() as session:
             for cache_entry in session.scalars(sa.select(database.CacheEntry)):
+                if cache_entry in cache_entries:
+                    continue
                 try:
                     decode.loads(cache_entry._result_as_string)
                 except decode.DecodeError:
-                    _delete_cache_entries(session, cache_entry)
+                    cache_entries.append(cache_entry)
+
+    if cache_entries:
+        _delete_cache_entries(
+            session, *cache_entries, batch_size=batch_size, batch_sleep=batch_sleep
+        )
 
 
 def expire_cache_entries(
@@ -379,6 +418,8 @@ def expire_cache_entries(
     before: datetime.datetime | None = None,
     after: datetime.date | None = None,
     delete: bool = False,
+    batch_size: int | None = None,
+    batch_sleep: int = 0,
 ) -> int:
     now = utils.utcnow()
 
@@ -395,7 +436,9 @@ def expire_cache_entries(
             session.scalars(sa.select(database.CacheEntry).filter(*filters))
         )
         if delete:
-            _delete_cache_entries(session, *cache_entries)
+            _delete_cache_entries(
+                session, *cache_entries, batch_size=batch_size, batch_sleep=batch_sleep
+            )
         else:
             for cache_entry in cache_entries:
                 cache_entry.expiration = now

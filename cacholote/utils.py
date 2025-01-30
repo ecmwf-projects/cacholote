@@ -22,15 +22,27 @@ import datetime
 import functools
 import hashlib
 import io
+import itertools
 import os
 import time
 import warnings
 from types import TracebackType
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 import fsspec
 
 from . import config
+
+
+def batched(iterable: Iterable[Any], n: int, *, strict: bool = False) -> Iterator[Any]:
+    """Batch data from the iterable into tuples of length n."""
+    if n < 1:
+        raise ValueError("n must be at least one")
+    iterator = iter(iterable)
+    while batch := tuple(itertools.islice(iterator, n)):
+        if strict and len(batch) != n:
+            raise ValueError("batched(): incomplete batch")
+        yield batch
 
 
 def hexdigestify(text: str) -> str:

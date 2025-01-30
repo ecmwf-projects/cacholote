@@ -97,7 +97,9 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
                         return _decode_and_update(session, cache_entry, settings)
                     except decode.DecodeError as ex:
                         warnings.warn(str(ex), UserWarning)
-                        clean._delete_cache_entries(session, cache_entry)
+                        clean._delete_cache_entries(
+                            session, cache_entry, batch_size=None, batch_sleep=0
+                        )
 
         result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(
