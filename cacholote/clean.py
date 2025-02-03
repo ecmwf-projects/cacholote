@@ -425,6 +425,7 @@ def expire_cache_entries(
     delete: bool = False,
     batch_size: int | None = None,
     batch_sleep: float = 0,
+    dry_run: bool = False,
 ) -> int:
     now = utils.utcnow()
 
@@ -440,6 +441,9 @@ def expire_cache_entries(
         cache_entries = list(
             session.scalars(sa.select(database.CacheEntry).filter(*filters))
         )
+        if dry_run:
+            return len(cache_entries)
+
         if delete:
             _delete_cache_entries(
                 session, *cache_entries, batch_size=batch_size, batch_sleep=batch_sleep
