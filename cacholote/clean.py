@@ -18,6 +18,7 @@ from __future__ import annotations
 import collections
 import datetime
 import posixpath
+import time
 from typing import Any, Callable, Literal, Optional
 
 import fsspec
@@ -248,6 +249,8 @@ class _Cleaner:
         method: Literal["LRU", "LFU"],
         tags_to_clean: list[str | None] | None,
         tags_to_keep: list[str | None] | None,
+        partition_size: int | None,
+        partition_sleep: float,
     ) -> None:
         filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
         sorters = self._get_method_sorters(method)
@@ -259,24 +262,31 @@ class _Cleaner:
         files_to_delete: set[str] = set()
         self.logger.info("getting cache entries to delete")
         with config.get().instantiated_sessionmaker() as session:
-            for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
-            ):
-                files = _get_files_from_cache_entry(cache_entry, key="file:size")
-                if (
-                    not self.stop_cleaning(maxsize)
-                    and any(file.startswith(self.urldir) for file in files)
-                ) or (set(files) & files_to_delete):
-                    entries_to_delete.append(cache_entry)
-                    for file in files:
-                        self.pop_file_size(file)
-                        files_to_delete.add(file)
+            stmt = (
+                sa.select(database.CacheEntry)
+                .filter(*filters)
+                .order_by(*sorters)
+                .execution_options(yield_per=partition_size)
+            )
+            for partition in session.scalars(stmt).partitions():
+                for cache_entry in partition:
+                    files = _get_files_from_cache_entry(cache_entry, key="file:size")
+                    if (
+                        not self.stop_cleaning(maxsize)
+                        and any(file.startswith(self.urldir) for file in files)
+                    ) or (set(files) & files_to_delete):
+                        entries_to_delete.append(cache_entry)
+                        for file in files:
+                            self.pop_file_size(file)
+                            files_to_delete.add(file)
 
-            if entries_to_delete:
-                self.logger.info(
-                    "deleting cache entries", n_entries_to_delete=len(entries_to_delete)
-                )
-            _delete_cache_entries(session, *entries_to_delete)
+                if entries_to_delete:
+                    self.logger.info(
+                        "deleting cache entries",
+                        n_entries_to_delete=len(entries_to_delete),
+                    )
+                _delete_cache_entries(session, *entries_to_delete)
+                time.sleep(partition_sleep)
 
         self.log_disk_usage()
 
@@ -300,6 +310,8 @@ def clean_cache_files(
     tags_to_keep: list[str | None] | None = None,
     depth: int = 1,
     use_database: bool = False,
+    partition_size: int | None = None,
+    partition_sleep: float = 0,
 ) -> None:
     """Clean cache files.
 
@@ -324,6 +336,10 @@ def clean_cache_files(
         depth for grouping cache files
     use_database: bool, default: False
         Whether to infer disk usage from the cacholote database
+    partition_size: int | None, default: None
+        Group cache entries to clean into partitions of this size (None: single batch)
+    partition_sleep: float, default: 0
+        Sleep duration after processing each partition (seconds)
     """
     if use_database and delete_unknown_files:
         raise ValueError(
@@ -340,11 +356,16 @@ def clean_cache_files(
         method=method,
         tags_to_clean=tags_to_clean,
         tags_to_keep=tags_to_keep,
+        partition_size=partition_size,
+        partition_sleep=partition_sleep,
     )
 
 
 def clean_invalid_cache_entries(
-    check_expiration: bool = True, try_decode: bool = False
+    check_expiration: bool = True,
+    try_decode: bool = False,
+    partition_size: int | None = None,
+    partition_sleep: float = 0,
 ) -> None:
     """Clean invalid cache entries.
 
@@ -354,16 +375,25 @@ def clean_invalid_cache_entries(
         Whether or not to delete expired entries
     try_decode: bool
         Whether or not to delete entries that raise DecodeError (this can be slow!)
+    partition_size: int | None, default: None
+        Group cache entries to clean into partitions of this size (None: single batch)
+    partition_sleep: float, default: 0
+        Sleep duration after processing each partition (seconds)
     """
     filters = []
     if check_expiration:
         filters.append(database.CacheEntry.expiration <= utils.utcnow())
     if filters:
         with config.get().instantiated_sessionmaker() as session:
-            for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters)
-            ):
-                _delete_cache_entries(session, cache_entry)
+            stmt = (
+                sa.select(database.CacheEntry)
+                .filter(*filters)
+                .execution_options(yield_per=partition_size)
+            )
+            for partition in session.scalars(stmt).partitions():
+                for cache_entry in partition:
+                    _delete_cache_entries(session, cache_entry)
+                time.sleep(partition_sleep)
 
     if try_decode:
         with config.get().instantiated_sessionmaker() as session:
@@ -379,6 +409,9 @@ def expire_cache_entries(
     before: datetime.datetime | None = None,
     after: datetime.date | None = None,
     delete: bool = False,
+    partition_size: int | None = None,
+    partition_sleep: float = 0,
+    dry_run: bool = False,
 ) -> int:
     now = utils.utcnow()
 
@@ -390,14 +423,23 @@ def expire_cache_entries(
     if after is not None:
         filters.append(database.CacheEntry.created_at > after)
 
+    count = 0
     with config.get().instantiated_sessionmaker() as session:
-        cache_entries = list(
-            session.scalars(sa.select(database.CacheEntry).filter(*filters))
+        stmt = (
+            sa.select(database.CacheEntry)
+            .filter(*filters)
+            .execution_options(yield_per=partition_size)
         )
-        if delete:
-            _delete_cache_entries(session, *cache_entries)
-        else:
-            for cache_entry in cache_entries:
-                cache_entry.expiration = now
-            database._commit_or_rollback(session)
-    return len(cache_entries)
+        for partition in session.scalars(stmt).partitions():
+            count += len(partition)
+            if dry_run:
+                continue
+
+            if delete:
+                _delete_cache_entries(session, *partition)
+            else:
+                for cache_entry in partition:
+                    cache_entry.expiration = now
+                database._commit_or_rollback(session)
+            time.sleep(partition_sleep)
+    return count
