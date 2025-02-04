@@ -419,5 +419,4 @@ def expire_cache_entries(
                 for cache_entry in cache_entries:
                     cache_entry.expiration = now
                 database._commit_or_rollback(session)
-
     return count

@@ -34,7 +34,7 @@ def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
 
 
 @cache.cacheable
-def cached_now() -> datetime.datetime:
+def cached_now(*args: Any, **kwargs: Any) -> datetime.datetime:
     return datetime.datetime.now()
 
 
@@ -439,3 +439,29 @@ def test_clean_duplicates(tmp_path: pathlib.Path) -> None:
     clean.clean_cache_files(maxsize=0)
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (0,)
+
+
+@pytest.mark.parametrize(
+    "partition_size,partition_sleep,expected_sleep",
+    [
+        (1, 0, 1),
+        (2, 0, 1),
+        (1, 1, 2),
+        (2, 1, 1),
+    ],
+)
+def test_expire_cache_entry_partition(
+    partition_size: int, partition_sleep: float, expected_sleep: float
+) -> None:
+    for i in range(2):
+        cached_now(i)
+
+    tic = time.perf_counter()
+    count = clean.expire_cache_entries(
+        before=datetime.datetime.now(),
+        partition_size=partition_size,
+        partition_sleep=partition_sleep,
+    )
+    toc = time.perf_counter()
+    assert count == 2
+    assert toc - tic < expected_sleep
