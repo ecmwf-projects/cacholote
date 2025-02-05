@@ -289,7 +289,6 @@ class _Cleaner:
                 _delete_cache_entries(session, *entries_to_delete)
 
             if not stop_cleaning:
-                print("sleep")
                 time.sleep(batch_delay)
 
         self.log_disk_usage()
