@@ -260,7 +260,7 @@ class _Cleaner:
         files_to_delete: set[str] = set()
         stop_cleaning = self.stop_cleaning(maxsize)
         while not stop_cleaning:
-            entries_to_delete = []
+            entries_to_delete: list[database.CacheEntry] = []
             self.logger.info("getting cache entries to delete")
             with config.get().instantiated_sessionmaker() as session:
                 for cache_entry in session.scalars(
