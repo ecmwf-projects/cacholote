@@ -442,7 +442,7 @@ def test_clean_duplicates(tmp_path: pathlib.Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "partition_size,partition_sleep,expected_sleep",
+    "batch_size,batch_delay,expected_time",
     [
         (1, 0, 1),
         (2, 0, 1),
@@ -452,9 +452,9 @@ def test_clean_duplicates(tmp_path: pathlib.Path) -> None:
 )
 @pytest.mark.parametrize("delete", [True, False])
 def test_expire_cache_entry_partition(
-    partition_size: int,
-    partition_sleep: float,
-    expected_sleep: float,
+    batch_size: int,
+    batch_delay: float,
+    expected_time: float,
     delete: bool,
 ) -> None:
     for i in range(2):
@@ -463,10 +463,10 @@ def test_expire_cache_entry_partition(
     tic = time.perf_counter()
     count = clean.expire_cache_entries(
         before=datetime.datetime.now(),
-        partition_size=partition_size,
-        partition_sleep=partition_sleep,
+        batch_size=batch_size,
+        batch_delay=batch_delay,
         delete=delete,
     )
     toc = time.perf_counter()
     assert count == 2
-    assert toc - tic < expected_sleep
+    assert toc - tic < expected_time
