@@ -266,6 +266,9 @@ class _Cleaner:
                 for cache_entry in session.scalars(
                     sa.select(database.CacheEntry).filter(*filters).order_by(*sorters)
                 ):
+                    if batch_size and len(entries_to_delete) >= batch_size:
+                        break
+
                     files = _get_files_from_cache_entry(cache_entry, key="file:size")
                     if (
                         not self.stop_cleaning(maxsize)
@@ -275,9 +278,6 @@ class _Cleaner:
                         for file in files:
                             self.pop_file_size(file)
                             files_to_delete.add(file)
-
-                    if batch_size and len(entries_to_delete) > batch_size:
-                        break
                 else:
                     stop_cleaning = True
 
@@ -289,6 +289,7 @@ class _Cleaner:
                 _delete_cache_entries(session, *entries_to_delete)
 
             if not stop_cleaning:
+                print("sleep")
                 time.sleep(batch_delay)
 
         self.log_disk_usage()
