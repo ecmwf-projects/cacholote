@@ -252,7 +252,7 @@ class _Cleaner:
         batch_size: int | None,
         batch_delay: float,
     ) -> None:
-        assert batch_size is None or batch_size > 1
+        assert batch_size is None or batch_size > 0
 
         filters = self._get_tag_filters(tags_to_clean, tags_to_keep)
         sorters = self._get_method_sorters(method)

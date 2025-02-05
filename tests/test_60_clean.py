@@ -451,7 +451,7 @@ def test_clean_duplicates(tmp_path: pathlib.Path) -> None:
     ],
 )
 @pytest.mark.parametrize("delete", [True, False])
-def test_expire_cache_entry_partition(
+def test_expire_cache_entries_batch(
     batch_size: int,
     batch_delay: float,
     expected_time: float,
@@ -469,4 +469,39 @@ def test_expire_cache_entry_partition(
     )
     toc = time.perf_counter()
     assert count == 2
-    assert toc - tic < expected_time
+    assert expected_time - 1 < toc - tic < expected_time
+
+
+@pytest.mark.parametrize(
+    "batch_size,batch_delay,expected_time",
+    [
+        (1, 0, 1),
+        (2, 0, 1),
+        (1, 1, 2),
+        (2, 1, 1),
+    ],
+)
+def test_expire_clean_cache_files_batch(
+    batch_size: int,
+    batch_delay: float,
+    expected_time: float,
+    tmp_path: pathlib.Path,
+) -> None:
+    for i in range(2):
+        tmpfile1 = tmp_path / f"file{i}.txt"
+        fsspec.filesystem("file").pipe_file(tmpfile1, ONE_BYTE)
+        open_url(tmpfile1)
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    assert len(fs.ls(dirname)) == 2
+
+    tic = time.perf_counter()
+    clean.clean_cache_files(
+        maxsize=0,
+        batch_size=batch_size,
+        batch_delay=batch_delay,
+    )
+    toc = time.perf_counter()
+    assert expected_time - 1 < toc - tic < expected_time
+
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    assert fs.ls(dirname) == []
