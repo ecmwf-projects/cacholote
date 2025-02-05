@@ -343,7 +343,7 @@ def clean_cache_files(
         Number of entries to process in each batch.
         If None, all entries are processed in a single batch.
     batch_delay: float, default: 0
-        Time in seconds to wait between processing consecutive batches.
+        Delay in seconds between processing batches.
     """
     if use_database and delete_unknown_files:
         raise ValueError(
@@ -383,7 +383,7 @@ def clean_invalid_cache_entries(
         Number of entries to process in each batch.
         If None, all entries are processed in a single batch.
     batch_delay: float, default: 0
-        Time in seconds to wait between processing consecutive batches.
+        Delay in seconds between processing batches.
     """
     if check_expiration:
         id_stmt = (
