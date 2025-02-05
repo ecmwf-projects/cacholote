@@ -366,7 +366,10 @@ def clean_cache_files(
 
 
 def clean_invalid_cache_entries(
-    check_expiration: bool = True, try_decode: bool = False
+    check_expiration: bool = True,
+    try_decode: bool = False,
+    batch_size: int | None = None,
+    batch_delay: float = 0,
 ) -> None:
     """Clean invalid cache entries.
 
@@ -376,16 +379,27 @@ def clean_invalid_cache_entries(
         Whether or not to delete expired entries
     try_decode: bool
         Whether or not to delete entries that raise DecodeError (this can be slow!)
+    batch_size: int, optional, default: None
+        Number of entries to process in each batch.
+        If None, all entries are processed in a single batch.
+    batch_delay: float, default: 0
+        Time in seconds to wait between processing consecutive batches.
     """
-    filters = []
     if check_expiration:
-        filters.append(database.CacheEntry.expiration <= utils.utcnow())
-    if filters:
+        id_stmt = (
+            sa.select(database.CacheEntry.id)
+            .filter(database.CacheEntry.expiration <= utils.utcnow())
+            .execution_options(yield_per=batch_size)
+        )
         with config.get().instantiated_sessionmaker() as session:
-            for cache_entry in session.scalars(
-                sa.select(database.CacheEntry).filter(*filters)
-            ):
-                _delete_cache_entries(session, cache_entry)
+            partitions = list(session.scalars(id_stmt).partitions())
+        for i, partition in enumerate(partitions):
+            entry_stmt = sa.select(database.CacheEntry).filter(
+                database.CacheEntry.id.in_(partition)
+            )
+            time.sleep(batch_delay if i else 0)
+            with config.get().instantiated_sessionmaker() as session:
+                _delete_cache_entries(session, *list(session.scalars(entry_stmt)))
 
     if try_decode:
         with config.get().instantiated_sessionmaker() as session:

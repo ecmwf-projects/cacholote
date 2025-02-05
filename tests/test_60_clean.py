@@ -518,3 +518,38 @@ def test_expire_cache_entries_dry_run(dry_run: bool, cache_entries: int) -> None
 
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (cache_entries,)
+
+
+@pytest.mark.parametrize(
+    "batch_size,batch_delay,expected_time",
+    [
+        (1, 0, 1),
+        (2, 0, 1),
+        (1, 1, 2),
+        (2, 1, 1),
+    ],
+)
+def test_clean_invalid_cache_entries_batch(
+    batch_size: int,
+    batch_delay: float,
+    expected_time: float,
+) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
+    for i in range(2):
+        cached_now(i)
+    clean.expire_cache_entries(before=TOMORROW, delete=False)
+
+    tic = time.perf_counter()
+    clean.clean_invalid_cache_entries(
+        check_expiration=True,
+        try_decode=False,
+        batch_size=batch_size,
+        batch_delay=batch_delay,
+    )
+    toc = time.perf_counter()
+    assert expected_time - 1 < toc - tic < expected_time
+
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (0,)
