@@ -462,7 +462,7 @@ def test_expire_cache_entries_batch(
 
     tic = time.perf_counter()
     count = clean.expire_cache_entries(
-        before=datetime.datetime.now(),
+        before=TOMORROW,
         batch_size=batch_size,
         batch_delay=batch_delay,
         delete=delete,
@@ -505,3 +505,16 @@ def test_expire_clean_cache_files_batch(
 
     fs, dirname = utils.get_cache_files_fs_dirname()
     assert fs.ls(dirname) == []
+
+
+@pytest.mark.parametrize("dry_run,cache_entries", [(True, 1), (False, 0)])
+def test_expire_cache_entries_dry_run(dry_run: bool, cache_entries: int) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
+    cached_now()
+    count = clean.expire_cache_entries(dry_run=dry_run, delete=True, before=TOMORROW)
+    assert count == 1
+
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (cache_entries,)
