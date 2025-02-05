@@ -399,11 +399,7 @@ def clean_invalid_cache_entries(
             )
             time.sleep(batch_delay if i else 0)
             with config.get().instantiated_sessionmaker() as session:
-                cache_entries = list(session.scalars(entry_stmt))
-                config.get().logger.info(
-                    "expiring cache entries", n_entries_to_expire=len(cache_entries)
-                )
-                _delete_cache_entries(session, *cache_entries)
+                _delete_cache_entries(session, *list(session.scalars(entry_stmt)))
 
     if try_decode:
         with config.get().instantiated_sessionmaker() as session:
