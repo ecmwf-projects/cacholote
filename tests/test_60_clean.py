@@ -34,7 +34,7 @@ def open_urls(*urls: pathlib.Path) -> list[fsspec.spec.AbstractBufferedFile]:
 
 
 @cache.cacheable
-def cached_now() -> datetime.datetime:
+def cached_now(*args: Any, **kwargs: Any) -> datetime.datetime:
     return datetime.datetime.now()
 
 
@@ -437,5 +437,119 @@ def test_clean_duplicates(tmp_path: pathlib.Path) -> None:
     assert cur.fetchone() == (2,)
 
     clean.clean_cache_files(maxsize=0)
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (0,)
+
+
+@pytest.mark.parametrize(
+    "batch_size,batch_delay,expected_time",
+    [
+        (1, 0, 1),
+        (2, 0, 1),
+        (1, 1, 2),
+        (2, 1, 1),
+    ],
+)
+@pytest.mark.parametrize("delete", [True, False])
+def test_expire_cache_entries_batch(
+    batch_size: int,
+    batch_delay: float,
+    expected_time: float,
+    delete: bool,
+) -> None:
+    for i in range(2):
+        cached_now(i)
+
+    tic = time.perf_counter()
+    count = clean.expire_cache_entries(
+        before=TOMORROW,
+        batch_size=batch_size,
+        batch_delay=batch_delay,
+        delete=delete,
+    )
+    toc = time.perf_counter()
+    assert count == 2
+    assert expected_time - 1 < toc - tic < expected_time
+
+
+@pytest.mark.parametrize(
+    "batch_size,batch_delay,expected_time",
+    [
+        (1, 0, 1),
+        (2, 0, 1),
+        (1, 1, 2),
+        (2, 1, 1),
+    ],
+)
+def test_expire_clean_cache_files_batch(
+    batch_size: int,
+    batch_delay: float,
+    expected_time: float,
+    tmp_path: pathlib.Path,
+) -> None:
+    for i in range(2):
+        tmpfile1 = tmp_path / f"file{i}.txt"
+        fsspec.filesystem("file").pipe_file(tmpfile1, ONE_BYTE)
+        open_url(tmpfile1)
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    assert len(fs.ls(dirname)) == 2
+
+    tic = time.perf_counter()
+    clean.clean_cache_files(
+        maxsize=0,
+        batch_size=batch_size,
+        batch_delay=batch_delay,
+    )
+    toc = time.perf_counter()
+    assert expected_time - 1 < toc - tic < expected_time
+
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    assert fs.ls(dirname) == []
+
+
+@pytest.mark.parametrize("dry_run,cache_entries", [(True, 1), (False, 0)])
+def test_expire_cache_entries_dry_run(dry_run: bool, cache_entries: int) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
+    cached_now()
+    count = clean.expire_cache_entries(dry_run=dry_run, delete=True, before=TOMORROW)
+    assert count == 1
+
+    cur.execute("SELECT COUNT(*) FROM cache_entries", ())
+    assert cur.fetchone() == (cache_entries,)
+
+
+@pytest.mark.parametrize(
+    "batch_size,batch_delay,expected_time",
+    [
+        (1, 0, 1),
+        (2, 0, 1),
+        (1, 1, 2),
+        (2, 1, 1),
+    ],
+)
+def test_clean_invalid_cache_entries_batch(
+    batch_size: int,
+    batch_delay: float,
+    expected_time: float,
+) -> None:
+    con = config.get().engine.raw_connection()
+    cur = con.cursor()
+
+    for i in range(2):
+        cached_now(i)
+    clean.expire_cache_entries(before=TOMORROW, delete=False)
+
+    tic = time.perf_counter()
+    clean.clean_invalid_cache_entries(
+        check_expiration=True,
+        try_decode=False,
+        batch_size=batch_size,
+        batch_delay=batch_delay,
+    )
+    toc = time.perf_counter()
+    assert expected_time - 1 < toc - tic < expected_time
+
     cur.execute("SELECT COUNT(*) FROM cache_entries", ())
     assert cur.fetchone() == (0,)
