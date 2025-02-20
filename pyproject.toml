@@ -81,6 +81,7 @@ convention = "numpy"
 packages = ["cacholote"]
 
 [tool.setuptools_scm]
+fallback_version = "999"
 write_to = "cacholote/version.py"
 write_to_template = '''
 # Do not change! Do not track in version control!
