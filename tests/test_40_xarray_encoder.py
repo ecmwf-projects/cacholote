@@ -21,7 +21,7 @@ def get_grib_ds() -> xr.Dataset:
     pytest.importorskip("cfgrib")
     eccodes = pytest.importorskip("eccodes")
     filename = pathlib.Path(eccodes.codes_samples_path()) / "GRIB2.tmpl"
-    ds = xr.open_dataset(filename, engine="cfgrib")
+    ds = xr.open_dataset(filename, engine="cfgrib", decode_timedelta=False)
     del ds.attrs["history"]
     return ds
 
