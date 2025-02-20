@@ -246,6 +246,8 @@ def decode_xr_object(
                 **{protocol: fs.storage_options for protocol in protocols},
             ) as of:
                 filename_or_obj = of.name
+
+    kwargs.setdefault("decode_timedelta", False)
     if xr_type == "Dataset":
         return xr.open_dataset(filename_or_obj, **kwargs)
     return xr.open_dataarray(filename_or_obj, **kwargs)
