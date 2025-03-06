@@ -49,6 +49,8 @@ class CacheEntry(Base):
     counter = sa.Column(sa.Integer)
     tag = sa.Column(sa.String)
 
+    __table_args__ = (sa.Index("ix_cache_entries_key_expiration", "key", "expiration"),)
+
     @property
     def _result_as_string(self) -> str:
         return json.dumps(self.result)
