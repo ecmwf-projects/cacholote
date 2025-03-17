@@ -123,7 +123,7 @@ In case of database structure upgrade, developers must follow these steps:
 
 ### Instructions for moving between different database versions
 
-The package comes with its own 'broker-alembic-cli' script in order to move between different
+The package comes with its own 'cacholote-alembic-cli' script in order to move between different
 database versions. This script is a slight modified version of the 'alembic' script, overriding
 default config path used ([cacholote/alembic.ini](/cacholote/alembic.ini)) and the sqlalchemy.url used, that is
 automatically computed by the environment and not read from any ini file.
