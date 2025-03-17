@@ -1,7 +1,7 @@
 """Custom alembic CLI with new default config path + db url by environment."""
 
 import os
-from typing import Sequence
+from typing import Optional, Sequence
 
 from alembic.config import CommandLine, Config
 
@@ -13,7 +13,7 @@ alembic_ini_path = os.path.abspath(
 
 
 class MyCommandLine(CommandLine):
-    def main(self, argv: Sequence[str] | None = None) -> None:
+    def main(self, argv: Optional[Sequence[str]] = None) -> None:
         options = self.parser.parse_args(argv)
         if not hasattr(options, "cmd"):
             self.parser.error("too few arguments")
