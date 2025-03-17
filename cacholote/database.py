@@ -18,7 +18,6 @@ from __future__ import annotations
 import datetime
 import functools
 import json
-import os
 import warnings
 from typing import Any
 
@@ -28,7 +27,7 @@ import sqlalchemy as sa
 import sqlalchemy.orm
 import sqlalchemy_utils
 
-from . import utils
+from . import alembic_cli, utils
 
 _DATETIME_MAX = datetime.datetime(
     datetime.MAXYEAR, 12, 31, tzinfo=datetime.timezone.utc
@@ -142,37 +141,23 @@ def init_database(
     engine: Engine
     """
     engine = sa.create_engine(connection_string, **kwargs)
-    migration_directory = os.path.abspath(os.path.join(__file__, ".."))
-    with utils.change_working_dir(migration_directory):
-        alembic_config_path = os.path.join(migration_directory, "alembic.ini")
-        alembic_cfg = alembic.config.Config(alembic_config_path)
-        for option in [
-            "drivername",
-            "username",
-            "password",
-            "host",
-            "port",
-            "database",
-        ]:
-            value = getattr(engine.url, option)
-            if value is None:
-                value = ""
-            alembic_cfg.set_main_option(option, str(value))
-        if not sqlalchemy_utils.database_exists(engine.url):
-            sqlalchemy_utils.create_database(engine.url)
-            # cleanup and create the schema
-            Base.metadata.drop_all(engine)
-            Base.metadata.create_all(engine)
-            alembic.command.stamp(alembic_cfg, "head")
-        elif "cache_entries" not in sa.inspect(engine).get_table_names():
-            # db structure is empty or incomplete
-            force = True
-        if force:
-            # cleanup and create the schema
-            Base.metadata.drop_all(engine)
-            Base.metadata.create_all(engine)
-            alembic.command.stamp(alembic_cfg, "head")
-        else:
-            # update db structure
-            alembic.command.upgrade(alembic_cfg, "head")
+    alembic_cfg = alembic.config.Config(alembic_cli.alembic_ini_path)
+    alembic_cfg.set_main_option("sqlalchemy.url", connection_string.replace("%", "%%"))
+    if not sqlalchemy_utils.database_exists(engine.url):
+        sqlalchemy_utils.create_database(engine.url)
+        # cleanup and create the schema
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, "head")
+    elif "cache_entries" not in sa.inspect(engine).get_table_names():
+        # db structure is empty or incomplete
+        force = True
+    if force:
+        # cleanup and create the schema
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+        alembic.command.stamp(alembic_cfg, "head")
+    else:
+        # update db structure
+        alembic.command.upgrade(alembic_cfg, "head")
     return engine

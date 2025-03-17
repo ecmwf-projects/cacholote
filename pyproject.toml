@@ -31,6 +31,9 @@ license = {file = "LICENSE"}
 name = "cacholote"
 readme = "README.md"
 
+[project.scripts]
+cacholote-alembic-cli = "cacholote.alembic_cli:main"
+
 [tool.coverage.run]
 branch = true
 
