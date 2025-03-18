@@ -24,6 +24,7 @@ def run_migrations_offline() -> None:
         target_metadata=cacholote.database.Base.metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table="alembic_version_cacholote",
     )
     with alembic.context.begin_transaction():
         alembic.context.run_migrations()

@@ -135,13 +135,13 @@ link to its revision hash (variable 'revision', the prefix of the file name) and
 Some useful commands are listed below.
 
 - To migrate to the newest version, type:\
-  `alembic-cli upgrade head`
+  `cacholote-alembic-cli upgrade head`
 - To upgrade to a specific version hash, for example 8ccbe515155c, type:\
-  `alembic-cli upgrade 8ccbe515155c`
+  `cacholote-alembic-cli upgrade 8ccbe515155c`
 - To downgrade to a specific version hash, for example 8ccbe515155c, type:\
-  `alembic-cli downgrade 8ccbe515155c`
+  `cacholote-alembic-cli downgrade 8ccbe515155c`
 - To get the current version hash of the database, type:\
-  `alembic-cli current`
+  `cacholote-alembic-cli current`
 
 Database migration changes could be applied to the cacholote component of the database, too. In such case,
 migrate the cacholote component after the migration by the 'broker-alembic-cli' tool.
