@@ -58,6 +58,7 @@ class Settings(pydantic_settings.BaseSettings):
     cache_files_urlpath: str = _DEFAULT_CACHE_FILES_URLPATH
     cache_files_urlpath_readonly: Optional[str] = None
     cache_files_storage_options: dict[str, Any] = {}
+    cache_files_protocol: str | None = None
     xarray_cache_type: Literal[
         "application/netcdf", "application/x-grib", "application/vnd+zarr"
     ] = "application/netcdf"

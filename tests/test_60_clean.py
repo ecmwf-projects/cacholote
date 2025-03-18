@@ -202,6 +202,7 @@ def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
         clean.clean_cache_files(0, tags_to_clean=wrong_type)
 
 
+@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
@@ -357,6 +358,24 @@ def test_expire_cache_entries(
     assert cur.fetchone() == (n_entries,)
     assert count == 1
     assert now != cached_now()
+
+
+@pytest.mark.parametrize("set_cache", ["cads"], indirect=True)
+def test_expire_cache_entries_delete_files(tmp_path: pathlib.Path) -> None:
+    fs, dirname = utils.get_cache_files_fs_dirname()
+    assert not fs.ls(dirname)
+
+    tmp_file = tmp_path / "test.txt"
+    fsspec.filesystem("file").pipe_file(tmp_file, ONE_BYTE)
+    open_urls(tmp_file)
+    assert fs.ls(dirname)
+
+    with config.set(cache_files_urlpath=str(tmp_path)):
+        count = clean.expire_cache_entries(
+            before=TOMORROW, after=YESTERDAY, delete=True
+        )
+    assert count == 1
+    assert not fs.ls(dirname)
 
 
 def test_expire_cache_entries_created_at() -> None:

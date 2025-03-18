@@ -44,6 +44,7 @@ def get_cache_files_fs_dirname() -> tuple[fsspec.AbstractFileSystem, str]:
     fs, _, (path,) = fsspec.get_fs_token_paths(
         config.get().cache_files_urlpath,
         storage_options=config.get().cache_files_storage_options,
+        protocol=config.get().cache_files_protocol,
     )
     fs.invalidate_cache()
     return (fs, path)
