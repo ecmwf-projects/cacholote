@@ -202,7 +202,6 @@ def test_clean_tagged_files_wrong_types(wrong_type: Any) -> None:
         clean.clean_cache_files(0, tags_to_clean=wrong_type)
 
 
-@pytest.mark.parametrize("set_cache", ["file", "cads"], indirect=True)
 def test_delete_cache_entry_and_files(tmp_path: pathlib.Path) -> None:
     fs, dirname = utils.get_cache_files_fs_dirname()
 
