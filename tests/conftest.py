@@ -57,6 +57,7 @@ def set_cache(
             ),
             cache_files_urlpath=f"s3://{test_bucket_name}",
             cache_files_storage_options={"client_kwargs": client_kwargs},
+            cache_files_protocol="s3",
         ):
             yield "cads"
     elif param.lower() in ("file", "local"):
