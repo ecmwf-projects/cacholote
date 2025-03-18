@@ -23,8 +23,10 @@ class MyCommandLine(CommandLine):
             )
             url = os.getenv("CACHOLOTE_CACHE_DB_URLPATH")
             if not url:
-                raise ValueError("env variable CACHOLOTE_CACHE_DB_URLPATH not set. "
-                                 "Please set it to use this script.")
+                raise ValueError(
+                    "env variable CACHOLOTE_CACHE_DB_URLPATH not set. "
+                    "Please set it to use this script."
+                )
             # passwords with special chars are urlencoded, but '%' must be escaped in ini files
             url = url.replace("%", "%%")
             cfg.set_main_option("sqlalchemy.url", url)
