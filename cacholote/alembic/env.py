@@ -5,8 +5,6 @@ import sqlalchemy as sa
 
 import cacholote
 
-config = alembic.context.config
-
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -20,16 +18,13 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url_props = dict()
-    for prop in ["drivername", "username", "password", "host", "port", "database"]:
-        url_props[prop] = config.get_main_option(prop)
-    url_props["port"] = url_props["port"] and int(url_props["port"]) or None  # type: ignore
-    url = sa.engine.URL.create(**url_props)  # type: ignore
+    url = alembic.context.config.get_main_option("sqlalchemy.url")
     alembic.context.configure(
         url=url,
         target_metadata=cacholote.database.Base.metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        version_table="alembic_version_cacholote",
     )
     with alembic.context.begin_transaction():
         alembic.context.run_migrations()
@@ -42,12 +37,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    url_props = dict()
-    for prop in ["drivername", "username", "password", "host", "port", "database"]:
-        url_props[prop] = config.get_main_option(prop)
-    url_props["port"] = url_props["port"] and int(url_props["port"]) or None  # type: ignore
-    url = sa.engine.URL.create(**url_props)  # type: ignore
-    engine = sa.create_engine(url, poolclass=sa.pool.NullPool)
+    url = alembic.context.config.get_main_option("sqlalchemy.url")
+    engine = sa.create_engine(url, poolclass=sa.pool.NullPool)  # type: ignore
     with engine.connect() as connection:
         alembic.context.configure(
             connection=connection,

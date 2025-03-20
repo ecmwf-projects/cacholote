@@ -104,7 +104,7 @@ Before pushing to GitHub, run the following commands:
 1. Run the static type checker: `make type-check`
 1. Build the documentation (see [Sphinx tutorial](https://www.sphinx-doc.org/en/master/tutorial/)): `make docs-build`
 
-### Instructions for database updating
+### Instructions for creating a new database version
 
 In case of database structure upgrade, developers must follow these steps:
 
@@ -120,6 +120,34 @@ In case of database structure upgrade, developers must follow these steps:
    use https://alembic.sqlalchemy.org/en/latest/ops.html#ops.
    Similarly, do the same with the `downgrade` function.
 1. Commit and push the modifications and the new file.
+
+### Instructions for moving between different database versions
+
+The package comes with its own 'cacholote-alembic-cli' script in order to move between different
+database versions. This script is a slight modified version of the 'alembic' script, overriding
+default config path used ([cacholote/alembic.ini](/cacholote/alembic.ini)) and the sqlalchemy.url used, that is
+automatically computed by the environment and not read from any ini file.
+
+All the database releases where you can migrate up and down must be defined by files contained inside
+the folder [/cacholote/alembic/versions](/cacholote/alembic/versions). All these files are in a version queue: each file has
+link to its revision hash (variable 'revision', the prefix of the file name) and to the next older one
+(variable 'down_revision'), and contains code to step up and down that database version.\
+Some useful commands are listed below.
+
+- To migrate to the newest version, type:\
+  `cacholote-alembic-cli upgrade head`
+- To upgrade to a specific version hash, for example 8ccbe515155c, type:\
+  `cacholote-alembic-cli upgrade 8ccbe515155c`
+- To downgrade to a specific version hash, for example 8ccbe515155c, type:\
+  `cacholote-alembic-cli downgrade 8ccbe515155c`
+- To get the current version hash of the database, type:\
+  `cacholote-alembic-cli current`
+
+Database migration changes could be applied to the cacholote component of the database, too. In such case,
+migrate the cacholote component after the migration by the 'broker-alembic-cli' tool.
+
+Other details are the same of the standard alembic migration tool,
+see the [Alembic tutorial](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
 
 For details about the alembic migration tool, see the [Alembic tutorial](https://alembic.sqlalchemy.org/en/latest/tutorial.html).
 
