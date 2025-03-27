@@ -134,7 +134,7 @@ class _Cleaner:
 
         self.logger.info("getting disk usage")
         self.file_sizes: dict[str, int] = collections.defaultdict(int)
-        du = self.known_files if use_database else self.fs.du(self.dirname, total=False)
+        du = self.known_files if use_database else self.robust_du
         for path, size in du.items():
             # Group dirs
             urlpath = self.fs.unstrip_protocol(path)
@@ -143,6 +143,19 @@ class _Cleaner:
                 self.file_sizes[posixpath.join(self.urldir, *parts[:depth])] += size
         self.disk_usage = sum(self.file_sizes.values())
         self.log_disk_usage()
+
+    @property
+    def robust_du(self) -> dict[str, int]:
+        sizes = {}
+        for root, _, files in self.fs.walk(self.dirname):
+            for file in files:
+                file_path = "/".join([root, file])
+                try:
+                    sizes[file_path] = self.fs.du(file_path)
+                except Exception:
+                    self.logger.exception("disk usage failed")
+                    continue
+        return sizes
 
     def pop_file_size(self, file: str) -> int:
         size = self.file_sizes.pop(file, 0)
