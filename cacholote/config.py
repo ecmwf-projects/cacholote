@@ -143,11 +143,13 @@ class set:
         sqlalchemy.sessionamaker, mutually exclusive with cache_db_urlpath and create_engine_kwargs
     cache_files_urlpath: str, default:"/system_tmp_dir/cacholote/cache_files"
         URL for cache files (protocol://location).
-    cache_files_storage_options: dict, default: {}
-        ``fsspec`` storage options for storing cache files.
     cache_files_urlpath_readonly: str, None, default: None
         URL for cache files accessible in read-only mode.
         None: same as ``cache_files_urlpath``
+    cache_files_storage_options: dict, default: {}
+        ``fsspec`` storage options for storing cache files.
+    cache_files_protocol: str, None, default: None
+        To override the protocol specifier in `cache_files_urlpath`.
     xarray_cache_type: {"application/netcdf", "application/x-grib", "application/vnd+zarr"}, \
         default: "application/netcdf"
         Type for ``xarray`` cache files.
@@ -162,6 +164,8 @@ class set:
         Note that existing tags are overwritten.
     return_cache_entry: bool, default: False
         Whether to return the cache database entry rather than decoded results.
+    logger: structlog.BoundLogger
+        Logger to use.
     lock_timeout: float, optional, default: None
         Time to wait before raising an error if a cache file is locked.
     context: Context, optional, default: None
