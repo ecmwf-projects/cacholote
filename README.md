@@ -12,13 +12,16 @@ Efficiently cache calls to functions
 >>> @cacholote.cacheable
 ... def now():
 ...     import datetime
+...
 ...     return datetime.datetime.now()
+...
 
 >>> now() == now()
 True
 
 >>> with cacholote.config.set(use_cache=False):
 ...     now() == now()
+...
 False
 
 ```
@@ -66,6 +69,7 @@ True
 >>> @cacholote.cacheable
 ... def dataset_from_dict(ds_dict):
 ...     return xr.Dataset(ds_dict)
+...
 
 >>> ds = dataset_from_dict({"foo": 0})
 >>> ds

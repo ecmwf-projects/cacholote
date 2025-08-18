@@ -22,7 +22,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: actions/setup-python@v5
       with:
         python-version: 3.x
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: actions/setup-python@v5
       with:
         python-version: 3.x
@@ -55,11 +55,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.11', '3.13']
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -87,8 +87,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -116,8 +116,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -157,8 +157,8 @@ jobs:
           extra: -integration
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -192,7 +192,7 @@ jobs:
       (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
@@ -230,7 +230,7 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publish
 
     steps:
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v5
       with:
         name: distribution
         path: dist
