@@ -12,13 +12,16 @@ Efficiently cache calls to functions
 >>> @cacholote.cacheable
 ... def now():
 ...     import datetime
+...
 ...     return datetime.datetime.now()
+...
 
 >>> now() == now()
 True
 
 >>> with cacholote.config.set(use_cache=False):
 ...     now() == now()
+...
 False
 
 ```
@@ -66,6 +69,7 @@ True
 >>> @cacholote.cacheable
 ... def dataset_from_dict(ds_dict):
 ...     return xr.Dataset(ds_dict)
+...
 
 >>> ds = dataset_from_dict({"foo": 0})
 >>> ds
@@ -87,10 +91,10 @@ Defaults are controlled by environment variables and dotenv files. See `help(cac
 
 ## Workflow for developers/contributors
 
-For best experience create a new conda environment (e.g. DEVELOP) with Python 3.11:
+For best experience create a new conda environment (e.g. DEVELOP) with Python 3.12:
 
 ```
-conda create -n DEVELOP -c conda-forge python=3.11
+conda create -n DEVELOP -c conda-forge python=3.12
 conda activate DEVELOP
 ```
 

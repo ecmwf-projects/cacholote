@@ -22,7 +22,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: actions/setup-python@v5
       with:
         python-version: 3.x
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: actions/setup-python@v5
       with:
         python-version: 3.x
@@ -55,11 +55,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11']
+        python-version: ['3.11', '3.12']
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -87,8 +87,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -103,7 +103,7 @@ jobs:
         cache-environment-key: environment-${{ steps.date.outputs.date }}
         cache-downloads-key: downloads-${{ steps.date.outputs.date }}
         create-args: >-
-          python=3.11
+          python=3.12
     - name: Install package
       run: |
         python -m pip install --no-deps -e .
@@ -116,8 +116,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -132,7 +132,7 @@ jobs:
         cache-environment-key: environment-${{ steps.date.outputs.date }}
         cache-downloads-key: downloads-${{ steps.date.outputs.date }}
         create-args: >-
-          python=3.11
+          python=3.12
     - name: Install package
       run: |
         python -m pip install --no-deps -e .
@@ -151,14 +151,14 @@ jobs:
         include:
         - python-version: '3.9'
           extra: -ci
-        - python-version: '3.12'
+        - python-version: '3.13'
           extra: -ci
-        - python-version: '3.11'
+        - python-version: '3.12'
           extra: -integration
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: actions/download-artifact@v4
+    - uses: actions/checkout@v5
+    - uses: actions/download-artifact@v5
       with:
         name: combined-environments
         path: ci
@@ -192,10 +192,10 @@ jobs:
       (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.11'
+        python-version: '3.12'
     - name: Install package
       run: |
         python -m pip install --upgrade pip
@@ -230,7 +230,7 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publish
 
     steps:
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v5
       with:
         name: distribution
         path: dist
