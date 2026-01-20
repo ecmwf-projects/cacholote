@@ -93,7 +93,7 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
-    config.set(xarray_cache_type=xarray_cache_type)
+    config.set(raise_all_encoding_errors=True, xarray_cache_type=xarray_cache_type)
 
     # cache-db to check
     con = config.get().engine.raw_connection()
