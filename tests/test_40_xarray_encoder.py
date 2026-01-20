@@ -165,7 +165,7 @@ def test_xr_corrupted_files(
 
 
 def test_xr_logging(log: pytest_structlog.StructuredLogCapture) -> None:
-    config.set(logger=structlog.get_logger(), raise_all_encoding_errors=True)
+    config.set(logger=structlog.get_logger())
 
     # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)
