@@ -93,7 +93,7 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
-    config.set(raise_all_encoding_errors=True, xarray_cache_type=xarray_cache_type)
+    config.set(xarray_cache_type=xarray_cache_type)
 
     # cache-db to check
     con = config.get().engine.raw_connection()
@@ -165,7 +165,7 @@ def test_xr_corrupted_files(
 
 
 def test_xr_logging(log: pytest_structlog.StructuredLogCapture) -> None:
-    config.set(logger=structlog.get_logger())
+    config.set(logger=structlog.get_logger(), raise_all_encoding_errors=True)
 
     # Cache dataset
     cfunc = cache.cacheable(get_grib_ds)
