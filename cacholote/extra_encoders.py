@@ -374,7 +374,7 @@ def _store_file_object(
                 with fs_out.open(urlpath_out, "wb") as f_out:
                     utils.copy_buffered_file(f_in, f_out)
 
-    if mode := config.get().io_chmod:
+    if (mode := config.get().io_chmod) is not None:
         fs_out.chmod(urlpath_out, mode)
 
     if io_delete_original and fs_in.exists(urlpath_in):
