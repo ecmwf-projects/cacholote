@@ -188,13 +188,13 @@ def test_xr_logging(log: pytest_structlog.StructuredLogCapture) -> None:
         },
         {
             "urlpath": urlpath,
-            "size": 22597,
+            "size": 22645,
             "event": "start upload",
             "level": "info",
         },
         {
             "urlpath": urlpath,
-            "size": 22597,
+            "size": 22645,
             "upload_time": log.events[3]["upload_time"],
             "event": "end upload",
             "level": "info",
