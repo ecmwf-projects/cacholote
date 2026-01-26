@@ -249,3 +249,28 @@ def test_io_in_place_file(tmp_path: pathlib.Path) -> None:
     output = cached_in_place_open(str(tmpfile))
     assert isinstance(output, fsspec.implementations.local.LocalFileOpener)
     assert output.name == str(tmpfile)
+
+
+@pytest.mark.parametrize(
+    "io_chmod,expected",
+    [
+        (None, 0o100644),
+        (0o100600, 0o100600),
+        ("100600", 0o100600),
+        ("600", 0o100600),
+    ],
+)
+def test_chmod(
+    tmp_path: pathlib.Path,
+    io_chmod: int | None,
+    expected: int,
+) -> None:
+    fs, _ = utils.get_cache_files_fs_dirname()
+
+    # Cache file
+    filename = tmp_path / "test.txt"
+    fsspec.filesystem("file").pipe_file(filename, b"test")
+    with config.set(raise_all_encoding_errors=True, io_chmod=io_chmod):
+        cached_file = cached_open(filename)
+
+    assert fs.info(cached_file)["mode"] == expected

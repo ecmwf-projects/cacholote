@@ -63,6 +63,7 @@ class Settings(pydantic_settings.BaseSettings):
         "application/netcdf", "application/x-grib", "application/vnd+zarr"
     ] = "application/netcdf"
     io_delete_original: bool = False
+    io_chmod: Optional[int | str] = None
     raise_all_encoding_errors: bool = False
     expiration: Optional[datetime.datetime] = None
     tag: Optional[str] = None
@@ -81,6 +82,17 @@ class Settings(pydantic_settings.BaseSettings):
         if isinstance(poolclass, str):
             create_engine_kwargs["poolclass"] = getattr(sa.pool, poolclass)
         return create_engine_kwargs
+
+    @pydantic.field_validator("io_chmod")
+    def validate_io_chmod(
+        cls: pydantic_settings.BaseSettings, io_chmod: Optional[int]
+    ) -> Optional[int]:
+        if isinstance(io_chmod, str):
+            try:
+                return int(io_chmod, 8)
+            except ValueError:
+                pass
+        return io_chmod
 
     @pydantic.field_validator("expiration")
     def validate_expiration(
