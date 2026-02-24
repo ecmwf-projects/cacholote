@@ -69,6 +69,10 @@ _UNION_IO_TYPES = Union[
 ]
 
 
+fsspec.register_implementation("cci1", fsspec.implementations.local.LocalFileSystem)
+fsspec.register_implementation("cci2", fsspec.implementations.local.LocalFileSystem)
+
+
 def _add_ext_to_mimetypes() -> None:
     """Add netcdf, grib, and zarr to mimetypes."""
     mimetypes.add_type("application/netcdf", ".nc", strict=True)
