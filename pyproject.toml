@@ -32,10 +32,6 @@ license = {file = "LICENSE"}
 name = "cacholote"
 readme = "README.md"
 
-[project.entry-points."fsspec.specs"]
-cci1 = "fsspec.implementations.local:LocalFileSystem"
-cci2 = "fsspec.implementations.local:LocalFileSystem"
-
 [project.scripts]
 cacholote-alembic-cli = "cacholote.alembic_cli:main"
 
