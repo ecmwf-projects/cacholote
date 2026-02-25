@@ -364,7 +364,10 @@ def _store_file_object(
         urlpath=fs_out.unstrip_protocol(urlpath_out),
         size=fs_in.size(urlpath_in),
     ):
-        if fs_in == fs_out or ("file" in fs_in.protocol and "file" in fs_out.protocol):
+        if fs_in == fs_out or (
+            isinstance(fs_in, fsspec.implementations.local.LocalFileSystem)
+            and isinstance(fs_out, fsspec.implementations.local.LocalFileSystem)
+        ):
             func = fs_in.mv if io_delete_original else fs_in.cp
             func(urlpath_in, urlpath_out, **kwargs)
         elif "file" in fs_in.protocol:
