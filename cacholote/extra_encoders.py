@@ -369,7 +369,9 @@ def _store_file_object(
             and isinstance(fs_out, fsspec.implementations.local.LocalFileSystem)
         ):
             func = fs_in.mv if io_delete_original else fs_in.cp
-            func(urlpath_in, urlpath_out, **kwargs)
+            target = fs_out.unstrip_protocol(urlpath_out)
+            _, _, (target,) = fsspec.get_fs_token_paths(target)
+            func(urlpath_in, target, **kwargs)
         elif "file" in fs_in.protocol:
             fs_out.put(urlpath_in, urlpath_out, **kwargs)
         else:
