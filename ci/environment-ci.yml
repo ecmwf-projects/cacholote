@@ -30,7 +30,7 @@ dependencies:
 - sqlalchemy[mypy]
 - types-requests
 - xarray>=2022.6.0
-- zarr<3.0.0
+- zarr
 - pip:
   - pytest-structlog
   - types-sqlalchemy-utils
