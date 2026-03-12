@@ -55,7 +55,7 @@ def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
                 "type": "application/netcdf",
                 "href": href,
                 "file:checksum": f"{fsspec.filesystem('file').checksum(local_path):x}",
-                "file:size": 669,
+                "file:size": 670,
                 "file:local_path": local_path,
             },
             {},
@@ -93,7 +93,7 @@ def test_xr_cacheable(
 ) -> None:
     pytest.importorskip(importorskip)
 
-    config.set(xarray_cache_type=xarray_cache_type)
+    config.set(xarray_cache_type=xarray_cache_type, raise_all_encoding_errors=True)
 
     # cache-db to check
     con = config.get().engine.raw_connection()
@@ -188,13 +188,13 @@ def test_xr_logging(log: pytest_structlog.StructuredLogCapture) -> None:
         },
         {
             "urlpath": urlpath,
-            "size": 22645,
+            "size": 22646,
             "event": "start upload",
             "level": "info",
         },
         {
             "urlpath": urlpath,
-            "size": 22645,
+            "size": 22646,
             "upload_time": log.events[3]["upload_time"],
             "event": "end upload",
             "level": "info",
