@@ -34,7 +34,8 @@ def _decode_and_update(
     cache_entry: Any,
     settings: config.Settings,
 ) -> Any:
-    result = decode.loads(cache_entry._result_as_string)
+    if not settings.return_cache_entry:
+        result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter = (cache_entry.counter or 0) + 1
     if settings.tag is not None:
         cache_entry.tag = settings.tag
