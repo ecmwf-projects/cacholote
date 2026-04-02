@@ -149,10 +149,10 @@ jobs:
     strategy:
       matrix:
         include:
-        - python-version: '3.10'
-          extra: -ci
         - python-version: '3.13'
           extra: -ci
+        - python-version: '3.11'
+          extra: -integration
         - python-version: '3.12'
           extra: -integration
 
