@@ -44,7 +44,7 @@ jobs:
         for SUFFIX in ci integration; do
         conda-merge ci/environment-$SUFFIX.yml environment.yml > ci/combined-environment-$SUFFIX.yml || exit
         done
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: combined-environments
         path: ci/combined-environment-*.yml
@@ -59,14 +59,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/download-artifact@v7
+    - uses: actions/download-artifact@v8
       with:
         name: combined-environments
         path: ci
     - name: Get current date
       id: date
       run: echo "date=$(date +%Y-%m-%d)" >> "${GITHUB_OUTPUT}"
-    - uses: mamba-org/setup-micromamba@v2
+    - uses: mamba-org/setup-micromamba@v3
       with:
         environment-file: ci/combined-environment-ci.yml
         environment-name: DEVELOP
@@ -88,14 +88,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/download-artifact@v7
+    - uses: actions/download-artifact@v8
       with:
         name: combined-environments
         path: ci
     - name: Get current date
       id: date
       run: echo "date=$(date +%Y-%m-%d)" >> "${GITHUB_OUTPUT}"
-    - uses: mamba-org/setup-micromamba@v2
+    - uses: mamba-org/setup-micromamba@v3
       with:
         environment-file: ci/combined-environment-ci.yml
         environment-name: DEVELOP
@@ -117,14 +117,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/download-artifact@v7
+    - uses: actions/download-artifact@v8
       with:
         name: combined-environments
         path: ci
     - name: Get current date
       id: date
       run: echo "date=$(date +%Y-%m-%d)" >> "${GITHUB_OUTPUT}"
-    - uses: mamba-org/setup-micromamba@v2
+    - uses: mamba-org/setup-micromamba@v3
       with:
         environment-file: ci/combined-environment-ci.yml
         environment-name: DEVELOP
@@ -158,14 +158,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/download-artifact@v7
+    - uses: actions/download-artifact@v8
       with:
         name: combined-environments
         path: ci
     - name: Get current date
       id: date
       run: echo "date=$(date +%Y-%m-%d)" >> "${GITHUB_OUTPUT}"
-    - uses: mamba-org/setup-micromamba@v2
+    - uses: mamba-org/setup-micromamba@v3
       with:
         environment-file: ci/combined-environment${{ matrix.extra }}.yml
         environment-name: DEVELOP${{ matrix.extra }}
@@ -210,7 +210,7 @@ jobs:
         python -m twine check --strict * || exit
         python -c "import cacholote" || exit
         cd ..
-    - uses: actions/upload-artifact@v6
+    - uses: actions/upload-artifact@v7
       with:
         name: distribution
         path: dist
@@ -230,7 +230,7 @@ jobs:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publish
 
     steps:
-    - uses: actions/download-artifact@v7
+    - uses: actions/download-artifact@v8
       with:
         name: distribution
         path: dist
