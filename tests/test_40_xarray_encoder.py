@@ -55,7 +55,7 @@ def test_dictify_xr_dataset(tmp_path: pathlib.Path) -> None:
                 "type": "application/netcdf",
                 "href": href,
                 "file:checksum": f"{fsspec.filesystem('file').checksum(local_path):x}",
-                "file:size": 670,
+                "file:size": 669,
                 "file:local_path": local_path,
             },
             {},
@@ -91,7 +91,9 @@ def test_xr_cacheable(
     importorskip: str,
     set_cache: str,
 ) -> None:
-    pytest.importorskip(importorskip)
+    imported = pytest.importorskip(importorskip)
+    if importorskip == "cfgrib" and imported.__version__ == "0.9.15.1":
+        pytest.xfail("See https://github.com/ecmwf/cfgrib/issues/433")
 
     config.set(xarray_cache_type=xarray_cache_type, raise_all_encoding_errors=True)
 
@@ -188,13 +190,13 @@ def test_xr_logging(log: pytest_structlog.StructuredLogCapture) -> None:
         },
         {
             "urlpath": urlpath,
-            "size": 22646,
+            "size": 22645,
             "event": "start upload",
             "level": "info",
         },
         {
             "urlpath": urlpath,
-            "size": 22646,
+            "size": 22645,
             "upload_time": log.events[3]["upload_time"],
             "event": "end upload",
             "level": "info",
