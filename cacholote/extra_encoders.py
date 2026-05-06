@@ -282,12 +282,16 @@ def _store_xr_object(
     filetype: str,
 ) -> None:
     if filetype == "application/vnd+zarr":
-        urlpath = fs.unstrip_protocol(urlpath)
-        storage_options = fs.storage_options
         if isinstance(fs, fsspec.implementations.local.LocalFileSystem):
-            storage_options = storage_options | {"auto_mkdir": True}
+            from zarr.storage import LocalStore
+
+            store = LocalStore(urlpath)
+            storage_options = None
+        else:
+            store = fs.unstrip_protocol(urlpath)
+            storage_options = fs.storage_options
         with _logging_timer("upload", urlpath=urlpath):
-            obj.to_zarr(urlpath, storage_options=storage_options)
+            obj.to_zarr(store, storage_options=storage_options)
         return
 
     # Need a tmp local copy to write on a different filesystem
