@@ -73,6 +73,7 @@ class Settings(pydantic_settings.BaseSettings):
     )
     lock_timeout: Optional[float] = None
     context: Optional[Context] = None
+    compute: bool = True
 
     @pydantic.field_validator("create_engine_kwargs")
     def validate_create_engine_kwargs(
@@ -109,6 +110,14 @@ class Settings(pydantic_settings.BaseSettings):
             storage_options=self.cache_files_storage_options,
         )
         fs.mkdirs(urlpath, exist_ok=True)
+        return self
+
+    @pydantic.model_validator(mode="after")
+    def check_compute_and_use_cache(self) -> Settings:
+        if not self.use_cache and not self.compute:
+            raise ValueError(
+                "Invalid configuration: 'use_cache' and 'compute' cannot both be False."
+            )
         return self
 
     @property
@@ -182,6 +191,8 @@ class set:
         Time to wait before raising an error if a cache file is locked.
     context: Context, optional, default: None
         CADS context for internal use.
+    compute: bool, default: True
+        Enables computation when a cached result cannot be found.
     """
 
     def __init__(self, **kwargs: Any):

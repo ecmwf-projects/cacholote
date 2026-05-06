@@ -29,6 +29,10 @@ from . import clean, config, database, decode, encode, utils
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+class NoCacheEntry(Exception):
+    pass
+
+
 def _decode_and_update(
     session: sa.orm.Session,
     cache_entry: Any,
@@ -66,7 +70,11 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         settings = config.get()
 
-        if not settings.use_cache and not settings.return_cache_entry:
+        if (
+            not settings.use_cache
+            and not settings.return_cache_entry
+            and settings.compute
+        ):
             return func(*args, **kwargs)
 
         try:
@@ -74,7 +82,7 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
                 func, *args, cache_kwargs=cache_kwargs, **kwargs
             )
         except encode.EncodeError as ex:
-            if settings.return_cache_entry:
+            if settings.return_cache_entry or not settings.compute:
                 raise ex
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)
@@ -99,6 +107,9 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
                     except decode.DecodeError as ex:
                         warnings.warn(str(ex), UserWarning)
                         clean._delete_cache_entries(session, cache_entry)
+
+        if not settings.compute:
+            raise NoCacheEntry(f"No cache entry for key: {hexdigest}")
 
         result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(
