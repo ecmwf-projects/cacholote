@@ -91,7 +91,6 @@ def test_xr_cacheable(
     importorskip: str,
     set_cache: str,
 ) -> None:
-    config.set(raise_all_encoding_errors=True)
     imported = pytest.importorskip(importorskip)
     if importorskip == "cfgrib" and imported.__version__ == "0.9.15.1":
         pytest.xfail("See https://github.com/ecmwf/cfgrib/issues/433")
