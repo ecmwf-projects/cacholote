@@ -283,9 +283,7 @@ def _store_xr_object(
 ) -> None:
     if filetype == "application/vnd+zarr":
         urlpath = fs.unstrip_protocol(urlpath)
-        storage_options = fs.storage_options
-        if isinstance(fs, fsspec.implementations.local.LocalFileSystem):
-            storage_options = storage_options | {"auto_mkdir": True}
+        storage_options = fs.storage_options or None
         with _logging_timer("upload", urlpath=urlpath):
             obj.to_zarr(urlpath, storage_options=storage_options)
         return
