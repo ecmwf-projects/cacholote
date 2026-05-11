@@ -241,3 +241,23 @@ def test_cache_entry_repr() -> None:
         "tag=None"
         ")"
     )
+
+
+def test_compute() -> None:
+    cache_now_no_compute = cache.cacheable_no_compute(cached_now)
+    with pytest.raises(ValueError, match="Invalid configuration"):
+        with config.set(use_cache=False):
+            cache_now_no_compute()
+
+    with pytest.raises(cache.NoCacheEntry):
+        cache_now_no_compute()
+
+    now = cached_now()
+    cache_entry = cache_now_no_compute()
+    assert isinstance(cache_entry, database.CacheEntry)
+    assert cache_entry.counter == 2
+    assert cache_entry.result == {
+        "type": "python_call",
+        "callable": "datetime:datetime.fromisoformat",
+        "args": [now.isoformat()],
+    }

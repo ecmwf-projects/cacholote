@@ -29,30 +29,41 @@ from . import clean, config, database, decode, encode, utils
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+class NoCacheEntry(Exception):
+    pass
+
+
 def _decode_and_update(
     session: sa.orm.Session,
     cache_entry: Any,
-    settings: config.Settings,
+    return_cache_entry: bool,
+    tag: str | None,
 ) -> Any:
-    if not settings.return_cache_entry:
+    if not return_cache_entry:
         result = decode.loads(cache_entry._result_as_string)
     cache_entry.counter = (cache_entry.counter or 0) + 1
-    if settings.tag is not None:
-        cache_entry.tag = settings.tag
+    if tag is not None:
+        cache_entry.tag = tag
     database._commit_or_rollback(session)
-    if settings.return_cache_entry:
+    if return_cache_entry:
         session.refresh(cache_entry)
         return cache_entry
     return result
 
 
-def cacheable(func: F, **cache_kwargs: Any) -> F:
+def cacheable(
+    func: F,
+    compute: bool = True,
+    **cache_kwargs: Any,
+) -> F:
     """Make a function cacheable.
 
     Parameters
     ----------
     func: callable
         Function to cache
+    compute: bool
+        Enables computation when a cached result cannot be found
     **cache_kwargs: Any
         Additional kwargs to use for hashing
 
@@ -66,7 +77,14 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         settings = config.get()
 
-        if not settings.use_cache and not settings.return_cache_entry:
+        return_cache_entry = True if compute is False else settings.return_cache_entry
+
+        if not settings.use_cache and not compute:
+            raise ValueError(
+                "Invalid configuration: 'use_cache' and 'compute' cannot both be False."
+            )
+
+        if compute and not settings.use_cache and not return_cache_entry:
             return func(*args, **kwargs)
 
         try:
@@ -74,7 +92,7 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
                 func, *args, cache_kwargs=cache_kwargs, **kwargs
             )
         except encode.EncodeError as ex:
-            if settings.return_cache_entry:
+            if not compute or return_cache_entry:
                 raise ex
             warnings.warn(f"can NOT encode python call: {ex!r}", UserWarning)
             return func(*args, **kwargs)
@@ -95,10 +113,18 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
                     .order_by(database.CacheEntry.updated_at.desc())
                 ):
                     try:
-                        return _decode_and_update(session, cache_entry, settings)
+                        return _decode_and_update(
+                            session,
+                            cache_entry,
+                            return_cache_entry,
+                            settings.tag,
+                        )
                     except decode.DecodeError as ex:
                         warnings.warn(str(ex), UserWarning)
                         clean._delete_cache_entries(session, cache_entry)
+
+        if not compute:
+            raise NoCacheEntry(f"No cache entry for key: {hexdigest}")
 
         result = func(*args, **kwargs)
         cache_entry = database.CacheEntry(
@@ -109,13 +135,22 @@ def cacheable(func: F, **cache_kwargs: Any) -> F:
         try:
             cache_entry.result = json.loads(encode.dumps(result))
         except encode.EncodeError as ex:
-            if settings.return_cache_entry:
+            if return_cache_entry:
                 raise ex
             warnings.warn(f"can NOT encode output: {ex!r}", UserWarning)
             return result
 
         with settings.instantiated_sessionmaker() as session:
             session.add(cache_entry)
-            return _decode_and_update(session, cache_entry, settings)
+            return _decode_and_update(
+                session, cache_entry, settings.return_cache_entry, settings.tag
+            )
 
     return cast(F, wrapper)
+
+
+def cacheable_no_compute(
+    func: F, **cache_kwargs: Any
+) -> Callable[..., database.CacheEntry]:
+    result = cacheable(func, compute=False, **cache_kwargs)
+    return result
