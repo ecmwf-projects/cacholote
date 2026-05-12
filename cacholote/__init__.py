@@ -16,7 +16,7 @@
 # limitations under the License.
 
 from . import config, database, extra_encoders, utils
-from .cache import cacheable
+from .cache import NoCacheEntry, cacheable
 from .clean import (
     clean_cache_files,
     clean_invalid_cache_entries,
@@ -51,4 +51,5 @@ __all__ = [
     "init_database",
     "loads",
     "utils",
+    "NoCacheEntry",
 ]

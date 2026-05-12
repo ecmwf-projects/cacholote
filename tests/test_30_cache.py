@@ -241,3 +241,17 @@ def test_cache_entry_repr() -> None:
         "tag=None"
         ")"
     )
+
+
+def test_compute() -> None:
+    with pytest.raises(ValueError, match="Invalid configuration"):
+        config.set(use_cache=False, compute=False)
+
+    with config.set(compute=False):
+        with pytest.raises(cache.NoCacheEntry):
+            cached_now()
+
+    first = cached_now()
+    with config.set(compute=False):
+        second = cached_now()
+    assert first == second
